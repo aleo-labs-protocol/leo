@@ -410,6 +410,7 @@ impl Compiler {
         // produced ErrExpression nodes in the AST, which would cause panics in later passes.
         self.state.handler.last_err()?;
 
+        self.state.legacy_interface_structs.clear();
         self.do_pass_with_check::<NameValidation, _>((), &mut should_continue)?;
         self.do_pass_with_check::<GlobalVarsCollection, _>((), &mut should_continue)?;
         self.do_pass_with_check::<PathResolution, _>((), &mut should_continue)?;

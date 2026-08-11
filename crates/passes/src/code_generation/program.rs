@@ -79,7 +79,18 @@ impl<'a> CodeGeneratingVisitor<'a> {
         // Add each `struct` or `record` in the post-ordering and produce an Aleo struct or record.
         let data_types = order
             .into_iter()
-            .filter_map(|loc| lookup(&loc).map(|composite| self.visit_struct_or_record(composite, &loc)))
+            .filter_map(|loc| {
+                // Preserve previously emitted template names when their original fields have Aleo types.
+                // Dependencies come first, so a field can refer only to a template we could also emit.
+                lookup(&loc)
+                    .filter(|c| {
+                        c.const_parameters.is_empty()
+                            || c.members
+                                .iter()
+                                .all(|m| m.type_.kind().is_empty() || self.has_concrete_layout(m.type_.kind()))
+                    })
+                    .map(|composite| self.visit_struct_or_record(composite, &loc))
+            })
             .collect();
 
         // Visit each mapping in the Leo AST and produce an Aleo mapping declaration.
@@ -138,6 +149,30 @@ impl<'a> CodeGeneratingVisitor<'a> {
         let constructor = program_scope.constructor.as_ref().map(|c| self.visit_constructor(c));
 
         AleoProgram { imports, program_id, data_types, mappings, functions, constructor }
+    }
+
+    fn has_concrete_layout(&self, ty: &TypeKind) -> bool {
+        match ty {
+            TypeKind::Array(array) => array.length.as_u32().is_some() && self.has_concrete_layout(array.element_type()),
+            TypeKind::Composite(composite) => {
+                let location = composite.path.expect_global_location();
+                self.composite_mapping.contains_key(location)
+                    || (Some(location.program) != self.program_id.map(|id| id.as_symbol())
+                        && !self.state.symbol_table.is_library(location.program))
+            }
+            TypeKind::Address
+            | TypeKind::Boolean
+            | TypeKind::Field
+            | TypeKind::Group
+            | TypeKind::Scalar
+            | TypeKind::Signature
+            | TypeKind::String
+            | TypeKind::Identifier
+            | TypeKind::DynRecord
+            | TypeKind::Integer(_)
+            | TypeKind::Ident(_) => true,
+            _ => false,
+        }
     }
 
     fn visit_struct_or_record(&mut self, composite: &'a Composite, loc: &Location) -> AleoDatatype {

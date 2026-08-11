@@ -80,11 +80,20 @@ impl AstReconstructor for MonomorphizationVisitor<'_> {
             return (TypeKind::Composite(input), Default::default());
         };
 
+        // Only the type written in the prototype used the template name in older bytecode.
+        // Types discovered while specializing its fields follow the normal dependency graph.
+        let in_library_root_interface = std::mem::take(&mut self.in_library_root_interface);
+        if in_library_root_interface {
+            self.legacy_interface_structs.insert(input.path.expect_global_location().clone());
+        }
+        let path = self.monomorphize_composite(&input.path, &evaluated_const_args);
+        self.in_library_root_interface = in_library_root_interface;
+
         // At this stage, we know that we're going to modify the program
         self.changed = true;
         (
             TypeKind::Composite(CompositeType {
-                path: self.monomorphize_composite(&input.path, &evaluated_const_args),
+                path,
                 const_arguments: vec![], // remove const arguments
             }),
             Default::default(),

@@ -1,0 +1,57 @@
+program consumer.aleo;
+
+struct Slot__E5tgmziTR6y:
+    amount as u32;
+
+record Token:
+    owner as address.private;
+    slot as Slot__E5tgmziTR6y.private;
+    padding as [u8; 4u32].private;
+
+struct Array__Bry8D6lySMW:
+    values as [u8; 5u32];
+
+struct Boxed__C9XlnD6VR9Q:
+    data as [u8; 3u32];
+
+struct Outer__LNZLLWSZbA1:
+    item as Boxed__C9XlnD6VR9Q;
+
+struct Legacy__2qwxLATwbuO:
+    amount as u32;
+
+struct Legacy__AsqpfBm92Jz:
+    amount as u32;
+
+struct Slot__ucXcNuRp6A:
+    amount as u32;
+
+mapping slots:
+    key as address.public;
+    value as Slot__E5tgmziTR6y.public;
+
+mapping current__:
+    key as boolean.public;
+    value as Slot__E5tgmziTR6y.public;
+
+function store:
+    input r0 as Slot__E5tgmziTR6y.private;
+    output r0 as Slot__E5tgmziTR6y.private;
+
+function read_item:
+    input r0 as identifier.private;
+    call.dynamic r0 'aleo' 'read' into r1 (as Outer__LNZLLWSZbA1.private);
+    output r1.item.data[2u32] as u8.private;
+
+function read_root:
+    input r0 as identifier.private;
+    call.dynamic r0 'aleo' 'root' into r1 (as Legacy__2qwxLATwbuO.private);
+    output r1.amount as u32.private;
+
+function read_nested:
+    input r0 as identifier.private;
+    call.dynamic r0 'aleo' 'nested' into r1 (as Array__Bry8D6lySMW.private);
+    output r1.values[0u32] as u8.private;
+
+constructor:
+    assert.eq edition 0u16;

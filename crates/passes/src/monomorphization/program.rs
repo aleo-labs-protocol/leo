@@ -79,7 +79,7 @@ impl UnitReconstructor for MonomorphizationVisitor<'_> {
             mappings,
             storage_variables,
             functions,
-            interfaces: input.interfaces.into_iter().map(|(i, int)| (i, self.reconstruct_interface(int))).collect(),
+            interfaces: input.interfaces,
             constructor: input.constructor,
             consts,
             span: input.span,
@@ -182,19 +182,38 @@ impl UnitReconstructor for MonomorphizationVisitor<'_> {
             }
         }
 
-        // Reconstruct all constructors before removing generic functions or collecting scope items.
-        for (program_name, scope) in input.program_scopes.iter_mut().chain(
-            input
-                .stubs
-                .values_mut()
-                .filter_map(|stub| match stub {
-                    Stub::FromLeo { program, .. } => Some(program),
-                    _ => None,
-                })
-                .flat_map(|program| program.program_scopes.iter_mut()),
-        ) {
-            self.program = *program_name;
-            scope.constructor = scope.constructor.take().map(|c| self.reconstruct_constructor(c));
+        // A prototype can be the only use of a specialization owned by another scope.
+        // Reconstruct all prototypes before any scope collects its composite definitions.
+        for stub in input.stubs.values_mut() {
+            if let Stub::FromLibrary { library, .. } = stub {
+                self.program = library.name;
+                self.in_library_root_interface = true;
+                self.reconstruct_interfaces(&mut library.interfaces);
+                self.in_library_root_interface = false;
+                for module in library.modules.values_mut() {
+                    self.program = module.unit_name;
+                    self.reconstruct_interfaces(&mut module.interfaces);
+                }
+            }
+        }
+
+        // Constructors can also introduce new specializations.
+        let imported_programs = input.stubs.values_mut().filter_map(|stub| match stub {
+            Stub::FromLeo { program, .. } => Some((&mut program.program_scopes, &mut program.modules)),
+            _ => None,
+        });
+        for (scopes, modules) in
+            std::iter::once((&mut input.program_scopes, &mut input.modules)).chain(imported_programs)
+        {
+            for (name, scope) in scopes {
+                self.program = *name;
+                self.reconstruct_interfaces(&mut scope.interfaces);
+                scope.constructor = scope.constructor.take().map(|c| self.reconstruct_constructor(c));
+            }
+            for module in modules.values_mut() {
+                self.program = module.unit_name;
+                self.reconstruct_interfaces(&mut module.interfaces);
+            }
         }
         self.program = top_level_program;
 

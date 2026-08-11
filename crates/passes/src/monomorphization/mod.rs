@@ -79,6 +79,8 @@ use visitor::*;
 
 #[derive(Debug)]
 pub struct MonomorphizationOutput {
+    /// Template names that older compilers emitted for root library interfaces.
+    pub legacy_interface_structs: indexmap::IndexSet<leo_ast::Location>,
     /// If we encountered calls to const generic functions that were not resolved, keep track of them in this vector
     pub unresolved_calls: Vec<leo_ast::CallExpression>,
     /// If we encountered const generic composite expressions that were not resolved, keep track of them in this vector
@@ -103,6 +105,8 @@ impl Pass for Monomorphization {
         let mut visitor = MonomorphizationVisitor {
             state,
             program: Symbol::intern(""),
+            in_library_root_interface: false,
+            legacy_interface_structs: Default::default(),
             reconstructed_functions: indexmap::IndexMap::new(),
             function_map: indexmap::IndexMap::new(),
             composite_map: indexmap::IndexMap::new(),
@@ -123,6 +127,7 @@ impl Pass for Monomorphization {
         visitor.state.ast = ast;
 
         Ok(MonomorphizationOutput {
+            legacy_interface_structs: visitor.legacy_interface_structs,
             unresolved_calls: visitor.unresolved_calls,
             unresolved_composite_exprs: visitor.unresolved_composite_exprs,
             unresolved_composite_types: visitor.unresolved_composite_types,

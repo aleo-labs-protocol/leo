@@ -16,7 +16,7 @@
 
 use crate::{Assigner, SymbolTable, TypeTable};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use leo_ast::{Ast, CallGraph, CompositeGraph, Location, NetworkName, NodeBuilder, TypeInterner};
 use leo_errors::{Handler, Result};
 
@@ -41,6 +41,8 @@ pub struct CompilerState {
     pub symbol_table: SymbolTable,
     /// A graph of which composite refer to each other.
     pub composite_graph: CompositeGraph,
+    /// Original struct names that older compilers emitted for root library interface types.
+    pub legacy_interface_structs: IndexSet<Location>,
     /// A graph of which functions call each other.
     pub call_graph: CallGraph,
     /// How many times a given function is called.
