@@ -57,4 +57,4 @@ for d in $(find documentation/code_snippets -name program.json -not -path '*/bui
 done
 ```
 
-CI runs the `docs-lint` and `build-doc-code-snippets` checks.
+GitHub Actions checks Markdown and links in the `docs-lint` job. The `build-doc-code-snippets` job builds each code snippet and runs its tests when a `tests/` directory exists. See [CI coverage and setup](../.github/CI.md).

@@ -1,0 +1,444 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_INCREMENTAL: '0'
+  CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
+  RUST_MIN_STACK: '16777216'
+  RUSTFLAGS: ''
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+      linux-runner: ${{ steps.scope.outputs.linux-runner }}
+      trusted: ${{ steps.scope.outputs.trusted }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select checks and runner
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          trusted = os.environ['EVENT_NAME'] != 'pull_request' or os.environ['HEAD_REPO'] == os.environ['GITHUB_REPOSITORY']
+          scope = 'full'
+          if os.environ['EVENT_NAME'] == 'pull_request':
+              try:
+                  paths = subprocess.check_output([
+                      'git', 'diff', '--name-only', '--no-renames', '-z',
+                      os.environ['BASE_SHA'] + '...' + os.environ['HEAD_SHA'],
+                  ]).decode().split('\0')
+                  paths = [path for path in paths if path]
+                  if paths and all(path.startswith('documentation/') for path in paths):
+                      scope = 'snippets' if any(path.startswith('documentation/code_snippets/') for path in paths) else 'docs'
+              except (subprocess.CalledProcessError, UnicodeDecodeError):
+                  print('Cannot classify the diff; running every check.')
+          runner = ['self-hosted', 'linux', 'x64', 'cpu'] if trusted else ['ubuntu-24.04']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'scope={scope}\ntrusted={str(trusted).lower()}\nlinux-runner={json.dumps(runner)}\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f'CI scope: **{scope}**. Linux runner: `{json.dumps(runner)}`.\n')
+          PY
+
+  check-shared-refs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: aleo-labs-protocol/gh-actions/.github/actions/check-shared-refs@v2
+
+  runner-config:
+    needs: changes
+    if: needs.changes.outputs.trusted == 'true' && needs.changes.outputs.scope != 'docs'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check shared runner configuration
+        env:
+          RUNNER_ROLE_ARN: ${{ vars.RUNNER_ROLE_ARN }}
+          RUNNER_APP_ID: ${{ vars.RUNNER_APP_ID }}
+          HAS_RUNNER_APP_KEY: ${{ secrets.RUNNER_APP_KEY != '' }}
+        run: |
+          if [ -z "$RUNNER_ROLE_ARN" ] || [ -z "$RUNNER_APP_ID" ] || [ "$HAS_RUNNER_APP_KEY" != true ]; then
+            echo '::error::Shared CPU runner setup is incomplete. See .github/CI.md.'
+            exit 1
+          fi
+
+  start-cpu-runners:
+    needs: [changes, runner-config]
+    if: needs.changes.outputs.trusted == 'true' && needs.changes.outputs.scope != 'docs'
+    uses: aleo-labs-protocol/gh-actions/.github/workflows/start-runner.yml@v2
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    secrets:
+      runner_app_key: ${{ secrets.RUNNER_APP_KEY }}
+    with:
+      role-to-assume: ${{ vars.RUNNER_ROLE_ARN }}
+      runner-app-id: ${{ vars.RUNNER_APP_ID }}
+      label: cpu
+      jobs-per-box: 2
+
+  linux-tests:
+    name: linux-workspace-tests
+    needs: [changes, start-cpu-runners]
+    if: >-
+      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
+      (needs.start-cpu-runners.result == 'success' ||
+       (needs.changes.outputs.trusted == 'false' && needs.start-cpu-runners.result == 'skipped'))
+    runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
+      - uses: ./.github/actions/setup-ci
+        with:
+          cache-key: linux-ci-only-testnet
+          nextest: 'true'
+          snarkos: 'true'
+      - name: Build and test the workspace
+        run: |
+          ulimit -n 65536
+          start=$SECONDS
+          cargo nextest run --no-run --all --locked --cargo-profile ci --features only_testnet
+          echo "Linux test build: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+          start=$SECONDS
+          cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
+          echo "Linux test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: linux-test-mismatches
+          path: tests/mismatches
+          if-no-files-found: ignore
+
+  platform-tests:
+    name: ${{ matrix.platform }}-workspace-tests
+    needs: changes
+    if: needs.changes.outputs.scope == 'full'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: ${{ needs.changes.outputs.trusted == 'true' && vars.CI_MACOS_RUNNER || 'macos-26' }}
+          - platform: windows
+            runner: ${{ needs.changes.outputs.trusted == 'true' && vars.CI_WINDOWS_RUNNER || 'windows-2025' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Check platform coverage
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            test "$(uname -m)" = arm64 || { echo 'macOS CI requires an ARM64 runner.' >&2; exit 1; }
+          elif [ "$RUNNER_OS" = Windows ]; then
+            test "$RUNNER_ARCH" = X64
+          fi
+      - uses: ./.github/actions/setup-ci
+        with:
+          cache-key: ${{ matrix.platform }}-ci-only-testnet
+          nextest: 'true'
+          snarkos: ${{ matrix.platform == 'macos' }}
+      - name: Build and test the workspace
+        run: |
+          if [ "$RUNNER_OS" != Windows ]; then ulimit -n 65536; fi
+          start=$SECONDS
+          cargo nextest run --no-run --all --locked --cargo-profile ci --features only_testnet
+          echo "$RUNNER_OS test build: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+          start=$SECONDS
+          cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
+          echo "$RUNNER_OS test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ${{ matrix.platform }}-test-mismatches
+          path: tests/mismatches
+          if-no-files-found: ignore
+
+  code-style:
+    needs: changes
+    if: needs.changes.outputs.scope == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: tree-sitter-cli-0.25.10-${{ runner.os }}-${{ runner.arch }}
+      - run: cargo +nightly fmt --all -- --check
+      - run: npx --yes tree-sitter-cli@0.25.10 test
+        working-directory: tree-sitter
+
+  rust-checks:
+    name: ${{ matrix.check }}
+    needs: [changes, start-cpu-runners]
+    if: >-
+      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
+      (needs.start-cpu-runners.result == 'success' ||
+       (needs.changes.outputs.trusted == 'false' && needs.start-cpu-runners.result == 'skipped'))
+    runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [clippy, fmt-validate, cargo-doc]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
+      - uses: ./.github/actions/setup-ci
+        with:
+          cache-key: ${{ matrix.check }}
+          nextest: ${{ matrix.check == 'fmt-validate' }}
+      - name: Clippy
+        if: matrix.check == 'clippy'
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Validate formatter semantics
+        if: matrix.check == 'fmt-validate'
+        run: |
+          cargo nextest run -p leo-fmt --locked --cargo-profile ci --features validate \
+            -E 'test(/validate_/) - test(validate_ast_equivalence_repos)'
+      - name: Build Cargo documentation
+        if: matrix.check == 'cargo-doc'
+        env:
+          RUSTDOCFLAGS: --enable-index-page -Zunstable-options
+          RUSTC_BOOTSTRAP: '1'
+        run: cargo doc --no-deps --document-private-items --workspace
+
+  docs-lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: docs-lint-mdlint-0.47.0-mlc-3.14.2
+      - name: Check Markdown
+        run: npx --yes markdownlint-cli@0.47.0 --config .markdownlint.yaml 'documentation/**/*.md'
+      - name: Check documentation links
+        run: |
+          rc=0
+          while IFS= read -r -d '' file; do
+            npx --yes markdown-link-check@3.14.2 --config .mlc_config.json --quiet "$file" || rc=1
+          done < <(find documentation -name '*.md' -print0)
+          exit "$rc"
+
+  build-leo:
+    needs: [changes, start-cpu-runners]
+    if: >-
+      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope != 'docs' &&
+      (needs.start-cpu-runners.result == 'success' ||
+       (needs.changes.outputs.trusted == 'false' && needs.start-cpu-runners.result == 'skipped'))
+    runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
+      - uses: ./.github/actions/setup-ci
+        with:
+          cache-key: leo-executable-default
+      - name: Build the default-feature CLI
+        run: cargo install --path crates/leo --root "$RUNNER_TEMP/leo" --locked --force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leo-executable
+          path: ${{ runner.temp }}/leo/bin/leo
+          retention-days: 3
+          if-no-files-found: error
+
+  cli-checks:
+    name: ${{ matrix.check }}
+    needs: [changes, build-leo]
+    if: >-
+      !cancelled() && needs.changes.result == 'success' && needs.build-leo.result == 'success'
+    runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [leo-new, leo-clean, test-examples, build-doc-code-snippets]
+    steps:
+      - name: Select the check
+        id: selected
+        env:
+          SCOPE: ${{ needs.changes.outputs.scope }}
+          CHECK: ${{ matrix.check }}
+        run: |
+          if [ "$SCOPE" = full ] || [ "$CHECK" = build-doc-code-snippets ]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.selected.outputs.run == 'true'
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        if: steps.selected.outputs.run == 'true'
+        with:
+          name: leo-executable
+          path: ${{ runner.temp }}/leo-bin
+      - uses: actions/cache@v6
+        if: steps.selected.outputs.run == 'true'
+        with:
+          path: ~/.aleo/resources
+          key: aleo-resources-Linux-X64-${{ hashFiles('Cargo.lock') }}
+          restore-keys: aleo-resources-Linux-X64-
+      - name: Run the CLI check
+        if: steps.selected.outputs.run == 'true'
+        env:
+          CHECK: ${{ matrix.check }}
+          LEO: ${{ runner.temp }}/leo-bin/leo
+          EXAMPLES: ${{ github.workspace }}/examples
+        run: |
+          chmod +x "$LEO"
+          "$LEO" --version
+          mkdir -p "$HOME/.aleo"
+          export PATH="$(dirname "$LEO"):$PATH"
+          timeout 30m bash ".github/scripts/ci/$CHECK.sh"
+
+  code-quality:
+    name: code-quality
+    needs: [changes, check-shared-refs, code-style, rust-checks, docs-lint]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check required results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          jobs = json.loads(os.environ['NEEDS'])
+          required = ['changes', 'check-shared-refs', 'docs-lint']
+          if jobs['changes']['outputs'].get('scope') == 'full':
+              required += ['code-style', 'rust-checks']
+          failed = [name for name in required if jobs[name]['result'] != 'success']
+          if failed:
+              raise SystemExit('Required checks did not pass: ' + ', '.join(failed))
+          PY
+
+  test-linux:
+    name: test-linux
+    needs: [changes, linux-tests]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check Linux results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SCOPE: ${{ needs.changes.outputs.scope }}
+          TEST_RESULT: ${{ needs.linux-tests.result }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          if [ "$SCOPE" = full ]; then test "$TEST_RESULT" = success; fi
+
+  test-macos:
+    name: test-macos
+    needs: [changes, platform-tests]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check native platform results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SCOPE: ${{ needs.changes.outputs.scope }}
+          TEST_RESULT: ${{ needs.platform-tests.result }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          if [ "$SCOPE" = full ]; then test "$TEST_RESULT" = success; fi
+
+  test-windows:
+    name: test-windows
+    needs: [changes, platform-tests]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check native platform results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SCOPE: ${{ needs.changes.outputs.scope }}
+          TEST_RESULT: ${{ needs.platform-tests.result }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          if [ "$SCOPE" = full ]; then test "$TEST_RESULT" = success; fi
+
+  leo-executable:
+    name: leo-executable
+    needs: [changes, build-leo, cli-checks]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check CLI results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          jobs = json.loads(os.environ['NEEDS'])
+          required = ['changes']
+          if jobs['changes']['outputs'].get('scope') != 'docs':
+              required += ['build-leo', 'cli-checks']
+          failed = [name for name in required if jobs[name]['result'] != 'success']
+          if failed:
+              raise SystemExit('Required CLI checks did not pass: ' + ', '.join(failed))
+          PY
