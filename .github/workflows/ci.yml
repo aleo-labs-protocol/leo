@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -26,6 +26,7 @@ jobs:
       scope: ${{ steps.scope.outputs.scope }}
       linux-runner: ${{ steps.scope.outputs.linux-runner }}
       trusted: ${{ steps.scope.outputs.trusted }}
+      use-shared: ${{ steps.scope.outputs.use-shared }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -38,6 +39,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          RUNNER_ROLE_ARN: ${{ vars.RUNNER_ROLE_ARN }}
         run: |
           python3 - <<'PY'
           import json
@@ -57,9 +59,11 @@ jobs:
                       scope = 'snippets' if any(path.startswith('documentation/code_snippets/') for path in paths) else 'docs'
               except (subprocess.CalledProcessError, UnicodeDecodeError):
                   print('Cannot classify the diff; running every check.')
-          runner = ['self-hosted', 'linux', 'x64', 'cpu'] if trusted else ['ubuntu-24.04']
+          use_shared = trusted and bool(os.environ['RUNNER_ROLE_ARN'])
+          runner = ['self-hosted', 'linux', 'x64', 'cpu'] if use_shared else ['ubuntu-24.04']
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'scope={scope}\ntrusted={str(trusted).lower()}\nlinux-runner={json.dumps(runner)}\n')
+              output.write(f'use-shared={str(use_shared).lower()}\n')
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               summary.write(f'CI scope: **{scope}**. Linux runner: `{json.dumps(runner)}`.\n')
           PY
@@ -74,7 +78,7 @@ jobs:
 
   runner-config:
     needs: changes
-    if: needs.changes.outputs.trusted == 'true' && needs.changes.outputs.scope != 'docs'
+    if: needs.changes.outputs.use-shared == 'true' && needs.changes.outputs.scope != 'docs'
     runs-on: ubuntu-24.04
     steps:
       - name: Check shared runner configuration
@@ -90,7 +94,7 @@ jobs:
 
   start-cpu-runners:
     needs: [changes, runner-config]
-    if: needs.changes.outputs.trusted == 'true' && needs.changes.outputs.scope != 'docs'
+    if: needs.changes.outputs.use-shared == 'true' && needs.changes.outputs.scope != 'docs'
     uses: aleo-labs-protocol/gh-actions/.github/workflows/start-runner.yml@v2
     permissions:
       id-token: write
@@ -110,7 +114,7 @@ jobs:
     if: >-
       !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
       (needs.start-cpu-runners.result == 'success' ||
-       (needs.changes.outputs.trusted == 'false' && needs.start-cpu-runners.result == 'skipped'))
+       (needs.changes.outputs.use-shared == 'false' && needs.start-cpu-runners.result == 'skipped'))
     runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
     timeout-minutes: 90
     steps:
@@ -220,7 +224,7 @@ jobs:
     if: >-
       !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
       (needs.start-cpu-runners.result == 'success' ||
-       (needs.changes.outputs.trusted == 'false' && needs.start-cpu-runners.result == 'skipped'))
+       (needs.changes.outputs.use-shared == 'false' && needs.start-cpu-runners.result == 'skipped'))
     runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
     timeout-minutes: 60
     strategy:
@@ -281,7 +285,7 @@ jobs:
     if: >-
       !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope != 'docs' &&
       (needs.start-cpu-runners.result == 'success' ||
-       (needs.changes.outputs.trusted == 'false' && needs.start-cpu-runners.result == 'skipped'))
+       (needs.changes.outputs.use-shared == 'false' && needs.start-cpu-runners.result == 'skipped'))
     runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
     timeout-minutes: 60
     steps:

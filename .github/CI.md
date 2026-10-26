@@ -30,19 +30,19 @@ The existing WASM, benchmark, scheduled code coverage, documentation deployment,
 
 Documentation-only pull requests run the documentation checks. Changes to `documentation/code_snippets/` also build Leo and check the snippets. Changes outside `documentation/` run all checks. A push to `master` and a manual run always run all checks. An unknown or empty comparison also runs all checks.
 
-The required check jobs report a result for each scope. They accept an intentional skip but fail when a selected check fails or is cancelled. Fork pull requests use GitHub-hosted Linux runners and run the same commands without organization secrets.
+The required check jobs report a result for each scope. They accept an intentional skip but fail when a selected check fails or is cancelled. Linux uses `ubuntu-24.04` by default. Fork pull requests always use GitHub-hosted runners and run the same commands without organization secrets.
 
 ## Shared Linux runners
 
-Configure these items before you run the workflow on a branch in this repository:
+Shared Linux runners are optional. You can run all checks on standard GitHub-hosted runners without infrastructure changes. To enable the shared fleet for branches in this repository, complete these steps:
 
 1. Give this repository access to the organization variable `RUNNER_APP_ID` and the organization secret `RUNNER_APP_KEY`. They identify the GitHub App that reads the shared fleet's runner status.
-2. Set the organization or repository variable `RUNNER_ROLE_ARN` to the AWS role used to start the shared runner fleet. Give this repository access to the variable. The `runner-config` job fails if this value is absent.
-3. Confirm that the runner census App is installed on the organization with read access to organization self-hosted runners. Add Leo to the shared runner group's repository allowlist. Do not give the census App repository or secret-management permissions.
-4. Add Leo's workflow identity to the AWS role's GitHub OIDC trust policy. Use the `sts.amazonaws.com` audience and the shared `start-runner.yml@v2` workflow identity, as in snarkVM and snarkOS. Permit the intended pull request and branch identities. Keep the existing fleet permissions and restrict trust to the required repository and events.
-5. Confirm that the fleet can start enough Linux runners for the parallel jobs. Keep the fleet's existing idle shutdown and disk management in place.
+2. Confirm that the runner census App is installed on the organization with read access to organization self-hosted runners. Add Leo to the shared runner group's repository allowlist. Do not give the census App repository or secret-management permissions.
+3. Add Leo's workflow identity to the AWS role's GitHub OIDC trust policy. Use the `sts.amazonaws.com` audience and the shared `start-runner.yml@v2` workflow identity, as in snarkVM and snarkOS. Permit the intended pull request and branch identities. Keep the existing fleet permissions and restrict trust to the required repository and events.
+4. Confirm that the fleet can start enough Linux runners for the parallel jobs. Keep the fleet's existing idle shutdown and disk management in place.
+5. Set the organization or repository variable `RUNNER_ROLE_ARN` to the AWS role used to start the shared runner fleet. Give this repository access to the variable. This enables the shared fleet. The `runner-config` job fails before queueing shared jobs if the app ID or key is absent.
 
-The app ID and key are available to this repository. `RUNNER_ROLE_ARN` must be supplied by the infrastructure maintainers. Fork pull requests do not use these credentials or the shared fleet. Linux builds and CLI consumers use the same runner selection. Keep the fleet's Linux images compatible so that the shared executable runs on each box.
+The app ID and key are available to this repository. Infrastructure maintainers can supply `RUNNER_ROLE_ARN` when the shared fleet is ready. Leave the variable unset to use standard GitHub-hosted Linux runners. Fork pull requests do not use these credentials or the shared fleet. Linux builds and CLI consumers use the same runner selection. Keep the fleet's Linux images compatible so that the shared executable runs on each box.
 
 ## macOS and Windows runners
 
