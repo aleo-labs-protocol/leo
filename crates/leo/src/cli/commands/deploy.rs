@@ -1381,7 +1381,7 @@ pub(crate) fn calculate_function_costs<N: Network, R: Rng + CryptoRng>(
                     tracing::debug!("Could not estimate execution cost for '{name}': {e}");
                     // Fall back to static finalize cost analysis.
                     let static_finalize_cost = if consensus_version >= ConsensusVersion::V10 {
-                        minimum_cost_in_microcredits_v3(&stack, function_name)?
+                        minimum_cost_in_microcredits_v3(&stack, function_name, Some(consensus_version))?
                     } else if consensus_version >= ConsensusVersion::V2 {
                         minimum_cost_in_microcredits_v2(&stack, function_name)?
                     } else {
