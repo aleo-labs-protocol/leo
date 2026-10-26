@@ -23,10 +23,8 @@ runs:
       if: runner.os == 'Linux'
       shell: bash
       run: |
-        if ! ldconfig -p | grep -E 'libclang(-[0-9]+)?\.so' > /dev/null; then
-          sudo apt-get update -qq
-          sudo apt-get install -y libclang-dev
-        fi
+        sudo apt-get update -qq
+        sudo apt-get install -y libclang-dev
 
     - name: Configure libclang on macOS
       if: runner.os == 'macOS'
