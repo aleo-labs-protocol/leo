@@ -19,12 +19,21 @@ runs:
       with:
         components: clippy
 
+    - uses: actions/cache@v6
+      if: runner.os == 'Linux'
+      with:
+        path: ~/.cache/leo-ci-apt/*.deb
+        key: libclang-debs-ubuntu24-${{ runner.arch }}-${{ github.sha }}
+        restore-keys: libclang-debs-ubuntu24-${{ runner.arch }}-
+
     - name: Install libclang on Linux
       if: runner.os == 'Linux'
       shell: bash
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y libclang-dev
+        mkdir -p "$HOME/.cache/leo-ci-apt"
+        sudo apt-get -o Dir::Cache::archives="$HOME/.cache/leo-ci-apt" \
+          -o APT::Keep-Downloaded-Packages=true install -y libclang-dev
 
     - name: Configure libclang on macOS
       if: runner.os == 'macOS'
@@ -47,98 +56,38 @@ runs:
         "LIBCLANG_PATH=$llvmBin" >> $env:GITHUB_ENV
 
     - name: Clear source timestamps before cache restore
-      if: runner.environment == 'github-hosted' || runner.os != 'Linux'
       shell: bash
-      run: rm -f "$HOME/.cache/leo-ci-mtimes/project.json"
-
-    - uses: Swatinem/rust-cache@v2
-      if: runner.environment == 'github-hosted' || runner.os != 'Linux'
-      with:
-        prefix-key: source-mtime-v1-rust
-        key: ${{ inputs.cache-key }}-${{ runner.environment }}
-        cache-workspace-crates: true
-        cache-directories: ~/.cache/leo-ci-mtimes
-        save-if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-
-    - name: Restore unchanged source timestamps
-      if: runner.environment == 'github-hosted' || runner.os != 'Linux'
-      shell: bash
-      run: |
-        python_command=python3
-        if [ "$RUNNER_OS" = Windows ]; then python_command=python; fi
-        "$python_command" - . "$HOME/.cache/leo-ci-mtimes/project.json" <<'PYTHON'
-        import hashlib
-        import json
-        import os
-        from pathlib import Path
-        import subprocess
-        import sys
-
-
-        root = Path(sys.argv[1]).resolve()
-        manifest = Path(sys.argv[2])
-        previous = json.loads(manifest.read_text()) if manifest.exists() else {}
-        current = {}
-        tracked = {
-            os.fsdecode(path)
-            for path in subprocess.check_output(
-                ["git", "ls-files", "--cached", "--recurse-submodules", "-z"], cwd=root
-            ).split(b"\0")
-            if path
-        }
-
-
-        def restore(path, digest, dirty=False):
-            name = path.relative_to(root).as_posix()
-            if path.is_dir():
-                name += "/"
-            saved = previous.get(name, {})
-            if not dirty and saved.get("hash") == digest:
-                os.utime(path, ns=(path.stat().st_atime_ns, saved["mtime_ns"]))
-            else:
-                os.utime(path, None)
-            current[name] = {"hash": digest, "mtime_ns": path.stat().st_mtime_ns}
-
-
-        def visit(directory):
-            entries = []
-            dirty = False
-            for entry in sorted(directory.iterdir()):
-                name = entry.relative_to(root).as_posix()
-                if entry.name == ".git":
-                    continue
-                if entry.is_dir() and (entry / ".rustc_info.json").exists():
-                    entries.append([entry.name, "build-output"])
-                    dirty = True
-                elif entry.is_symlink():
-                    entries.append([entry.name, "symlink", os.readlink(entry)])
-                    dirty = True
-                elif entry.is_dir():
-                    digest, child_dirty = visit(entry)
-                    entries.append([entry.name, "directory", digest])
-                    dirty |= child_dirty
-                elif not entry.is_file():
-                    entries.append([entry.name, "unsupported"])
-                    dirty = True
-                elif name not in tracked:
-                    entries.append([entry.name, "untracked"])
-                    dirty = True
-                else:
-                    digest = hashlib.sha256(entry.read_bytes()).hexdigest()
-                    restore(entry, digest)
-                    entries.append([entry.name, "file", digest])
-            digest = hashlib.sha256(json.dumps(entries, separators=(",", ":")).encode()).hexdigest()
-            restore(directory, digest, dirty)
-            return digest, dirty
-
-
-        visit(root)
-        manifest.parent.mkdir(parents=True, exist_ok=True)
-        manifest.write_text(json.dumps(current))
-        PYTHON
+      run: rm -f "$HOME/.cache/leo-ci-mtimes/project.db"
 
     - uses: actions/cache@v6
-      if: runner.environment == 'github-hosted' || runner.os != 'Linux'
+      with:
+        path: |
+          ~/.cargo/bin
+          ~/.cargo/.crates.toml
+          ~/.cargo/.crates2.json
+          ~/.cargo/registry/cache
+          ~/.cargo/registry/index
+          ~/.cargo/git/db
+          target
+          ~/.cache/leo-ci-mtimes
+        key: cargo-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key }}-rust-1.96.0-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+        restore-keys: |
+          cargo-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key }}-rust-1.96.0-${{ hashFiles('Cargo.lock') }}-
+          cargo-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key }}-rust-1.96.0-
+
+    - name: Restore unchanged source timestamps
+      shell: bash
+      run: |
+        cargo install cargo-mtime --version 0.1.1 --locked
+        if [ "$RUNNER_OS" != Windows ]; then ulimit -n 65536; fi
+        db="$HOME/.cache/leo-ci-mtimes/project.db"
+        mkdir -p "$(dirname "$db")"
+        cargo-mtime . "$db"
+        # Keep only current hashes so a source revert cannot reuse newer artifacts.
+        rm "$db"
+        cargo-mtime . "$db"
+
+    - uses: actions/cache@v6
       with:
         path: ~/.aleo/resources
         key: aleo-resources-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
@@ -165,10 +114,6 @@ runs:
       shell: bash
       env:
         CACHE_HIT: ${{ steps.snarkos-cache.outputs.cache-hit }}
-        CARGO_PROFILE_RELEASE_LTO: 'off'
-        CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
-        CARGO_PROFILE_RELEASE_OPT_LEVEL: '2'
-        CARGO_PROFILE_RELEASE_DEBUG: '0'
       run: |
         version="$(tr -d '[:space:]' < .resources/snarkos-version)"
         root="$HOME/.cache/leo-ci-snarkos"

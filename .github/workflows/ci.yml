@@ -24,29 +24,22 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       scope: ${{ steps.scope.outputs.scope }}
-      linux-runner: ${{ steps.scope.outputs.linux-runner }}
-      trusted: ${{ steps.scope.outputs.trusted }}
-      use-shared: ${{ steps.scope.outputs.use-shared }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Select checks and runner
+      - name: Select checks
         id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          RUNNER_ROLE_ARN: ${{ vars.RUNNER_ROLE_ARN }}
         run: |
           python3 - <<'PY'
-          import json
           import os
           import subprocess
 
-          trusted = os.environ['EVENT_NAME'] != 'pull_request' or os.environ['HEAD_REPO'] == os.environ['GITHUB_REPOSITORY']
           scope = 'full'
           if os.environ['EVENT_NAME'] == 'pull_request':
               try:
@@ -59,70 +52,23 @@ jobs:
                       scope = 'snippets' if any(path.startswith('documentation/code_snippets/') for path in paths) else 'docs'
               except (subprocess.CalledProcessError, UnicodeDecodeError):
                   print('Cannot classify the diff; running every check.')
-          use_shared = trusted and bool(os.environ['RUNNER_ROLE_ARN'])
-          runner = ['self-hosted', 'linux', 'x64', 'cpu'] if use_shared else ['ubuntu-24.04']
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'scope={scope}\ntrusted={str(trusted).lower()}\nlinux-runner={json.dumps(runner)}\n')
-              output.write(f'use-shared={str(use_shared).lower()}\n')
+              output.write(f'scope={scope}\n')
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
-              summary.write(f'CI scope: **{scope}**. Linux runner: `{json.dumps(runner)}`.\n')
+              summary.write(f'CI scope: **{scope}**.\n')
           PY
-
-  check-shared-refs:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: aleo-labs-protocol/gh-actions/.github/actions/check-shared-refs@v2
-
-  runner-config:
-    needs: changes
-    if: needs.changes.outputs.use-shared == 'true' && needs.changes.outputs.scope != 'docs'
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check shared runner configuration
-        env:
-          RUNNER_ROLE_ARN: ${{ vars.RUNNER_ROLE_ARN }}
-          RUNNER_APP_ID: ${{ vars.RUNNER_APP_ID }}
-          HAS_RUNNER_APP_KEY: ${{ secrets.RUNNER_APP_KEY != '' }}
-        run: |
-          if [ -z "$RUNNER_ROLE_ARN" ] || [ -z "$RUNNER_APP_ID" ] || [ "$HAS_RUNNER_APP_KEY" != true ]; then
-            echo '::error::Shared CPU runner setup is incomplete. See .github/CI.md.'
-            exit 1
-          fi
-
-  start-cpu-runners:
-    needs: [changes, runner-config]
-    if: needs.changes.outputs.use-shared == 'true' && needs.changes.outputs.scope != 'docs'
-    uses: aleo-labs-protocol/gh-actions/.github/workflows/start-runner.yml@v2
-    permissions:
-      id-token: write
-      contents: read
-      actions: read
-    secrets:
-      runner_app_key: ${{ secrets.RUNNER_APP_KEY }}
-    with:
-      role-to-assume: ${{ vars.RUNNER_ROLE_ARN }}
-      runner-app-id: ${{ vars.RUNNER_APP_ID }}
-      label: cpu
-      jobs-per-box: 2
 
   linux-tests:
     name: linux-workspace-tests
-    needs: [changes, start-cpu-runners]
-    if: >-
-      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
-      (needs.start-cpu-runners.result == 'success' ||
-       (needs.changes.outputs.use-shared == 'false' && needs.start-cpu-runners.result == 'skipped'))
-    runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
+    needs: changes
+    if: needs.changes.outputs.scope == 'full'
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
       - uses: ./.github/actions/setup-ci
         with:
           cache-key: linux-ci-only-testnet
@@ -156,9 +102,9 @@ jobs:
       matrix:
         include:
           - platform: macos
-            runner: ${{ needs.changes.outputs.trusted == 'true' && vars.CI_MACOS_RUNNER || 'macos-26' }}
+            runner: macos-26
           - platform: windows
-            runner: ${{ needs.changes.outputs.trusted == 'true' && vars.CI_WINDOWS_RUNNER || 'windows-2025' }}
+            runner: windows-2025
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     defaults:
@@ -226,12 +172,9 @@ jobs:
 
   rust-checks:
     name: ${{ matrix.check }}
-    needs: [changes, start-cpu-runners]
-    if: >-
-      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
-      (needs.start-cpu-runners.result == 'success' ||
-       (needs.changes.outputs.use-shared == 'false' && needs.start-cpu-runners.result == 'skipped'))
-    runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
+    needs: changes
+    if: needs.changes.outputs.scope == 'full'
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -242,7 +185,6 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
       - uses: ./.github/actions/setup-ci
         with:
           cache-key: ${{ matrix.check }}
@@ -287,19 +229,15 @@ jobs:
           exit "$rc"
 
   build-leo:
-    needs: [changes, start-cpu-runners]
-    if: >-
-      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope != 'docs' &&
-      (needs.start-cpu-runners.result == 'success' ||
-       (needs.changes.outputs.use-shared == 'false' && needs.start-cpu-runners.result == 'skipped'))
-    runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
+    needs: changes
+    if: needs.changes.outputs.scope != 'docs'
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
       - uses: ./.github/actions/setup-ci
         with:
           cache-key: leo-executable-default
@@ -317,7 +255,7 @@ jobs:
     needs: [changes, build-leo]
     if: >-
       !cancelled() && needs.changes.result == 'success' && needs.build-leo.result == 'success'
-    runs-on: ${{ fromJSON(needs.changes.outputs.linux-runner) }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     strategy:
       fail-fast: false
@@ -366,7 +304,7 @@ jobs:
 
   code-quality:
     name: code-quality
-    needs: [changes, check-shared-refs, code-style, rust-checks, docs-lint]
+    needs: [changes, code-style, rust-checks, docs-lint]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -378,7 +316,7 @@ jobs:
           import json
           import os
           jobs = json.loads(os.environ['NEEDS'])
-          required = ['changes', 'check-shared-refs', 'docs-lint']
+          required = ['changes', 'docs-lint']
           if jobs['changes']['outputs'].get('scope') == 'full':
               required += ['code-style', 'rust-checks']
           failed = [name for name in required if jobs[name]['result'] != 'success']
