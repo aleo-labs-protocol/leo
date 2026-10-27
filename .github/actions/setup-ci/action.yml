@@ -59,7 +59,25 @@ runs:
       shell: bash
       run: rm -f "$HOME/.cache/leo-ci-mtimes/project.db"
 
+    - uses: actions/cache/restore@v6
+      if: github.event_name != 'push' || github.ref != 'refs/heads/master'
+      with:
+        path: |
+          ~/.cargo/bin
+          ~/.cargo/.crates.toml
+          ~/.cargo/.crates2.json
+          ~/.cargo/registry/cache
+          ~/.cargo/registry/index
+          ~/.cargo/git/db
+          target
+          ~/.cache/leo-ci-mtimes
+        key: cargo-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key }}-rust-1.96.0-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+        restore-keys: |
+          cargo-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key }}-rust-1.96.0-${{ hashFiles('Cargo.lock') }}-
+          cargo-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-key }}-rust-1.96.0-
+
     - uses: actions/cache@v6
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       with:
         path: |
           ~/.cargo/bin
