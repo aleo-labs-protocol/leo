@@ -638,6 +638,7 @@ impl Package {
                         ..Default::default()
                     })
                     .collect();
+                test_dependencies.sort_by(|a, b| a.name.cmp(&b.name));
                 if let Some(deps) = manifest.dev_dependencies.as_ref() {
                     // Canonicalize dev-dependency paths like regular dependencies, so the same local
                     // library in both lists dedups instead of comparing relative against absolute.

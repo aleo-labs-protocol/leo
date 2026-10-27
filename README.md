@@ -8,8 +8,8 @@
     <a href="https://crates.io/crates/leo-lang">
         <img src="https://img.shields.io/crates/v/leo-lang?style=flat-square"/>
     </a>
-    <a href="https://circleci.com/gh/ProvableHQ/leo">
-        <img src="https://circleci.com/gh/ProvableHQ/leo.svg?style=svg&circle-token=00960191919c40be0774e00ce8f7fa1fcaa20c00">
+    <a href="https://github.com/aleo-labs-protocol/leo/actions/workflows/ci.yml">
+        <img alt="CI" src="https://github.com/aleo-labs-protocol/leo/actions/workflows/ci.yml/badge.svg?branch=master">
     </a>
     <a href="https://discord.gg/aleo">
         <img src="https://img.shields.io/discord/700454073459015690?logo=discord"/>

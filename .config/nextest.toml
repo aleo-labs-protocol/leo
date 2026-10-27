@@ -5,3 +5,4 @@ serial-integration = { max-threads = 1 }
 filter = 'test(cli_tests::)'
 platform = 'cfg(unix)'
 test-group = 'serial-integration'
+priority = 100
