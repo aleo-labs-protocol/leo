@@ -16,7 +16,6 @@ concurrency:
 env:
   CARGO_INCREMENTAL: '0'
   CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
-  RUST_MIN_STACK: '16777216'
   RUSTFLAGS: ''
 
 jobs:
@@ -138,6 +137,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.scope == 'full'
     runs-on: windows-2025
+    env:
+      RUST_MIN_STACK: '16777216'
     timeout-minutes: 90
     defaults:
       run:
