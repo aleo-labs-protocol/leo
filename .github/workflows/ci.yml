@@ -93,19 +93,11 @@ jobs:
           path: tests/mismatches
           if-no-files-found: ignore
 
-  platform-tests:
-    name: ${{ matrix.platform }}-workspace-tests
+  macos-tests:
+    name: macos-workspace-tests
     needs: changes
     if: needs.changes.outputs.scope == 'full'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos
-            runner: macos-26
-          - platform: windows
-            runner: windows-2025
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-26
     timeout-minutes: 90
     defaults:
       run:
@@ -116,33 +108,65 @@ jobs:
           submodules: recursive
           persist-credentials: false
       - name: Check platform coverage
-        run: |
-          if [ "$RUNNER_OS" = macOS ]; then
-            test "$(uname -m)" = arm64 || { echo 'macOS CI requires an ARM64 runner.' >&2; exit 1; }
-          elif [ "$RUNNER_OS" = Windows ]; then
-            test "$RUNNER_ARCH" = X64
-          fi
+        run: test "$(uname -m)" = arm64
       - uses: ./.github/actions/setup-ci
         with:
-          cache-key: ${{ matrix.platform }}-ci-only-testnet
+          cache-key: macos-ci-only-testnet
           nextest: 'true'
-          snarkos: ${{ matrix.platform == 'macos' }}
+          snarkos: 'true'
       - name: Build the workspace tests
         run: |
-          if [ "$RUNNER_OS" != Windows ]; then ulimit -n 65536; fi
+          ulimit -n 65536
           start=$SECONDS
           cargo nextest run --no-run --all --locked --cargo-profile ci --features only_testnet
           echo "$RUNNER_OS test build: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
       - name: Run the workspace tests
         run: |
-          if [ "$RUNNER_OS" != Windows ]; then ulimit -n 65536; fi
+          ulimit -n 65536
           start=$SECONDS
           cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
           echo "$RUNNER_OS test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: ${{ matrix.platform }}-test-mismatches
+          name: macos-test-mismatches
+          path: tests/mismatches
+          if-no-files-found: ignore
+
+  windows-tests:
+    name: windows-workspace-tests
+    needs: changes
+    if: needs.changes.outputs.scope == 'full'
+    runs-on: windows-2025
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Check platform coverage
+        run: test "$RUNNER_ARCH" = X64
+      - uses: ./.github/actions/setup-ci
+        with:
+          cache-key: windows-ci-only-testnet
+          nextest: 'true'
+      - name: Build the workspace tests
+        run: |
+          start=$SECONDS
+          cargo nextest run --no-run --all --locked --cargo-profile ci --features only_testnet
+          echo "$RUNNER_OS test build: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+      - name: Run the workspace tests
+        run: |
+          start=$SECONDS
+          cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
+          echo "$RUNNER_OS test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: windows-test-mismatches
           path: tests/mismatches
           if-no-files-found: ignore
 
@@ -341,30 +365,30 @@ jobs:
 
   test-macos:
     name: test-macos
-    needs: [changes, platform-tests]
+    needs: [changes, macos-tests]
     if: always()
     runs-on: ubuntu-24.04
     steps:
-      - name: Check native platform results
+      - name: Check macOS results
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           SCOPE: ${{ needs.changes.outputs.scope }}
-          TEST_RESULT: ${{ needs.platform-tests.result }}
+          TEST_RESULT: ${{ needs.macos-tests.result }}
         run: |
           test "$CHANGES_RESULT" = success
           if [ "$SCOPE" = full ]; then test "$TEST_RESULT" = success; fi
 
   test-windows:
     name: test-windows
-    needs: [changes, platform-tests]
+    needs: [changes, windows-tests]
     if: always()
     runs-on: ubuntu-24.04
     steps:
-      - name: Check native platform results
+      - name: Check Windows results
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           SCOPE: ${{ needs.changes.outputs.scope }}
-          TEST_RESULT: ${{ needs.platform-tests.result }}
+          TEST_RESULT: ${{ needs.windows-tests.result }}
         run: |
           test "$CHANGES_RESULT" = success
           if [ "$SCOPE" = full ]; then test "$TEST_RESULT" = success; fi
