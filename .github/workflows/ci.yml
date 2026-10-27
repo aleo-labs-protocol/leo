@@ -128,12 +128,15 @@ jobs:
           cache-key: linux-ci-only-testnet
           nextest: 'true'
           snarkos: 'true'
-      - name: Build and test the workspace
+      - name: Build the workspace tests
         run: |
           ulimit -n 65536
           start=$SECONDS
           cargo nextest run --no-run --all --locked --cargo-profile ci --features only_testnet
           echo "Linux test build: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+      - name: Run the workspace tests
+        run: |
+          ulimit -n 65536
           start=$SECONDS
           cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
           echo "Linux test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
@@ -178,12 +181,15 @@ jobs:
           cache-key: ${{ matrix.platform }}-ci-only-testnet
           nextest: 'true'
           snarkos: ${{ matrix.platform == 'macos' }}
-      - name: Build and test the workspace
+      - name: Build the workspace tests
         run: |
           if [ "$RUNNER_OS" != Windows ]; then ulimit -n 65536; fi
           start=$SECONDS
           cargo nextest run --no-run --all --locked --cargo-profile ci --features only_testnet
           echo "$RUNNER_OS test build: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+      - name: Run the workspace tests
+        run: |
+          if [ "$RUNNER_OS" != Windows ]; then ulimit -n 65536; fi
           start=$SECONDS
           cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
           echo "$RUNNER_OS test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"

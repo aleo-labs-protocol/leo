@@ -32,6 +32,16 @@ Documentation-only pull requests run the documentation checks. Changes to `docum
 
 The required check jobs report a result for each scope. They accept an intentional skip but fail when a selected check fails or is cancelled. Linux uses `ubuntu-24.04` by default. Fork pull requests always use GitHub-hosted runners and run the same commands without organization secrets.
 
+## Caching
+
+All hosted Rust jobs cache their build output and a source timestamp manifest in the same archive. This includes workspace tests on each platform, Clippy, formatter validation, Cargo documentation, and the Leo executable build. The manifest uses file hashes and directory membership to restore timestamps for unchanged inputs, including hidden source files. Changed, reverted, added, or deleted inputs cause a rebuild. Each saved manifest contains only the current contents of each path.
+
+The workflow clears any previous local manifest before it restores the archive. It keeps Git metadata fresh so that Leo records the current commit. Directories with untracked files, symbolic links, or build output keep fresh timestamps. Shared Linux runners use the fleet's persistent build cache separately, without this timestamp restoration.
+
+The snarkOS executable and Aleo parameters use separate caches. A verified snarkOS executable is saved immediately, so a later test failure does not discard its build. Future snarkOS cache misses use the same test-network feature with a faster release build configuration. Existing compatible executables remain reusable. The documentation and tree-sitter jobs retain their npm caches.
+
+Unix CLI tests start first but still run one at a time. This lets their long sequence overlap other tests instead of waiting for compiler tests to finish. The workflow reports workspace build time and test time in separate steps.
+
 ## Shared Linux runners
 
 Shared Linux runners are optional. You can run all checks on standard GitHub-hosted runners without infrastructure changes. To enable the shared fleet for branches in this repository, complete these steps:
