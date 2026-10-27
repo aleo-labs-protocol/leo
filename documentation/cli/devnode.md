@@ -126,9 +126,9 @@ A devnode exposes two REST endpoints for evaluating a program's [`view fn`](../l
 
 Both endpoints are mounted under the network prefix (for example `testnet`) and are also available behind the `v1` and `v2` API version prefixes:
 
-| Method | Path                                               | Description                                          |
-| ------ | -------------------------------------------------- | ---------------------------------------------------- |
-| `POST` | `/{network}/program/{id}/view/{function}`          | Evaluate a view function at the latest block height. |
+| Method | Path                                               | Description                                                      |
+| ------ | -------------------------------------------------- | ---------------------------------------------------------------- |
+| `POST` | `/{network}/program/{id}/view/{function}`          | Evaluate a view function at the latest block height.             |
 | `POST` | `/{network}/program/{id}/view/{function}/{height}` | Evaluate a view function if `height` is the latest block height. |
 
 Historical view evaluation is not supported with snarkVM 4.12.0. The endpoint with an explicit height accepts only the latest block height.
