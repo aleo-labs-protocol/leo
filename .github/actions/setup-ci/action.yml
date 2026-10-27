@@ -80,6 +80,10 @@ runs:
       run: |
         cargo install cargo-mtime --version 0.1.1 --locked
         if [ "$RUNNER_OS" != Windows ]; then ulimit -n 65536; fi
+        # A cache can finish after checkout, so unmatched inputs must have fresh timestamps.
+        git ls-files --recurse-submodules -z | xargs -0 touch -c --
+        find . -name .git -prune -o -path ./target -prune -o -type d -exec touch {} +
+        touch "$(git rev-parse --git-path HEAD)"
         db="$HOME/.cache/leo-ci-mtimes/project.db"
         mkdir -p "$(dirname "$db")"
         cargo-mtime . "$db"
