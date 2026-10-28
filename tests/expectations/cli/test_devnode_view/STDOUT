@@ -8,5 +8,7 @@
 422
 --- unknown view is rejected (400) ---
 400
---- view before deployment height is rejected (400) ---
+--- historical view is rejected (400) ---
+400
+--- future view is rejected (400) ---
 400

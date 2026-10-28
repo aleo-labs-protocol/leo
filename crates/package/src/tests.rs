@@ -60,7 +60,7 @@ fn network_pin(bytecode: &str, edition: u16) -> serde_json::Value {
         "name": program.id().to_string(),
         "network": "testnet",
         "edition": edition,
-        "checksum": program.to_checksum().map(|byte| *byte),
+        "checksum": program.to_checksum().iter().map(|byte| format!("{:02x}", **byte)).collect::<String>(),
     })
 }
 
@@ -400,6 +400,59 @@ fn bundled_credits_ignores_hostile_cache() {
         }
         std::fs::remove_dir_all(home).expect("test directory must be removed");
     });
+}
+
+#[test]
+fn network_lock_writes_hex_and_reads_legacy_checksums() {
+    let directory = unique_dir("network-lock-checksum-format");
+    let checksum = std::array::from_fn::<_, 32, _>(|index| index as u8);
+    let expected = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+    for (version, value, expected) in [
+        (2, serde_json::json!(checksum), expected.to_owned()),
+        (3, serde_json::json!(expected), expected.to_owned()),
+        (3, serde_json::json!(expected.to_ascii_uppercase()), expected.to_owned()),
+        (3, serde_json::json!(([255u8; 32])), "ff".repeat(32)),
+    ] {
+        let mut pin = network_pin(TRUSTED_TOKEN, 2);
+        pin["checksum"] = value;
+        write_file(
+            &directory.join(LOCK_FILENAME),
+            &serde_json::json!({"version": version, "network": [pin]}).to_string(),
+        );
+        let mut lock = Lock::read(&directory).expect("legacy arrays and hexadecimal checksums must load");
+        lock.write(&directory).expect("the lock must write");
+        let contents = std::fs::read_to_string(directory.join(LOCK_FILENAME)).expect("the lock must exist");
+        let written: serde_json::Value = serde_json::from_str(&contents).expect("the lock must be JSON");
+        assert_eq!(written["version"], 3);
+        assert_eq!(written["network"][0]["checksum"], expected);
+        assert!(!contents.contains("\"checksum\": ["));
+        assert_eq!(
+            Lock::read(&directory).expect("the written lock must load").network_entries(),
+            lock.network_entries()
+        );
+    }
+    std::fs::remove_dir_all(directory).expect("test directory must be removed");
+}
+
+#[test]
+fn network_lock_rejects_invalid_hex_checksums() {
+    let directory = unique_dir("network-lock-invalid-hex");
+    for value in [
+        serde_json::json!("00".repeat(31)),
+        serde_json::json!("00".repeat(33)),
+        serde_json::json!("gg".repeat(32)),
+        serde_json::json!("é".repeat(32)),
+        serde_json::json!("0x".to_owned() + &"00".repeat(32)),
+        serde_json::json!(([256u16; 32])),
+        serde_json::json!(([-1i16; 32])),
+        serde_json::Value::Null,
+    ] {
+        let mut pin = network_pin(TRUSTED_TOKEN, 0);
+        pin["checksum"] = value;
+        write_file(&directory.join(LOCK_FILENAME), &serde_json::json!({"version": 3, "network": [pin]}).to_string());
+        assert!(Lock::read(&directory).is_err(), "invalid checksums must not load");
+    }
+    std::fs::remove_dir_all(directory).expect("test directory must be removed");
 }
 
 #[test]

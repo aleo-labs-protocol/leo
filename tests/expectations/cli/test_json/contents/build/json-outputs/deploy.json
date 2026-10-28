@@ -18,10 +18,10 @@
         "max_constraints": 4194304,
         "storage_cost": 956000,
         "namespace_cost": 1000000,
-        "synthesis_cost": 95589,
+        "synthesis_cost": 30203,
         "constructor_cost": 10440,
         "priority_fee": 0,
-        "total_cost": 2062029,
+        "total_cost": 1996643,
         "function_costs": [
           {
             "name": "main",

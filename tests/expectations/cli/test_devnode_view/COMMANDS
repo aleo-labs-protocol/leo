@@ -45,9 +45,14 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
     "${ENDPOINT}/v2/testnet/program/${PROG}/view/does_not_exist" \
     -H 'Content-Type: application/json' -d "[\"${ADDR}\"]"
 
-echo "--- view before deployment height is rejected (400) ---"
+echo "--- historical view is rejected (400) ---"
 curl -s -o /dev/null -w "%{http_code}\n" -X POST \
     "${ENDPOINT}/v2/testnet/program/${PROG}/view/get_balance/1" \
+    -H 'Content-Type: application/json' -d "[\"${ADDR}\"]"
+
+echo "--- future view is rejected (400) ---"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+    "${ENDPOINT}/v2/testnet/program/${PROG}/view/get_balance/4294967295" \
     -H 'Content-Type: application/json' -d "[\"${ADDR}\"]"
 
 exit 0

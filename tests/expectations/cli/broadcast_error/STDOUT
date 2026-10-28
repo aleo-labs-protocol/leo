@@ -48,11 +48,11 @@ Once it is deployed, it CANNOT be changed.
 
 💰 Cost Breakdown (credits)
   Transaction Storage:  0.914000
-  Program Synthesis:    0.095589
+  Program Synthesis:    0.030118
   Namespace:            1.000000
   Constructor:          0.002000
   Priority Fee:         0.000000
-  Total Fee:            2.011589
+  Total Fee:            1.946118
   Function 'main'
     Total Execution Cost:   0.001326
     |- Storage Cost:        0.001326
@@ -125,11 +125,11 @@ Once it is deployed, it CANNOT be changed.
 
 💰 Cost Breakdown (credits)
   Transaction Storage:  0.914000
-  Program Synthesis:    0.095589
+  Program Synthesis:    0.030118
   Namespace:            1.000000
   Constructor:          0.002000
   Priority Fee:         0.000000
-  Total Fee:            2.011589
+  Total Fee:            1.946118
   Function 'main'
     Total Execution Cost:   0.001326
     |- Storage Cost:        0.001326
