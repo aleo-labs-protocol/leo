@@ -126,10 +126,12 @@ A devnode exposes two REST endpoints for evaluating a program's [`view fn`](../l
 
 Both endpoints are mounted under the network prefix (for example `testnet`) and are also available behind the `v1` and `v2` API version prefixes:
 
-| Method | Path                                               | Description                                          |
-| ------ | -------------------------------------------------- | ---------------------------------------------------- |
-| `POST` | `/{network}/program/{id}/view/{function}`          | Evaluate a view function at the latest block height. |
-| `POST` | `/{network}/program/{id}/view/{function}/{height}` | Evaluate a view function at a specific block height. |
+| Method | Path                                               | Description                                                      |
+| ------ | -------------------------------------------------- | ---------------------------------------------------------------- |
+| `POST` | `/{network}/program/{id}/view/{function}`          | Evaluate a view function at the latest block height.             |
+| `POST` | `/{network}/program/{id}/view/{function}/{height}` | Evaluate a view function if `height` is the latest block height. |
+
+Historical view evaluation is not supported with snarkVM 4.12.0. The endpoint with an explicit height accepts only the latest block height.
 
 The request body is a JSON array of the view function's inputs, each encoded as an Aleo value string. Pass `[]` when the function takes no inputs. The response is a JSON array of the function's outputs.
 
@@ -148,13 +150,14 @@ curl -X POST 'http://localhost:3030/testnet/program/my_program.aleo/view/my_view
   -H 'Content-Type: application/json' \
   -d '[]'
 
-# Evaluate against historical state at block height 10
-curl -X POST http://localhost:3030/testnet/program/my_program.aleo/view/my_view/10 \
+# Evaluate at the current block height
+HEIGHT=$(curl -s http://localhost:3030/testnet/block/height/latest)
+curl -X POST "http://localhost:3030/testnet/program/my_program.aleo/view/my_view/${HEIGHT}" \
   -H 'Content-Type: application/json' \
   -d '[]'
 ```
 
-Under the `v2` prefix, malformed inputs return `422 Unprocessable Entity`. An unknown view function or a height before program deployment returns `400 Bad Request`.
+Under the `v2` prefix, malformed inputs return `422 Unprocessable Entity`. An unknown view function or a height other than the latest block height returns `400 Bad Request`.
 
 ## Typical Workflow
 

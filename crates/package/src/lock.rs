@@ -27,7 +27,7 @@ use std::{io::Write, path::Path};
 /// File name of the lock file, stored alongside `program.json`.
 pub const LOCK_FILENAME: &str = "leo.lock";
 
-const LOCK_VERSION: u32 = 2;
+const LOCK_VERSION: u32 = 3;
 
 /// A single pinned git dependency.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,7 +47,36 @@ pub struct NetworkLockEntry {
     pub network: String,
     pub edition: u16,
     /// The SHA3-256 checksum of the canonical Aleo program, as 32 bytes.
+    #[serde(serialize_with = "serialize_checksum", deserialize_with = "deserialize_checksum")]
     pub checksum: [u8; 32],
+}
+
+fn serialize_checksum<S: serde::Serializer>(
+    checksum: &[u8; 32],
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(64);
+    for byte in checksum {
+        encoded.push(HEX[usize::from(byte >> 4)] as char);
+        encoded.push(HEX[usize::from(byte & 15)] as char);
+    }
+    serializer.serialize_str(&encoded)
+}
+
+fn deserialize_checksum<'de, D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<[u8; 32], D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    let serde_json::Value::String(encoded) = value else {
+        return serde_json::from_value(value).map_err(serde::de::Error::custom);
+    };
+    if encoded.len() != 64 || !encoded.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(serde::de::Error::custom("expected 64 hexadecimal characters"));
+    }
+    let mut checksum = [0; 32];
+    for (index, byte) in checksum.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&encoded[index * 2..index * 2 + 2], 16).map_err(serde::de::Error::custom)?;
+    }
+    Ok(checksum)
 }
 
 /// The contents of `leo.lock`.
@@ -78,7 +107,7 @@ impl Lock {
         };
         let mut lock: Self =
             serde_json::from_str(&contents).map_err(|err| crate::errors::invalid_lock_file(path.display(), err))?;
-        if !matches!(lock.version, 1 | LOCK_VERSION) {
+        if !matches!(lock.version, 1 | 2 | LOCK_VERSION) {
             return Err(crate::errors::invalid_lock_file(path.display(), "unsupported lock version").into());
         }
         let mut seen = IndexSet::with_capacity(lock.network.len());

@@ -583,7 +583,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
     /// POST /{network}/program/{id}/view/{functionName}/{height}
     ///
-    /// Evaluates a view function against the ledger state at the given block `height`.
+    /// Evaluates a view function at `height` if it is the latest block height.
     pub(crate) async fn evaluate_view(
         State(rest): State<Self>,
         Path((program_id, view_name, height)): Path<ViewFunctionRoute<N>>,
@@ -597,7 +597,26 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         let inputs = parse_view_inputs(&raw_inputs)?;
 
         let outputs = match tokio::task::spawn_blocking(move || {
-            rest.ledger.vm().evaluate_view_at_height(program_id, view_name, inputs, height)
+            let block = rest.ledger.latest_block();
+            anyhow::ensure!(
+                height == block.height(),
+                "View evaluation is only supported at the latest block height ({})",
+                block.height()
+            );
+            let block_timestamp =
+                (height >= N::CONSENSUS_HEIGHT(ConsensusVersion::V12).unwrap_or_default()).then_some(block.timestamp());
+            let state = FinalizeGlobalState::new::<N>(
+                block.round(),
+                height,
+                block_timestamp,
+                block.cumulative_weight(),
+                block.cumulative_proof_target(),
+                block.previous_hash(),
+                None,
+                None,
+            )?;
+            let stack = rest.ledger.vm().process().get_stack(program_id)?;
+            stack.evaluate_view(state, rest.ledger.vm().finalize_store(), &view_name, inputs)
         })
         .await
         {
