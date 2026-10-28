@@ -583,7 +583,7 @@ pub fn run_with_ledger(
                     &genesis_private_key,
                     &aleo_program,
                     edition,
-                    latest_consensus_version,
+                    CurrentNetwork::CONSENSUS_VERSION(ledger.latest_height())?,
                     &mut rng,
                 )
                 .map_err(|e| anyhow!("Failed to deploy program {name}: {e}"))?
@@ -670,7 +670,8 @@ pub fn run_with_ledger(
                                 SvmValue::from_str("1_000_000_000_000u64").expect("Failed to parse amount"),
                             ]
                             .iter(),
-                            latest_consensus_version,
+                            CurrentNetwork::CONSENSUS_VERSION(ledger.latest_height())
+                                .expect("Failed to determine funding consensus version"),
                             &mut rng,
                         )
                         .expect("Failed to generate funding transaction");
@@ -738,7 +739,7 @@ pub fn run_with_ledger(
                                 &case.program_name,
                                 &case.function,
                                 case.input.iter(),
-                                latest_consensus_version,
+                                CurrentNetwork::CONSENSUS_VERSION(ledger.latest_height())?,
                                 &mut rng,
                             )
                         } else {
