@@ -167,20 +167,22 @@ view echo_point:
 view current_counter:
     contains counter__[false] into r0;
     get.or_use counter__[false] 0u32 into r1;
-    ternary r0 r1 0u32 into r2;
-    cast r0 r2 into r3 as Optional__JzunLORyB8U;
-    ternary r3.is_some r3.val 0u32 into r4;
-    output r4 as u32.public;
+    cast true r1 into r2 as Optional__JzunLORyB8U;
+    cast false 0u32 into r3 as Optional__JzunLORyB8U;
+    ternary r0 r2 r3 into r4;
+    ternary r4.is_some r4.val 0u32 into r5;
+    output r5 as u32.public;
 
 view counters:
     contains counter__[false] into r0;
     get.or_use counter__[false] 0u32 into r1;
-    ternary r0 r1 0u32 into r2;
-    cast r0 r2 into r3 as Optional__JzunLORyB8U;
-    ternary r3.is_some r3.val 0u32 into r4;
-    add r4 1u32 into r5;
-    output r4 as u32.public;
+    cast true r1 into r2 as Optional__JzunLORyB8U;
+    cast false 0u32 into r3 as Optional__JzunLORyB8U;
+    ternary r0 r2 r3 into r4;
+    ternary r4.is_some r4.val 0u32 into r5;
+    add r5 1u32 into r6;
     output r5 as u32.public;
+    output r6 as u32.public;
 
 constructor:
     assert.eq edition 0u16;
