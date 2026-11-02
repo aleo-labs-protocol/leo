@@ -1,6 +1,6 @@
 /*
 seed = 123456789
-start_height = 20
+start_height = 26
 
 [case]
 program = "logger.aleo"

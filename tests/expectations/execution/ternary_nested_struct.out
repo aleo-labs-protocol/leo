@@ -1,0 +1,36 @@
+program test.aleo;
+
+struct Point:
+    x as u32;
+    y as u32;
+
+struct Segment:
+    lo as Point;
+    hi as Point;
+    tag as u32;
+
+function select:
+    input r0 as boolean.private;
+    input r1 as Segment.private;
+    input r2 as Segment.private;
+    ternary r0 r1 r2 into r3;
+    output r3 as Segment.private;
+
+constructor:
+    assert.eq edition 0u16;
+status: success
+output: {lo: {
+  x: 1u32,
+  y: 2u32
+}, hi: {
+  x: 3u32,
+  y: 4u32
+}, tag: 5u32}
+status: success
+output: {lo: {
+  x: 10u32,
+  y: 20u32
+}, hi: {
+  x: 30u32,
+  y: 40u32
+}, tag: 50u32}

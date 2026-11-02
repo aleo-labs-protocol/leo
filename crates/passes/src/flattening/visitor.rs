@@ -17,9 +17,6 @@
 use crate::CompilerState;
 
 use leo_ast::{
-    ArrayAccess,
-    ArrayExpression,
-    ArrayType,
     AstReconstructor,
     BinaryExpression,
     BinaryOperation,
@@ -30,7 +27,6 @@ use leo_ast::{
     CompositeType,
     Expression,
     Identifier,
-    IntegerType,
     Literal,
     Member,
     MemberAccess,
@@ -365,98 +361,7 @@ impl FlatteningVisitor<'_> {
         }
     }
 
-    // For use in `ternary_array`.
-    fn make_array_access_definition(
-        &mut self,
-        i: usize,
-        identifier: Identifier,
-        array_type: &ArrayType,
-    ) -> (Identifier, Statement) {
-        let index =
-            Literal::integer(IntegerType::U32, i.to_string(), Default::default(), self.state.node_builder.next_id());
-        self.state.type_table.insert(index.id(), Type::U32);
-        let access: Expression = ArrayAccess {
-            array: Path::from(identifier).to_local().into(),
-            index: index.into(),
-            span: Default::default(),
-            id: self.state.node_builder.next_id(),
-        }
-        .into();
-        let element_ty = self.state.types.intern(array_type.element_type());
-        self.state.type_table.insert(access.id(), element_ty);
-        self.unique_simple_definition(access)
-    }
-
-    pub fn ternary_array(
-        &mut self,
-        array: &ArrayType,
-        condition: &Expression,
-        first: &Identifier,
-        second: &Identifier,
-    ) -> (Expression, Vec<Statement>) {
-        // Initialize a vector to accumulate any statements generated.
-        let mut statements = Vec::new();
-        // For each array element, construct a new ternary expression.
-        let elements = (0..array.length.as_u32().expect("length should be known at this point") as usize)
-            .map(|i| {
-                // Create an assignment statement for the first access expression.
-                let (first, stmt) = self.make_array_access_definition(i, *first, array);
-                statements.push(stmt);
-                // Create an assignment statement for the second access expression.
-                let (second, stmt) = self.make_array_access_definition(i, *second, array);
-                statements.push(stmt);
-
-                // Recursively reconstruct the ternary expression.
-                let ternary = TernaryExpression {
-                    condition: condition.clone(),
-                    // Access the member of the first expression.
-                    if_true: Path::from(first).to_local().into(),
-                    // Access the member of the second expression.
-                    if_false: Path::from(second).to_local().into(),
-                    span: Default::default(),
-                    id: self.state.node_builder.next_id(),
-                };
-                let element_ty = self.state.types.intern(array.element_type());
-                self.state.type_table.insert(ternary.id(), element_ty);
-
-                let (expression, stmts) = self.reconstruct_ternary(ternary, &());
-
-                // Accumulate any statements generated.
-                statements.extend(stmts);
-
-                expression
-            })
-            .collect();
-
-        // Construct the array expression.
-        let (expr, stmts) = self.reconstruct_array(
-            ArrayExpression {
-                elements,
-                span: Default::default(),
-                id: {
-                    // Create a node ID for the array expression.
-                    let id = self.state.node_builder.next_id();
-                    // Set the type of the node ID.
-                    let array_ty = self.state.types.intern(&TypeKind::Array(array.clone()));
-                    self.state.type_table.insert(id, array_ty);
-                    id
-                },
-            },
-            &(),
-        );
-
-        // Accumulate any statements generated.
-        statements.extend(stmts);
-
-        // Create a new assignment statement for the array expression.
-        let (identifier, statement) = self.unique_simple_definition(expr);
-
-        statements.push(statement);
-
-        (Path::from(identifier).to_local().into(), statements)
-    }
-
-    // For use in `ternary_composite`.
+    /// Constructs an access expression `inner.name` bound to a fresh identifier.
     fn make_composite_access_definition(
         &mut self,
         inner: Identifier,
@@ -474,6 +379,8 @@ impl FlatteningVisitor<'_> {
         self.unique_simple_definition(expr)
     }
 
+    /// Constructs a record from separate ternary selections for each field.
+    /// Plaintext structs use the Aleo `ternary` instruction directly.
     pub fn ternary_composite(
         &mut self,
         composite_path: &Path,
@@ -482,9 +389,7 @@ impl FlatteningVisitor<'_> {
         first: &Identifier,
         second: &Identifier,
     ) -> (Expression, Vec<Statement>) {
-        // Initialize a vector to accumulate any statements generated.
         let mut statements = Vec::new();
-        // For each composite member, construct a new ternary expression.
         let members = composite
             .members
             .iter()
@@ -494,7 +399,6 @@ impl FlatteningVisitor<'_> {
                 statements.push(stmt);
                 let (second, stmt) = self.make_composite_access_definition(*second, *identifier, member_ty);
                 statements.push(stmt);
-                // Recursively reconstruct the ternary expression.
                 let ternary = TernaryExpression {
                     condition: condition.clone(),
                     if_true: Path::from(first).to_local().into(),
@@ -504,8 +408,6 @@ impl FlatteningVisitor<'_> {
                 };
                 self.state.type_table.insert(ternary.id(), member_ty);
                 let (expression, stmts) = self.reconstruct_ternary(ternary, &());
-
-                // Accumulate any statements generated.
                 statements.extend(stmts);
 
                 CompositeFieldInitializer {
@@ -520,17 +422,15 @@ impl FlatteningVisitor<'_> {
         let (expr, stmts) = self.reconstruct_composite_init(
             CompositeExpression {
                 path: composite_path.clone(),
-                const_arguments: Vec::new(), // All const arguments should have been resolved by now
+                const_arguments: Vec::new(),
                 members,
                 base: None,
                 span: Default::default(),
                 id: {
-                    // Create a new node ID for the comopsite expression.
                     let id = self.state.node_builder.next_id();
-                    // Set the type of the node ID.
                     let comp_ty = self.state.types.intern(&TypeKind::Composite(CompositeType {
                         path: composite_path.clone(),
-                        const_arguments: Vec::new(), // all const generics should have been resolved by now
+                        const_arguments: Vec::new(),
                     }));
                     self.state.type_table.insert(id, comp_ty);
                     id
@@ -539,12 +439,9 @@ impl FlatteningVisitor<'_> {
             &(),
         );
 
-        // Accumulate any statements generated.
         statements.extend(stmts);
 
-        // Create a new assignment statement for the composite expression.
         let (identifier, statement) = self.unique_simple_definition(expr);
-
         statements.push(statement);
 
         (Path::from(identifier).to_local().into(), statements)
