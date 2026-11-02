@@ -1,18 +1,18 @@
-const M: u32 = 52;
+export const M: u32 = 52;
 
-struct Foo::[N: u32] {
+export struct Foo::[N: u32] {
     arr: [u32; N],
 }
 
-struct Goo::[P: u32] {
+export struct Goo::[P: u32] {
     f: Foo::[P],
 }
 
-struct Boo::[P: u32] {
+export struct Boo::[P: u32] {
     g: Goo::[P],
 }
 
-struct Baz {
+export struct Baz {
     f: Foo::[10u32],
 }
 
@@ -32,4 +32,7 @@ program test.aleo {
         };
         return g.f.arr[6] + s.arr[7] + g2.f.arr[5] + boo.g.f.arr[8];
     }
+
+    @noupgrade
+    constructor() {}
 }

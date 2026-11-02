@@ -26,3 +26,6 @@ finalize update:
     input r2 as Segment.public;
     ternary r0 r1 r2 into r3;
     set r3 into segs[0u32];
+
+constructor:
+    assert.eq edition 0u16;

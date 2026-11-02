@@ -3,7 +3,7 @@
 // there is nothing to ignore because generic functions cannot be closures.
 
 @no_inline
-fn scale::[N: u32](x: u32) -> u32 {
+export fn scale::[N: u32](x: u32) -> u32 {
     return x * N;
 }
 
@@ -11,4 +11,7 @@ program test.aleo {
     fn main(x: u32) -> u32 {
         return scale::[3u32](x);
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -3,9 +3,9 @@
     │
  11 │ ╭─▶ program test.aleo: Counter + Calculator {
     ┆ ┆   
- 20 │ ├─▶ }
+ 23 │ ├─▶ }
     │ │       
-    │ ╰─────── 
+    │ ╰─────── here
     │     
     │     Help: Add the missing function `add` with the exact signature specified in `test.aleo/Calculator`.
 ────╯

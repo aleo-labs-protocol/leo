@@ -20,7 +20,7 @@
 
 #![forbid(unsafe_code)]
 
-use leo_ast::{AleoProgram, FunctionStub, Identifier, NetworkName, NodeBuilder, ProgramId, Stub};
+use leo_ast::{AleoProgram, FunctionStub, Identifier, NetworkName, NodeBuilder, ProgramId, Stub, TypeInterner};
 use leo_compiler::{Compiler, CompilerOptions};
 use leo_errors::Handler;
 use leo_package::{Package, ProgramData};
@@ -28,11 +28,7 @@ use leo_parser::parse_program;
 use leo_span::{Symbol, source_map::FileName, with_session_globals};
 use snarkvm::prelude::{CanaryV0, MainnetV0, TestnetV0};
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::{fs, path::Path, rc::Rc};
 
 use indexmap::IndexMap;
 use walkdir::WalkDir;
@@ -104,18 +100,25 @@ fn parse_interface_stub(program_name: Symbol, source: &Path, source_dir: &Path) 
         .map(|(source, filename)| with_session_globals(|s| s.source_map.new_source(source, filename.clone())))
         .collect::<Vec<_>>();
     let node_builder = NodeBuilder::default();
+    let interner = TypeInterner::default();
 
-    let program =
-        match parse_program(Handler::default(), &node_builder, &source_file, &module_source_files, BENCH_NETWORK) {
-            Ok(ast) => ast,
-            Err(err) => {
-                return Err(format!(
-                    "failed to parse dependency {}.aleo interface source {}: {err}",
-                    program_name,
-                    source.display()
-                ));
-            }
-        };
+    let program = match parse_program(
+        Handler::default(),
+        &node_builder,
+        &interner,
+        &source_file,
+        &module_source_files,
+        BENCH_NETWORK,
+    ) {
+        Ok(ast) => ast,
+        Err(err) => {
+            return Err(format!(
+                "failed to parse dependency {}.aleo interface source {}: {err}",
+                program_name,
+                source.display()
+            ));
+        }
+    };
 
     // Extract the single program scope.
     let scope = match program.program_scopes.values().next() {
@@ -199,6 +202,7 @@ pub fn load_fixture(package_dir: &Path) -> Result<FixtureData, String> {
         &home,
         false, // no_cache
         false, // no_local
+        false, // offline
         Some(BENCH_NETWORK),
         None, // no endpoint needed for local-only fixtures
         2,
@@ -277,7 +281,6 @@ pub fn create_compiler(fixture: &FixtureData) -> Compiler {
         false,
         Handler::default(),
         Rc::new(NodeBuilder::default()),
-        PathBuf::default(),
         Some(CompilerOptions::default()),
         fixture.import_stubs.clone(),
         fixture.network,
@@ -293,7 +296,6 @@ pub fn create_parse_only_compiler(fixture: &FixtureData) -> Compiler {
         false,
         Handler::default(),
         Rc::new(NodeBuilder::default()),
-        PathBuf::default(),
         Some(CompilerOptions::default()),
         IndexMap::new(),
         fixture.network,

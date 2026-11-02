@@ -1,12 +1,14 @@
+export struct Inner {
+    v: u32,
+}
+
+export struct Outer {
+    inner: Inner,
+}
+
 program test.aleo {
-    struct Inner {
-        v: u32,
-    }
-
-    struct Outer {
-        inner: Inner,
-    }
-
+    @noupgrade
+    constructor() {}
     // Nested composites: SSA lowers `o.inner.v` into a pair of accesses
     // (`$t = o.inner; $t.v`). The first access forwards to the tracked
     // atom for `o.inner` (`Path(i)`), but the second access sits on the

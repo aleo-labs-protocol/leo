@@ -3,7 +3,7 @@
     "address": "XXXXXX",
     "network": "testnet",
     "endpoint": "http://localhost:3030",
-    "consensus_version": 15
+    "consensus_version": 22
   },
   "deployments": [
     {
@@ -11,11 +11,11 @@
       "transaction_id": "XXXXXX",
       "stats": {
         "program_size_bytes": 381,
-        "max_program_size_bytes": 512000,
+        "max_program_size_bytes": 2048000,
         "total_variables": 17276,
         "total_constraints": 12927,
-        "max_variables": 2097152,
-        "max_constraints": 2097152,
+        "max_variables": 4194304,
+        "max_constraints": 4194304,
         "storage_cost": 956000,
         "namespace_cost": 1000000,
         "synthesis_cost": 30203,

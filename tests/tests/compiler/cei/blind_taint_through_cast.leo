@@ -7,9 +7,12 @@ program exchange.aleo {
     fn get_rate(a: u32) -> (u64, Final) {
         return (0u64, final { finalize_get_rate(a); });
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_get_rate(a: u32) {
+export final fn finalize_get_rate(a: u32) {
     Mapping::set(rates, 0u32, a as u64);
 }
 
@@ -30,4 +33,7 @@ program caller.aleo {
             f.run();
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

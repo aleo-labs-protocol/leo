@@ -1,32 +1,38 @@
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-    ╭─[ compiler-test:10:18 ]
+    ╭─[ compiler-test:10:25 ]
     │
- 10 │ ╭─▶ interface ILeft {
+ 10 │ ╭─▶ export interface ILeft {
     ┆ ┆   
  14 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Simplify the declaration to `record Token;`.
 ────╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-   ╭─[ compiler-test:3:19 ]
+   ╭─[ compiler-test:3:26 ]
    │
- 3 │ ╭─▶ interface IRight {
+ 3 │ ╭─▶ export interface IRight {
    ┆ ┆   
  7 │ ├─▶     }
    │ │           
-   │ ╰─────────── 
+   │ ╰─────────── here
    │     
    │     Help: Simplify the declaration to `record Token;`.
 ───╯
 program lib1.aleo;
 
 function dummy:
+
+constructor:
+    assert.eq edition 0u16;
 // --- Next Program --- //
 program lib2.aleo;
 
 function dummy:
+
+constructor:
+    assert.eq edition 0u16;
 // --- Next Program --- //
 import lib1.aleo;
 import lib2.aleo;
@@ -47,6 +53,9 @@ function stake:
 
 function main:
 
+constructor:
+    assert.eq edition 0u16;
+
 
 ---
 Note: Treating dependencies as Aleo produces different results:
@@ -66,46 +75,46 @@ Note: Treating dependencies as Aleo produces different results:
    │ Help: Make sure the interface is defined in the current program or an imported program.
 ───╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-    ╭─[ compiler-test:10:18 ]
+    ╭─[ compiler-test:10:25 ]
     │
- 10 │ ╭─▶ interface ILeft {
+ 10 │ ╭─▶ export interface ILeft {
     ┆ ┆   
  14 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Simplify the declaration to `record Token;`.
 ────╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-    ╭─[ compiler-test:10:18 ]
+    ╭─[ compiler-test:10:25 ]
     │
- 10 │ ╭─▶ interface ILeft {
+ 10 │ ╭─▶ export interface ILeft {
     ┆ ┆   
  14 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Simplify the declaration to `record Token;`.
 ────╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-   ╭─[ compiler-test:3:19 ]
+   ╭─[ compiler-test:3:26 ]
    │
- 3 │ ╭─▶ interface IRight {
+ 3 │ ╭─▶ export interface IRight {
    ┆ ┆   
  7 │ ├─▶     }
    │ │           
-   │ ╰─────────── 
+   │ ╰─────────── here
    │     
    │     Help: Simplify the declaration to `record Token;`.
 ───╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-   ╭─[ compiler-test:3:19 ]
+   ╭─[ compiler-test:3:26 ]
    │
- 3 │ ╭─▶ interface IRight {
+ 3 │ ╭─▶ export interface IRight {
    ┆ ┆   
  7 │ ├─▶     }
    │ │           
-   │ ╰─────────── 
+   │ ╰─────────── here
    │     
    │     Help: Simplify the declaration to `record Token;`.
 ───╯

@@ -334,14 +334,20 @@ fn ident_to_kind(s: &str) -> SyntaxKind {
         // Visibility & assertion keywords
         "public" => KW_PUBLIC,
         "private" => KW_PRIVATE,
+        "export" => KW_EXPORT,
         "as" => KW_AS,
         "self" => KW_SELF,
+        "Self" => KW_SELF_UPPER,
         "assert" => KW_ASSERT,
         "assert_eq" => KW_ASSERT_EQ,
         "assert_neq" => KW_ASSERT_NEQ,
         // Not a keyword
         _ => IDENT,
     }
+}
+
+pub(crate) fn is_keyword(s: &str) -> bool {
+    ident_to_kind(s).is_keyword()
 }
 
 /// Strip integer type suffix from a string, returning the numeric part.
@@ -722,6 +728,14 @@ mod tests {
             KW_IDENTIFIER "identifier"
             EOF ""
         "#]]);
+    }
+
+    #[test]
+    fn keyword_predicate_matches_identifier_keywords() {
+        assert!(super::is_keyword("view"));
+        assert!(super::is_keyword("dyn"));
+        assert!(super::is_keyword("in"));
+        assert!(!super::is_keyword("inside"));
     }
 
     #[test]

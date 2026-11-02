@@ -4,9 +4,12 @@ program test.aleo {
     fn mint_public(public receiver: address, public amount: u64) {
         return final { finalize_mint_public(receiver, amount); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_mint_public(receiver: address, amount: u64) {
+export final fn finalize_mint_public(receiver: address, amount: u64) {
     let has_key: bool = Mapping::has_key(account, receiver);
     Mapping::set(account, receiver, amount);
 }

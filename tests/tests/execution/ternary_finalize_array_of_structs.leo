@@ -1,23 +1,14 @@
 /*
 seed = 123456789
-min_height = 16
 
 [case]
 program = "test.aleo"
 function = "update"
-input = [
-    "true",
-    "[{ x: 1u32, y: 2u32 }, { x: 3u32, y: 4u32 }]",
-    "[{ x: 10u32, y: 20u32 }, { x: 30u32, y: 40u32 }]",
-]
+input = ["true", "[{ x: 1u32, y: 2u32 }, { x: 3u32, y: 4u32 }]", "[{ x: 10u32, y: 20u32 }, { x: 30u32, y: 40u32 }]",]
 [case]
 program = "test.aleo"
 function = "update"
-input = [
-    "false",
-    "[{ x: 1u32, y: 2u32 }, { x: 3u32, y: 4u32 }]",
-    "[{ x: 10u32, y: 20u32 }, { x: 30u32, y: 40u32 }]",
-]
+input = ["false", "[{ x: 1u32, y: 2u32 }, { x: 3u32, y: 4u32 }]", "[{ x: 10u32, y: 20u32 }, { x: 30u32, y: 40u32 }]",]
 */
 
 struct Point {

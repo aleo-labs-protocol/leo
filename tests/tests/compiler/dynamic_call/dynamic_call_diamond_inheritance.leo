@@ -1,16 +1,16 @@
-interface Base {
+export interface Base {
     fn get_value() -> u64;
 }
 
-interface Left: Base {
+export interface Left: Base {
     fn left_op() -> u64;
 }
 
-interface Right: Base {
+export interface Right: Base {
     fn right_op() -> u64;
 }
 
-interface Diamond: Left + Right {
+export interface Diamond: Left + Right {
 }
 
 program test.aleo: Diamond {
@@ -29,4 +29,7 @@ program test.aleo: Diamond {
     fn main(target: field) -> u64 {
         return Base@(target)::get_value();
     }
+
+    @noupgrade
+    constructor() {}
 }

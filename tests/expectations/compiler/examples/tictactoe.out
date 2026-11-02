@@ -155,3 +155,6 @@ function make_move:
     ternary r72 1u8 r77 into r79;
     output r78 as Board.private;
     output r79 as u8.private;
+
+constructor:
+    assert.eq edition 0u16;

@@ -1,11 +1,11 @@
+export struct wrapper {
+    data: [token; 2],
+}
+
 program test.aleo {
     record token {
         owner: address,
         amount: u64,
-    }
-
-    struct wrapper {
-        data: [token; 2],
     }
 
     fn main(owner: address) -> u8 {
@@ -13,4 +13,7 @@ program test.aleo {
         let arr: [token; 2] = [t, t];
         return 0u8;
     }
+
+    @noupgrade
+    constructor() {}
 }

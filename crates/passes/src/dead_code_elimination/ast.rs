@@ -22,6 +22,10 @@ impl AstReconstructor for DeadCodeEliminatingVisitor<'_> {
     type AdditionalInput = ();
     type AdditionalOutput = ();
 
+    fn interner(&self) -> &TypeInterner {
+        &self.state.types
+    }
+
     /* Expressions */
     // Use and reconstruct a path.
     fn reconstruct_path(&mut self, input: Path, _additional: &()) -> (Expression, Self::AdditionalOutput) {
@@ -58,20 +62,14 @@ impl AstReconstructor for DeadCodeEliminatingVisitor<'_> {
 
     /// Reconstructs the statements inside a basic block, eliminating any dead code.
     fn reconstruct_block(&mut self, block: Block) -> (Block, Self::AdditionalOutput) {
-        // Don't count empty blocks as statements, as that would be a bit misleading to the user as
-        // to how much the code is being transformed.
-        self.statements_before += block.statements.iter().filter(|stmt| !stmt.is_empty()).count() as u32;
-
         // Reconstruct each of the statements in reverse.
         let mut statements: Vec<Statement> =
             block.statements.into_iter().rev().map(|statement| self.reconstruct_statement(statement).0).collect();
 
-        statements.retain(|stmt| !stmt.is_empty());
+        statements.retain(|stmt| !stmt.is_removable());
 
         // Reverse the direction of `statements`.
         statements.reverse();
-
-        self.statements_after += statements.len() as u32;
 
         (Block { statements, span: block.span, id: block.id }, Default::default())
     }
@@ -86,7 +84,7 @@ impl AstReconstructor for DeadCodeEliminatingVisitor<'_> {
             }
         };
 
-        if !lhs_is_used && self.is_pure(&input.value) {
+        if !lhs_is_used && self.can_discard(&input.value) {
             // We can eliminate this statement.
             (Statement::dummy(), Default::default())
         } else {
@@ -102,7 +100,7 @@ impl AstReconstructor for DeadCodeEliminatingVisitor<'_> {
     }
 
     fn reconstruct_expression_statement(&mut self, input: ExpressionStatement) -> (Statement, Self::AdditionalOutput) {
-        if self.is_pure(&input.expression) {
+        if self.can_discard(&input.expression) {
             (Statement::dummy(), Default::default())
         } else {
             (

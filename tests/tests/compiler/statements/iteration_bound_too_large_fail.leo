@@ -1,6 +1,9 @@
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}
 
-fn calculate_interest(principal: u64, rate: u64, periods: u64) -> u64 {
+export fn calculate_interest(principal: u64, rate: u64, periods: u64) -> u64 {
     let amount: u64 = principal;
     for i: u64 in 0u64..1000000000000000000000000000000000000000000000000000000000000000000000000000000000000u64 {
         if i < periods {

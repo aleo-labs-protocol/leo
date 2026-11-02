@@ -31,7 +31,7 @@ use leo_ast::{
     ProgramScope,
     RecordPrototype,
     StorageVariablePrototype,
-    Type,
+    TypeKind,
     UnitVisitor,
     Variant,
 };
@@ -211,7 +211,7 @@ impl<'a> CheckInterfacesVisitor<'a> {
                                     return None;
                                 }
                                 Some(cm)
-                                    if !cm.type_.eq_user(&parent_member.type_)
+                                    if !cm.type_.types_equivalent(&parent_member.type_)
                                         || !cm.mode.eq_user(&parent_member.mode) =>
                                 {
                                     self.state.handler.emit_err(
@@ -254,8 +254,8 @@ impl<'a> CheckInterfacesVisitor<'a> {
                     flattened.mappings.iter().find(|m| m.identifier.name == parent_mapping.identifier.name)
                 {
                     // Same name exists - check if types are compatible.
-                    if !existing_mapping.key_type.eq_user(&parent_mapping.key_type)
-                        || !existing_mapping.value_type.eq_user(&parent_mapping.value_type)
+                    if !existing_mapping.key_type.types_equivalent(&parent_mapping.key_type)
+                        || !existing_mapping.value_type.types_equivalent(&parent_mapping.value_type)
                     {
                         self.state.handler.emit_err(crate::errors::check_interfaces::conflicting_interface_member(
                             parent_mapping.identifier.name,
@@ -278,7 +278,7 @@ impl<'a> CheckInterfacesVisitor<'a> {
                     flattened.storages.iter().find(|s| s.identifier.name == parent_storage.identifier.name)
                 {
                     // Same name exists - check if types are compatible.
-                    if !existing_storage.type_.eq_user(&parent_storage.type_) {
+                    if !existing_storage.type_.types_equivalent(&parent_storage.type_) {
                         self.state.handler.emit_err(crate::errors::check_interfaces::conflicting_interface_member(
                             parent_storage.identifier.name,
                             interface_name,
@@ -428,8 +428,8 @@ impl<'a> CheckInterfacesVisitor<'a> {
             match program_scope.mappings.iter().find(|(name, _)| *name == mapping_name) {
                 Some((_, program_mapping)) => {
                     // Mapping exists - check types match.
-                    if !program_mapping.key_type.eq_user(&required_mapping.key_type)
-                        || !program_mapping.value_type.eq_user(&required_mapping.value_type)
+                    if !program_mapping.key_type.types_equivalent(&required_mapping.key_type)
+                        || !program_mapping.value_type.types_equivalent(&required_mapping.value_type)
                     {
                         self.state.handler.emit_err(crate::errors::check_interfaces::mapping_type_mismatch(
                             mapping_name,
@@ -459,12 +459,12 @@ impl<'a> CheckInterfacesVisitor<'a> {
             match program_scope.storage_variables.iter().find(|(name, _)| *name == storage_name) {
                 Some((_, program_storage)) => {
                     // Storage exists - check type matches.
-                    if !program_storage.type_.eq_user(&required_storage.type_) {
+                    if !program_storage.type_.types_equivalent(&required_storage.type_) {
                         self.state.handler.emit_err(crate::errors::check_interfaces::storage_type_mismatch(
                             storage_name,
                             interface_location,
-                            &required_storage.type_,
-                            &program_storage.type_,
+                            required_storage.type_.kind(),
+                            program_storage.type_.kind(),
                             program_storage.span,
                         ));
                     }
@@ -492,18 +492,18 @@ impl<'a> CheckInterfacesVisitor<'a> {
         a.input.len() == b.input.len() &&
         a.input.iter().zip(b.input.iter()).all(|(input_a, input_b)| {
             // Parameter types must match.
-            Self::proto_type_eq(&input_a.type_, &input_b.type_, prototype_record_locations) &&
+            Self::proto_type_eq(input_a.type_.kind(), input_b.type_.kind(), prototype_record_locations) &&
             // Parameter modes must match.
             input_a.mode.eq_user(&input_b.mode)
         }) &&
 
         // Output must match.
         a.output.len() == b.output.len() &&
-        a.output.iter().zip(b.output.iter()).all(|(output_a, output_b)| Self::proto_type_eq(&output_a.type_, &output_b.type_, prototype_record_locations) && output_a.mode.eq_user(&output_b.mode)) &&
+        a.output.iter().zip(b.output.iter()).all(|(output_a, output_b)| Self::proto_type_eq(output_a.type_.kind(), output_b.type_.kind(), prototype_record_locations) && output_a.mode.eq_user(&output_b.mode)) &&
 
         // Const parameters must match.
         a.const_parameters.len() == b.const_parameters.len() &&
-        a.const_parameters.iter().zip(b.const_parameters.iter()).all(|(const_a, const_b)| const_a.type_.eq_user(&const_b.type_)) &&
+        a.const_parameters.iter().zip(b.const_parameters.iter()).all(|(const_a, const_b)| const_a.type_.types_equivalent(&const_b.type_)) &&
 
         //TODO: we may want to check certain annotations, but they are not significant yet
         // // Annotations must match.
@@ -516,7 +516,7 @@ impl<'a> CheckInterfacesVisitor<'a> {
 
     /// Compare two prototype types. If both sides name the same prototype record, match by name;
     /// otherwise require exact equality.
-    fn proto_type_eq(a: &Type, b: &Type, prototype_record_locations: &IndexSet<Location>) -> bool {
+    fn proto_type_eq(a: &TypeKind, b: &TypeKind, prototype_record_locations: &IndexSet<Location>) -> bool {
         Self::record_type_eq(a, b, prototype_record_locations, None)
     }
 
@@ -524,8 +524,8 @@ impl<'a> CheckInterfacesVisitor<'a> {
     /// the concrete type must have the same name and belong to `self.current_unit`.
     fn concrete_type_matches_proto(
         &self,
-        concrete: &Type,
-        proto: &Type,
+        concrete: &TypeKind,
+        proto: &TypeKind,
         prototype_record_locations: &IndexSet<Location>,
     ) -> bool {
         Self::record_type_eq(concrete, proto, prototype_record_locations, Some(self.current_unit))
@@ -543,13 +543,13 @@ impl<'a> CheckInterfacesVisitor<'a> {
     /// When `concrete_program` is `Some(prog)` (concrete-to-proto mode), a prototype composite
     /// in `rhs` matches `lhs` only when `lhs` has the same name and `lhs.program == prog`.
     fn record_type_eq(
-        lhs: &Type,
-        rhs: &Type,
+        lhs: &TypeKind,
+        rhs: &TypeKind,
         prototype_record_locations: &IndexSet<Location>,
         concrete_program: Option<Symbol>,
     ) -> bool {
         match (lhs, rhs) {
-            (Type::Composite(lc), Type::Composite(rc)) => {
+            (TypeKind::Composite(lc), TypeKind::Composite(rc)) => {
                 if let Some(rhs_loc) = rc.path.try_global_location()
                     && prototype_record_locations.contains(rhs_loc)
                 {
@@ -570,9 +570,9 @@ impl<'a> CheckInterfacesVisitor<'a> {
                         None => name_match && prototype_record_locations.contains(lhs_loc),
                     };
                 }
-                lhs.eq_user(rhs)
+                lhs.types_equivalent(rhs)
             }
-            (Type::Tuple(lt), Type::Tuple(rt)) => {
+            (TypeKind::Tuple(lt), TypeKind::Tuple(rt)) => {
                 lt.elements.len() == rt.elements.len()
                     && lt
                         .elements
@@ -580,7 +580,7 @@ impl<'a> CheckInterfacesVisitor<'a> {
                         .zip(rt.elements.iter())
                         .all(|(le, re)| Self::record_type_eq(le, re, prototype_record_locations, concrete_program))
             }
-            _ => lhs.eq_user(rhs),
+            _ => lhs.types_equivalent(rhs),
         }
     }
 
@@ -599,7 +599,7 @@ impl<'a> CheckInterfacesVisitor<'a> {
 
         func.input.iter().zip(proto.input.iter()).all(|(func_input, proto_input)| {
             // Parameter types must match.
-            self.concrete_type_matches_proto(&func_input.type_, &proto_input.type_, prototype_record_locations) &&
+            self.concrete_type_matches_proto(func_input.type_.kind(), proto_input.type_.kind(), prototype_record_locations) &&
             // Parameter modes must match.
             func_input.mode.eq_user(&proto_input.mode)
         }) &&
@@ -608,11 +608,11 @@ impl<'a> CheckInterfacesVisitor<'a> {
         func.output.len() == proto.output.len() &&
 
         func.output.iter().zip(proto.output.iter()).all(
-            |(func_output, proto_output)| self.concrete_type_matches_proto(&func_output.type_, &proto_output.type_, prototype_record_locations) && func_output.mode.eq_user(&proto_output.mode)) &&
+            |(func_output, proto_output)| self.concrete_type_matches_proto(func_output.type_.kind(), proto_output.type_.kind(), prototype_record_locations) && func_output.mode.eq_user(&proto_output.mode)) &&
 
         // Const parameters must match.
         func.const_parameters.len() == proto.const_parameters.len() &&
-        func.const_parameters.iter().zip(proto.const_parameters.iter()).all(|(func_const, proto_const)| func_const.type_.eq_user(&proto_const.type_)) &&
+        func.const_parameters.iter().zip(proto.const_parameters.iter()).all(|(func_const, proto_const)| func_const.type_.types_equivalent(&proto_const.type_)) &&
 
         //TODO: we may want to check certain annotations, but they are not significant yet
         // // Annotations must match.
@@ -656,7 +656,7 @@ impl<'a> CheckInterfacesVisitor<'a> {
         parent.members.iter().all(|parent_member| {
             child.members.iter().any(|child_member| {
                 child_member.identifier.name == parent_member.identifier.name
-                    && child_member.type_.eq_user(&parent_member.type_)
+                    && child_member.type_.types_equivalent(&parent_member.type_)
                     && child_member.mode.eq_user(&parent_member.mode)
             })
         })
@@ -677,7 +677,7 @@ impl<'a> CheckInterfacesVisitor<'a> {
             match found {
                 None => return Some((required_member.identifier.name, required_member, None)),
                 Some(actual_member) => {
-                    if !actual_member.type_.eq_user(&required_member.type_)
+                    if !actual_member.type_.types_equivalent(&required_member.type_)
                         || !actual_member.mode.eq_user(&required_member.mode)
                     {
                         return Some((required_member.identifier.name, required_member, Some(actual_member)));
@@ -688,16 +688,64 @@ impl<'a> CheckInterfacesVisitor<'a> {
         None
     }
 
+    /// Emit an error for every duplicated member name within a single interface body.
+    ///
+    /// A single map catches both within-kind duplicates (two `fn foo`) and cross-kind
+    /// clashes (`fn foo` + `mapping foo`); the error names each side's kind so users
+    /// can tell which two declarations collide. Walks kinds in a fixed order so the
+    /// "first seen" report is deterministic across runs.
+    fn check_intra_interface_duplicates<'b>(&mut self, interfaces: impl IntoIterator<Item = &'b Interface>) {
+        for interface in interfaces {
+            let interface_name = interface.identifier.name;
+            let mut seen: IndexMap<Symbol, (&'static str, Span)> = IndexMap::new();
+
+            let entries = interface
+                .functions
+                .iter()
+                .map(|(name, proto)| ("function", *name, proto.identifier.span))
+                .chain(interface.records.iter().map(|(name, proto)| ("record", *name, proto.identifier.span)))
+                .chain(interface.mappings.iter().map(|proto| ("mapping", proto.identifier.name, proto.identifier.span)))
+                .chain(
+                    interface
+                        .storages
+                        .iter()
+                        .map(|proto| ("storage variable", proto.identifier.name, proto.identifier.span)),
+                );
+
+            for (kind, name, span) in entries {
+                if let Some((first_kind, first_span)) = seen.get(&name).copied() {
+                    self.state.handler.emit_err(
+                        crate::errors::check_interfaces::duplicate_interface_member(
+                            kind,
+                            first_kind,
+                            name,
+                            interface_name,
+                            span,
+                        )
+                        .with_labels(vec![
+                            Label::new(first_span)
+                                .with_message(format!("`{name}` first declared here as a {first_kind}"))
+                                .with_color(Color::Blue),
+                            Label::new(span).with_message(format!("`{name}` redeclared here as a {kind}")),
+                        ]),
+                    );
+                } else {
+                    seen.insert(name, (kind, span));
+                }
+            }
+        }
+    }
+
     /// Validate that record prototypes don't specify `owner` with a type other than `address`.
     fn validate_record_prototypes<'b>(&mut self, interfaces: impl IntoIterator<Item = &'b Interface>) {
         for interface in interfaces {
             for (_, record_proto) in &interface.records {
                 for member in &record_proto.members {
-                    if member.identifier.name == sym::owner && member.type_ != Type::Address {
+                    if member.identifier.name == sym::owner && *member.type_.kind() != TypeKind::Address {
                         self.state.handler.emit_err(
                             crate::errors::check_interfaces::record_prototype_owner_wrong_type(
                                 record_proto.identifier.name,
-                                &member.type_,
+                                member.type_.kind(),
                                 member.span,
                             ),
                         );
@@ -742,7 +790,7 @@ impl<'a> CheckInterfacesVisitor<'a> {
             };
 
             for (parent_span, parent_type) in &interface.parents {
-                let Type::Composite(CompositeType { path: parent_path, .. }) = parent_type else {
+                let TypeKind::Composite(CompositeType { path: parent_path, .. }) = parent_type else {
                     self.state
                         .handler
                         .emit_err(crate::errors::check_interfaces::not_an_interface(parent_type, *parent_span));
@@ -805,6 +853,10 @@ impl UnitVisitor for CheckInterfacesVisitor<'_> {
             return;
         }
 
+        // Reject duplicate member names within a single interface before flattening,
+        // so inheritance errors aren't cascaded from an already-malformed interface.
+        self.check_intra_interface_duplicates(prefixed.iter().map(|(_, i)| i));
+
         // Validate record prototypes (e.g. owner must be address).
         self.validate_record_prototypes(prefixed.iter().map(|(_, i)| i));
 
@@ -832,7 +884,7 @@ impl UnitVisitor for CheckInterfacesVisitor<'_> {
             .parents
             .iter()
             .filter_map(|(span, parent_type)| {
-                if let Type::Composite(CompositeType { path: parent_path, .. }) = parent_type {
+                if let TypeKind::Composite(CompositeType { path: parent_path, .. }) = parent_type {
                     parent_path.try_global_location().map(|loc| (loc.clone(), *span))
                 } else {
                     None
@@ -850,6 +902,10 @@ impl UnitVisitor for CheckInterfacesVisitor<'_> {
             return;
         }
 
+        // Reject duplicate member names within a single interface before flattening,
+        // so inheritance errors aren't cascaded from an already-malformed interface.
+        self.check_intra_interface_duplicates(input.interfaces.iter().map(|(_, i)| i));
+
         // Validate record prototypes (e.g. owner must be address).
         self.validate_record_prototypes(input.interfaces.iter().map(|(_, i)| i));
 
@@ -862,7 +918,7 @@ impl UnitVisitor for CheckInterfacesVisitor<'_> {
 
         // Check if the program implements interfaces (supports multiple inheritance).
         for (parent_span, parent_type) in &input.parents {
-            let Type::Composite(CompositeType { path: parent_path, .. }) = parent_type else {
+            let TypeKind::Composite(CompositeType { path: parent_path, .. }) = parent_type else {
                 self.state
                     .handler
                     .emit_err(crate::errors::check_interfaces::not_an_interface(parent_type, *parent_span));

@@ -7,7 +7,7 @@
 // concrete type belongs to the current program — the alias entry for the second
 // parent's location makes this work correctly.
 
-interface ILeft {
+export interface ILeft {
     record Token {
         owner: address,
         ..
@@ -17,11 +17,14 @@ interface ILeft {
 
 program lib1.aleo {
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
 
-interface IRight {
+export interface IRight {
     record Token {
         owner: address,
         ..
@@ -31,6 +34,9 @@ interface IRight {
 
 program lib2.aleo {
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -51,4 +57,7 @@ program test.aleo: lib1.aleo::ILeft + lib2.aleo::IRight {
     }
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }

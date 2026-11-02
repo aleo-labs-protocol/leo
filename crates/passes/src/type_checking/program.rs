@@ -17,7 +17,7 @@
 use super::TypeCheckingVisitor;
 use crate::VariableSymbol;
 
-use leo_ast::{DiGraphError, Type, *};
+use leo_ast::{DiGraphError, TypeKind, *};
 use leo_errors::Label;
 use leo_span::{Symbol, sym};
 
@@ -32,18 +32,18 @@ use std::collections::{BTreeMap, HashMap};
 /// at a time historically missed cases such as `Node?`, `[Node?; N]`, and
 /// `[[Node; N]; M]?`, allowing programs that should be diagnosed as cyclic to
 /// crash the type checker with a stack overflow instead.
-fn add_composite_dependencies(member_type: &Type, composite_location: &Location, graph: &mut CompositeGraph) {
+fn add_composite_dependencies(member_type: &TypeKind, composite_location: &Location, graph: &mut CompositeGraph) {
     match member_type {
-        Type::Composite(composite_member_type) => {
+        TypeKind::Composite(composite_member_type) => {
             graph.add_edge(composite_location.clone(), composite_member_type.path.expect_global_location().clone());
         }
-        Type::Array(array_type) => {
+        TypeKind::Array(array_type) => {
             add_composite_dependencies(array_type.element_type(), composite_location, graph);
         }
-        Type::Optional(OptionalType { inner }) => {
+        TypeKind::Optional(OptionalType { inner }) => {
             add_composite_dependencies(inner, composite_location, graph);
         }
-        Type::Tuple(tuple_type) => {
+        TypeKind::Tuple(tuple_type) => {
             for elem in tuple_type.elements().iter() {
                 add_composite_dependencies(elem, composite_location, graph);
             }
@@ -80,8 +80,15 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
     fn visit_program_scope(&mut self, input: &ProgramScope) {
         let unit_name = input.program_id.as_symbol();
 
-        // Set the current program name.
+        // Set the current program name. Reset the module path; program scopes are top-level
+        // and must not inherit any leftover nesting from a previously visited module.
         self.scope_state.unit_name = Some(unit_name);
+        self.scope_state.module_name.clear();
+
+        // Reject inheriting from interfaces that aren't accessible from this program scope.
+        // Conformance/cycle checks happen later in `check_interfaces`; this is the visibility
+        // policy, which belongs in type-checking.
+        self.check_parent_interface_accessibility(&input.parents);
 
         // Collect a map from record names to their spans
         let record_info: BTreeMap<String, leo_span::Span> = input
@@ -163,9 +170,6 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
             }
         }
 
-        // Typecheck the constructor.
-        // Note: Constructors are required for all **new** programs once they are supported in the AVM.
-        //  However, we do not require them to exist to ensure backwards compatibility with existing programs.
         if let Some(constructor) = &input.constructor {
             self.visit_constructor(constructor);
         }
@@ -189,6 +193,12 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
             self.emit_err(crate::errors::type_checker::no_entry_points(
                 input.program_id.name.span + input.program_id.network.span,
             ));
+        }
+
+        // Imported Aleo bytecode dependencies are registered as stubs, so this local-source check
+        // does not require constructors on those dependencies.
+        if input.constructor.is_none() {
+            self.emit_err(crate::errors::type_checker::missing_constructor(input.program_id.span()));
         }
     }
 
@@ -215,8 +225,10 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
     }
 
     fn visit_library(&mut self, input: &Library) {
-        // Set the scope state.
+        // Set the scope state. Reset the module path; libraries are top-level and must not
+        // inherit any leftover nesting from a previously visited module.
         self.scope_state.unit_name = Some(input.name);
+        self.scope_state.module_name.clear();
 
         input.structs.iter().for_each(|(_, s)| self.visit_composite(s));
         input.consts.iter().for_each(|(_, c)| self.visit_const(c));
@@ -229,6 +241,9 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
     }
 
     fn visit_interface(&mut self, input: &Interface) {
+        // Reject inheriting from interfaces that aren't accessible from this declaration site.
+        self.check_parent_interface_accessibility(&input.parents);
+
         // Entry point functions declared in interfaces cannot have const generic parameters.
         for (_, prototype) in &input.functions {
             if !prototype.const_parameters.is_empty() {
@@ -276,28 +291,27 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
                         .for_each(|const_param| slf.insert_symbol_conditional_scope(const_param.identifier.name));
 
                     for const_param in &input.const_parameters {
-                        slf.visit_type(const_param.type_());
+                        slf.visit_type(const_param.type_().kind());
 
-                        // Restrictions for const parameters
-                        if !matches!(
-                            const_param.type_(),
-                            Type::Boolean | Type::Integer(_) | Type::Address | Type::Scalar | Type::Group | Type::Field
-                        ) {
+                        if !const_param.type_().kind().is_valid_const_generic_type() {
                             slf.emit_err(crate::errors::type_checker::bad_const_generic_type(
-                                const_param.type_(),
+                                const_param.type_().kind(),
                                 const_param.span(),
                             ));
                         }
 
                         // Set the type of the input in the symbol table.
-                        slf.state.symbol_table.set_local_type(const_param.identifier.name, const_param.type_().clone());
+                        slf.state
+                            .symbol_table
+                            .set_local_type(const_param.identifier.name, const_param.type_().kind().clone());
 
                         // Add the input to the type table.
-                        slf.state.type_table.insert(const_param.identifier().id(), const_param.type_().clone());
+                        let ty = const_param.type_().ty();
+                        slf.state.type_table.insert(const_param.identifier().id(), ty);
                     }
                 }
 
-                input.members.iter().for_each(|member| slf.visit_type(&member.type_));
+                input.members.iter().for_each(|member| slf.visit_type(member.type_.kind()));
             })
         });
 
@@ -305,7 +319,7 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         let mut used = HashMap::new();
         for Member { identifier, type_, span, .. } in &input.members {
             // Check that the member types are defined.
-            self.assert_type_is_valid(type_, *span);
+            self.assert_type_is_valid(type_.kind(), *span);
 
             if let Some(first_span) = used.get(&identifier.name) {
                 self.emit_err(if input.is_record {
@@ -330,12 +344,10 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
 
         // For records, enforce presence of the `owner: Address` member.
         if input.is_record {
-            let check_has_field = |need, expected_ty: Type| match input
-                .members
-                .iter()
-                .find_map(|Member { identifier, type_, .. }| (identifier.name == need).then_some((identifier, type_)))
-            {
-                Some((_, actual_ty)) if expected_ty.eq_flat_relaxed(actual_ty) => {} // All good, found + right type!
+            let check_has_field = |need, expected_ty: TypeKind| match input.members.iter().find_map(
+                |Member { identifier, type_, .. }| (identifier.name == need).then_some((identifier, type_.kind())),
+            ) {
+                Some((_, actual_ty)) if expected_ty.types_equivalent(actual_ty) => {} // All good, found + right type!
                 Some((field, _)) => {
                     self.emit_err(crate::errors::type_checker::record_var_wrong_type(field, expected_ty, input.span()));
                 }
@@ -347,12 +359,14 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
                     ));
                 }
             };
-            check_has_field(sym::owner, Type::Address);
+            check_has_field(sym::owner, TypeKind::Address);
 
             for Member { identifier, type_, span, .. } in input.members.iter() {
-                if self.contains_optional_type(type_) {
+                if self.contains_optional_type(type_.kind()) {
                     self.emit_err(crate::errors::type_checker::record_field_cannot_be_optional(
-                        identifier, type_, *span,
+                        identifier,
+                        type_.kind(),
+                        *span,
                     ));
                 }
             }
@@ -360,19 +374,19 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         // For structs, check that there is at least one member.
         else if input.members.is_empty() {
             self.emit_err(crate::errors::type_checker::empty_struct(input.span()));
-        } else if input.members.iter().all(|m| m.type_.is_empty()) {
+        } else if input.members.iter().all(|m| m.type_.kind().is_empty()) {
             self.emit_err(crate::errors::type_checker::zero_size_struct(input.span()));
         }
 
         if !(input.is_record && self.scope_state.is_stub) {
             for Member { mode, identifier, type_, span, .. } in input.members.iter() {
                 // Check that the member type is not a tuple.
-                if matches!(type_, Type::Tuple(_)) {
+                if matches!(type_.kind(), TypeKind::Tuple(_)) {
                     self.emit_err(crate::errors::type_checker::composite_data_type_cannot_contain_tuple(
                         if input.is_record { "record" } else { "struct" },
                         identifier.span,
                     ));
-                } else if matches!(type_, Type::Future(..)) {
+                } else if matches!(type_.kind(), TypeKind::Future(..)) {
                     self.emit_err(crate::errors::type_checker::composite_data_type_cannot_contain_final(
                         if input.is_record { "record" } else { "struct" },
                         identifier.span,
@@ -380,7 +394,7 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
                 }
 
                 // Ensure that there are no record members.
-                self.assert_member_is_not_record(identifier.span, input.identifier.name, type_);
+                self.assert_member_is_not_record(identifier.span, input.identifier.name, type_.kind());
                 // If the member is a composite, add it to the composite dependency graph.
                 // Note that we have already checked that each member is defined and valid.
                 let composite_path = self
@@ -397,7 +411,7 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
                 // recursive walk (rather than enumerating one shape at a time) ensures shapes like
                 // `Node?`, `[Node?; N]`, `[[Node; N]; M]?`, and arbitrary deeper nestings all
                 // participate in cycle detection.
-                add_composite_dependencies(type_, &composite_location, &mut self.state.composite_graph);
+                add_composite_dependencies(type_.kind(), &composite_location, &mut self.state.composite_graph);
 
                 // If the input is a struct, then check that the member does not have a mode.
                 if !input.is_record && !matches!(mode, Mode::None) {
@@ -415,13 +429,13 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         self.assert_type_is_valid(&input.key_type, input.span);
         // Check that a mapping's key type is not a future, tuple, record, or mapping.
         match input.key_type.clone() {
-            Type::Future(_) => {
+            TypeKind::Future(_) => {
                 self.emit_err(crate::errors::type_checker::invalid_mapping_type("key", "future", input.span))
             }
-            Type::Tuple(_) => {
+            TypeKind::Tuple(_) => {
                 self.emit_err(crate::errors::type_checker::invalid_mapping_type("key", "tuple", input.span))
             }
-            Type::Composite(composite_type) => {
+            TypeKind::Composite(composite_type) => {
                 if let Some(comp) = self.lookup_composite(composite_type.path.expect_global_location()) {
                     if comp.is_record {
                         self.emit_err(crate::errors::type_checker::invalid_mapping_type("key", "record", input.span));
@@ -430,11 +444,11 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
                     self.emit_err(crate::errors::type_checker::undefined_type(&input.key_type, input.span));
                 }
             }
-            Type::DynRecord => {
+            TypeKind::DynRecord => {
                 self.emit_err(crate::errors::type_checker::invalid_mapping_type("key", "dyn record", input.span));
             }
             // Note that this is not possible since the parser does not currently accept mapping types.
-            Type::Mapping(_) => {
+            TypeKind::Mapping(_) => {
                 self.emit_err(crate::errors::type_checker::invalid_mapping_type("key", "mapping", input.span))
             }
             _ => {}
@@ -456,13 +470,13 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         self.assert_type_is_valid(&input.value_type, input.span);
         // Check that a mapping's value type is not a future, tuple, record or mapping.
         match input.value_type.clone() {
-            Type::Future(_) => {
+            TypeKind::Future(_) => {
                 self.emit_err(crate::errors::type_checker::invalid_mapping_type("value", "future", input.span))
             }
-            Type::Tuple(_) => {
+            TypeKind::Tuple(_) => {
                 self.emit_err(crate::errors::type_checker::invalid_mapping_type("value", "tuple", input.span))
             }
-            Type::Composite(composite_type) => {
+            TypeKind::Composite(composite_type) => {
                 if let Some(comp) = self.lookup_composite(composite_type.path.expect_global_location()) {
                     if comp.is_record {
                         self.emit_err(crate::errors::type_checker::invalid_mapping_type("value", "record", input.span));
@@ -471,11 +485,11 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
                     self.emit_err(crate::errors::type_checker::undefined_type(&input.value_type, input.span));
                 }
             }
-            Type::DynRecord => {
+            TypeKind::DynRecord => {
                 self.emit_err(crate::errors::type_checker::invalid_mapping_type("value", "dyn record", input.span));
             }
             // Note that this is not possible since the parser does not currently accept mapping types.
-            Type::Mapping(_) => {
+            TypeKind::Mapping(_) => {
                 self.emit_err(crate::errors::type_checker::invalid_mapping_type("value", "mapping", input.span))
             }
             _ => {}
@@ -495,12 +509,12 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
     }
 
     fn visit_storage_variable(&mut self, input: &StorageVariable) {
-        self.visit_type(&input.type_);
+        self.visit_type(input.type_.kind());
 
-        let storage_type = if let Type::Vector(VectorType { element_type }) = &input.type_ {
+        let storage_type = if let TypeKind::Vector(VectorType { element_type }) = &input.type_.kind() {
             *element_type.clone()
         } else {
-            input.type_.clone()
+            input.type_.kind().clone()
         };
 
         self.assert_storage_type_is_valid(&storage_type, input.span);
@@ -513,12 +527,27 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         // Set the scope state before traversing the function.
         self.scope_state.variant = Some(function.variant);
 
-        // Check that the function's annotations are valid.
+        // Check that the function's annotations are valid. The `_`-prefixed annotations are
+        // compiler-internal and are only recognised inside the standard library; user code that
+        // spells them gets the same "unknown annotation" error as any typo.
+        let in_std = self.scope_state.unit_name == Some(sym::std);
         for annotation in function.annotations.iter() {
-            if !matches!(annotation.identifier.name, sym::test | sym::should_fail | sym::no_inline | sym::inline) {
+            let is_public =
+                matches!(annotation.identifier.name, sym::test | sym::should_fail | sym::no_inline | sym::inline);
+            let is_internal = matches!(
+                annotation.identifier.name,
+                sym::_caller_annotation | sym::_program_id_arg | sym::_callable_function_arg | sym::_onchain_context
+            );
+            if !(is_public || (is_internal && in_std)) {
                 self.emit_err(crate::errors::type_checker::unknown_annotation(annotation, annotation.span))
             }
         }
+
+        // `@_onchain_context` wrappers evaluate a `FinalizeRead` intrinsic in a regular `fn` body;
+        // remember the flag so the intrinsic's own scope check can pass. Callsite propagation in
+        // `visit_call` enforces the caller-side rule.
+        self.scope_state.has_onchain_context =
+            function.annotations.iter().any(|a| a.identifier.name == sym::_onchain_context);
 
         let get = |symbol: Symbol| -> &Annotation {
             function.annotations.iter().find(|ann| ann.identifier.name == symbol).unwrap()
@@ -602,7 +631,7 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
                 slf.visit_block(&function.block);
 
                 // If the function has a return type, then check that it has a return.
-                if function.output_type != Type::Unit && !slf.scope_state.has_return {
+                if function.output_type != TypeKind::Unit && !slf.scope_state.has_return {
                     slf.emit_err(crate::errors::type_checker::missing_return(function.span));
                 }
             })
@@ -652,7 +681,7 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         // For the checksum variant, check that the mapping exists and that the type matches.
         if let UpgradeVariant::Checksum { mapping, key, key_type } = &upgrade_variant {
             // Look up the mapping type.
-            let Some(VariableSymbol { type_: Some(Type::Mapping(mapping_type)), .. }) =
+            let Some(VariableSymbol { type_: Some(TypeKind::Mapping(mapping_type)), .. }) =
                 self.state.symbol_table.lookup_global(self.scope_state.unit_name.unwrap(), mapping)
             else {
                 self.emit_err(crate::errors::type_checker::custom(
@@ -671,9 +700,9 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
                 ));
             }
             // Check that the value type is a `[u8; 32]`.
-            let check_value_type = |type_: &Type| -> bool {
-                if let Type::Array(array_type) = type_ {
-                    if !matches!(array_type.element_type.as_ref(), &Type::Integer(_)) {
+            let check_value_type = |type_: &TypeKind| -> bool {
+                if let TypeKind::Array(array_type) = type_ {
+                    if !matches!(array_type.element_type.as_ref(), &TypeKind::Integer(_)) {
                         return false;
                     }
                     if let Some(length) = array_type.length.as_u32() {
@@ -721,20 +750,25 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         // Create future stubs.
         if input.variant == Variant::Finalize {
             let finalize_input_map = &mut self.async_function_input_types;
-            let resolved_inputs: Vec<Type> = input
+            let resolved_inputs: Vec<TypeKind> = input
                 .input
                 .iter()
                 .map(|input| {
-                    match &input.type_ {
-                        Type::Future(f) => {
-                            // Since we traverse stubs in post-order, we can assume that the corresponding finalize stub has already been traversed.
-                            Type::Future(FutureType::new(
-                                finalize_input_map.get(f.location.as_ref().unwrap()).unwrap().clone(),
-                                f.location.clone(),
-                                true,
-                            ))
-                        }
-                        _ => input.clone().type_,
+                    match &input.type_.kind() {
+                        TypeKind::Future(f) => match &f.location {
+                            Some(location) => {
+                                // Since we traverse stubs in post-order, the corresponding finalize stub has already
+                                // been traversed.
+                                TypeKind::Future(FutureType::new(
+                                    finalize_input_map.get(location).unwrap().clone(),
+                                    f.location.clone(),
+                                    true,
+                                ))
+                            }
+                            // Dynamic futures do not identify a concrete callee, so their inputs cannot be resolved.
+                            None => input.type_.kind().clone(),
+                        },
+                        _ => input.clone().type_.kind().clone(),
                     }
                 })
                 .collect();

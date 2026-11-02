@@ -1,4 +1,3 @@
-program test.aleo  {
         struct Foo  {
         // leading comment on x
                     x  :  u32  ,
@@ -13,6 +12,9 @@ program test.aleo  {
             b  :  bool  ,
                         // inline comment
     }       // after struct
+
+program test.aleo  {
+    @noupgrade constructor() {}
 
             fn main(  f  :  Foo  ,  b  :  Bar  )  ->  u32  {
                     return  f.x  +  b.a  ;

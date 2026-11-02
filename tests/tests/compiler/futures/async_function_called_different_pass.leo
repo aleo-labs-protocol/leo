@@ -8,13 +8,16 @@ program dependent.aleo {
         let f: Final = final { finalize2(1u8); };
         return f;
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize1(x: u8) {
+export final fn finalize1(x: u8) {
     assert_eq(1u8, 1u8);
 }
 
-final fn finalize2(x: u8) {
+export final fn finalize2(x: u8) {
     assert_eq(1u8, 1u8);
 }
 
@@ -31,8 +34,11 @@ program test.aleo {
         let f: Final = dependent.aleo::t2();
         return final { finalize(f); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(f: Final) {
+export final fn finalize(f: Final) {
     f.run();
 }

@@ -9,6 +9,9 @@ program other.aleo {
     }
 
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -28,11 +31,14 @@ program test.aleo: interfaces::IChild {
     }
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Module: interfaces.leo --- //
 
-interface IBase {
+export interface IBase {
     record Token {
         owner: address,
         ..
@@ -40,7 +46,7 @@ interface IBase {
     fn f1(t: Token) -> Token;
 }
 
-interface IChild: IBase {
+export interface IChild: IBase {
     record Token {
         owner: address,
         ..

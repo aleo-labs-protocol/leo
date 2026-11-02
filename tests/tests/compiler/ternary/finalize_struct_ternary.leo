@@ -13,4 +13,7 @@ program test.aleo {
             points.set(0u32, chosen);
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

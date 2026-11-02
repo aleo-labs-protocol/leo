@@ -5,8 +5,11 @@ program test.aleo {
         let f: Final = final { finalize_main(1u32, 1u32); };
         return f;
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_main(a: u32, b: u32) {
+export final fn finalize_main(a: u32, b: u32) {
     Mapping::set(Yo, a, b);
 }

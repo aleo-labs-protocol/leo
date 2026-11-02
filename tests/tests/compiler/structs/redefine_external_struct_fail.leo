@@ -1,20 +1,20 @@
-struct Foo {
+export struct Foo {
     bar: [Bar; 1],
 }
 
-struct Bar {
+export struct Bar {
     baz: [Baz; 2],
 }
 
-struct Baz {
+export struct Baz {
     one: One,
 }
 
-struct One {
+export struct One {
     two: [Two; 2],
 }
 
-struct Two {
+export struct Two {
     val1: u32,
     val2: u32,
 }
@@ -46,28 +46,31 @@ program child.aleo {
             ],
         };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
 import child.aleo;
 
-struct Foo {
+export struct Foo {
     bar: [Bar; 1],
 }
 
-struct Bar {
+export struct Bar {
     baz: [Baz; 2],
 }
 
-struct Baz {
+export struct Baz {
     one: One,
 }
 
-struct One {
+export struct One {
     two: [Two; 2],
 }
 
-struct Two {
+export struct Two {
     val1: u32,
     val2: u32,
 }
@@ -100,4 +103,7 @@ program parent.aleo {
         };
         return child.aleo::create();
     }
+
+    @noupgrade
+    constructor() {}
 }

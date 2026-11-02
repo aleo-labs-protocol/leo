@@ -1,31 +1,14 @@
 /*
 seed = 123456789
-min_height = 16
 
 [case]
 program = "test.aleo"
 function = "update"
-input = [
-    "true",
-    "7u32",
-    "99u32",
-    "1field",
-    "42field",
-    "aleo1l7ytv5jqjzpxtjqttl5z9mle8ujcpac9t6tkge5f4haah4pxas8sagzecd",
-    "aleo1dtpkpg3d653mdlzh6g028937qdgujecn5gw5tzh7ftcvyz7jxvfqw6t8p6",
-]
+input = ["true", "7u32", "99u32", "1field", "42field", "aleo1l7ytv5jqjzpxtjqttl5z9mle8ujcpac9t6tkge5f4haah4pxas8sagzecd", "aleo1dtpkpg3d653mdlzh6g028937qdgujecn5gw5tzh7ftcvyz7jxvfqw6t8p6",]
 [case]
 program = "test.aleo"
 function = "update"
-input = [
-    "false",
-    "7u32",
-    "99u32",
-    "1field",
-    "42field",
-    "aleo1l7ytv5jqjzpxtjqttl5z9mle8ujcpac9t6tkge5f4haah4pxas8sagzecd",
-    "aleo1dtpkpg3d653mdlzh6g028937qdgujecn5gw5tzh7ftcvyz7jxvfqw6t8p6",
-]
+input = ["false", "7u32", "99u32", "1field", "42field", "aleo1l7ytv5jqjzpxtjqttl5z9mle8ujcpac9t6tkge5f4haah4pxas8sagzecd", "aleo1dtpkpg3d653mdlzh6g028937qdgujecn5gw5tzh7ftcvyz7jxvfqw6t8p6",]
 */
 
 program test.aleo {

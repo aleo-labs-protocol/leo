@@ -18,11 +18,11 @@
 
 use crate::{
     convert_mapping,
-    convert_mode,
     convert_plaintext,
     convert_record,
     convert_struct,
     prune_non_interface_types,
+    resolve_io_mode,
 };
 
 use leo_abi_types as abi;
@@ -98,8 +98,7 @@ pub fn generate(aleo: &ast::AleoProgram) -> abi::Program {
         .map(|(_, f)| convert_function_stub(f, &record_names))
         .collect();
 
-    let mut program =
-        abi::Program { program, implements: vec![], structs, records, mappings, storage_variables, functions, views };
+    let mut program = abi::Program { program, structs, records, mappings, storage_variables, functions, views };
 
     // Prune types not used in the public interface.
     prune_non_interface_types(&mut program);
@@ -124,29 +123,25 @@ pub fn generate_from_bytecode(
 /// Converts a function stub to an ABI function.
 fn convert_function_stub(function: &ast::FunctionStub, record_names: &HashSet<Symbol>) -> abi::Function {
     let name = function.identifier.name.to_string();
-    let is_final = function.has_final_output();
-    let inputs = function.input.iter().map(|i| convert_input(i, record_names)).collect();
-    let outputs = function.output.iter().map(|o| convert_output(o, record_names)).collect();
-    abi::Function { name, is_final, const_parameters: vec![], inputs, outputs }
+    let is_view = function.variant.is_view();
+    let inputs = function.input.iter().map(|i| convert_input(i, record_names, is_view)).collect();
+    let outputs = function.output.iter().map(|o| convert_output(o, record_names, is_view)).collect();
+    abi::Function { name, inputs, outputs }
 }
 
-fn convert_input(input: &ast::Input, record_names: &HashSet<Symbol>) -> abi::Input {
-    abi::Input {
-        name: input.identifier.name.to_string(),
-        ty: convert_function_input(&input.type_, record_names),
-        mode: convert_mode(input.mode),
-    }
+fn convert_input(input: &ast::Input, record_names: &HashSet<Symbol>, is_view: bool) -> abi::FunctionInput {
+    convert_function_input(input.type_.kind(), record_names, resolve_io_mode(input.mode, is_view))
 }
 
-fn convert_output(output: &ast::Output, record_names: &HashSet<Symbol>) -> abi::Output {
-    abi::Output { ty: convert_function_output(&output.type_, record_names), mode: convert_mode(output.mode) }
+fn convert_output(output: &ast::Output, record_names: &HashSet<Symbol>, is_view: bool) -> abi::FunctionOutput {
+    convert_function_output(output.type_.kind(), record_names, resolve_io_mode(output.mode, is_view))
 }
 
-fn convert_function_input(ty: &ast::Type, record_names: &HashSet<Symbol>) -> abi::FunctionInput {
-    if let ast::Type::DynRecord = ty {
+fn convert_function_input(ty: &ast::TypeKind, record_names: &HashSet<Symbol>, mode: abi::Mode) -> abi::FunctionInput {
+    if let ast::TypeKind::DynRecord = ty {
         return abi::FunctionInput::DynamicRecord;
     }
-    if let ast::Type::Composite(comp_ty) = ty {
+    if let ast::TypeKind::Composite(comp_ty) = ty {
         let name = comp_ty.path.identifier().name;
         if record_names.contains(&name) {
             return abi::FunctionInput::Record(abi::RecordRef {
@@ -155,14 +150,14 @@ fn convert_function_input(ty: &ast::Type, record_names: &HashSet<Symbol>) -> abi
             });
         }
     }
-    abi::FunctionInput::Plaintext(convert_plaintext(ty))
+    abi::FunctionInput::Plaintext { ty: convert_plaintext(ty), mode }
 }
 
-fn convert_function_output(ty: &ast::Type, record_names: &HashSet<Symbol>) -> abi::FunctionOutput {
+fn convert_function_output(ty: &ast::TypeKind, record_names: &HashSet<Symbol>, mode: abi::Mode) -> abi::FunctionOutput {
     match ty {
-        ast::Type::Future(_) => abi::FunctionOutput::Final,
-        ast::Type::DynRecord => abi::FunctionOutput::DynamicRecord,
-        ast::Type::Composite(comp_ty) => {
+        ast::TypeKind::Future(_) => abi::FunctionOutput::Final,
+        ast::TypeKind::DynRecord => abi::FunctionOutput::DynamicRecord,
+        ast::TypeKind::Composite(comp_ty) => {
             let name = comp_ty.path.identifier().name;
             if record_names.contains(&name) {
                 return abi::FunctionOutput::Record(abi::RecordRef {
@@ -170,9 +165,9 @@ fn convert_function_output(ty: &ast::Type, record_names: &HashSet<Symbol>) -> ab
                     program: comp_ty.path.program().map(|s| s.to_string()),
                 });
             }
-            abi::FunctionOutput::Plaintext(convert_plaintext(ty))
+            abi::FunctionOutput::Plaintext { ty: convert_plaintext(ty), mode }
         }
-        _ => abi::FunctionOutput::Plaintext(convert_plaintext(ty)),
+        _ => abi::FunctionOutput::Plaintext { ty: convert_plaintext(ty), mode },
     }
 }
 

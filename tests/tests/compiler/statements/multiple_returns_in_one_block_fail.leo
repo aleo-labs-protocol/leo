@@ -1,6 +1,9 @@
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}
 
-fn main(x: u32) -> u32 {
+export fn main(x: u32) -> u32 {
     return x;
     let double: u32 = x + x;
     return double;

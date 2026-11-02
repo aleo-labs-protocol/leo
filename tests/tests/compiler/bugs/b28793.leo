@@ -3,8 +3,11 @@ program b28610.aleo {
     fn foo() {
         return final { bar(); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn bar() {
+export final fn bar() {
     assert(true);
 }

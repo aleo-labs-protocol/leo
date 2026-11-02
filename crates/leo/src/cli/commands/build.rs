@@ -16,8 +16,8 @@
 
 use super::*;
 
-use leo_ast::{NetworkName, NodeBuilder, Program, Stub};
-use leo_compiler::{AstSnapshots, Compiled, Compiler, CompilerOptions};
+use leo_ast::{NetworkName, NodeBuilder, Program, Stub, TypeInterner};
+use leo_compiler::{Compiled, Compiler, CompilerOptions};
 use leo_package::{ABI_FILENAME, Package};
 use leo_span::Symbol;
 
@@ -54,15 +54,7 @@ struct ProgramForValidation {
 
 impl From<BuildOptions> for CompilerOptions {
     fn from(options: BuildOptions) -> Self {
-        Self {
-            ast_spans_enabled: options.enable_ast_spans,
-            ast_snapshots: if options.enable_all_ast_snapshots {
-                AstSnapshots::All
-            } else {
-                AstSnapshots::Some(options.ast_snapshots.into_iter().collect())
-            },
-            initial_ast: options.enable_all_ast_snapshots | options.enable_initial_ast_snapshot,
-        }
+        Self { no_std: options.no_std }
     }
 }
 
@@ -73,6 +65,10 @@ pub struct LeoBuild {
     pub(crate) options: BuildOptions,
     #[clap(flatten)]
     pub(crate) env_override: EnvOptions,
+    /// Recompile the primary program under a different on-chain name. Set internally
+    /// by `leo deploy --rename`; not exposed as a build flag.
+    #[clap(skip)]
+    pub(crate) rename: Option<String>,
 }
 
 impl Command for LeoBuild {
@@ -89,7 +85,7 @@ impl Command for LeoBuild {
 
     fn apply(self, context: Context, _: Self::Input) -> Result<Self::Output> {
         match context.resolve_targets()? {
-            Some(targets) => {
+            Some((_, targets)) => {
                 let mut last_package = None;
                 for target in &targets {
                     let member_name = target.file_name().and_then(|n| n.to_str()).unwrap_or("?");
@@ -130,12 +126,13 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
         }
     };
 
-    let package = if command.options.build_tests {
+    let mut package = if command.options.build_tests {
         Package::from_directory_with_tests(
             &package_path,
             &home_path,
             command.options.no_cache,
             command.options.no_local,
+            command.options.offline,
             Some(network),
             Some(&endpoint),
             command.env_override.network_retries,
@@ -146,6 +143,7 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
             &home_path,
             command.options.no_cache,
             command.options.no_local,
+            command.options.offline,
             Some(network),
             Some(&endpoint),
             command.env_override.network_retries,
@@ -168,6 +166,10 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
 
     // Resolve via the manifest so this isn't a test unit under `--build-tests`.
     let primary_name = package.primary_unit().map(|p| p.name);
+
+    // `leo deploy --rename`: recompile the primary program under a different on-chain name.
+    let rename_target = apply_rename(command, &mut package, primary_name)?;
+
     std::fs::create_dir_all(&build_directory).map_err(|err| {
         crate::errors::util_file_io_error(format_args!("Couldn't create directory {}", build_directory.display()), err)
     })?;
@@ -179,7 +181,25 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
     let handler = Handler::default();
     let node_builder = Rc::new(NodeBuilder::default());
 
+    // Manifest opt-out for the implicit `std` library. Propagated to every
+    // unit's `Compiler` via `CompilerOptions::no_std`.
+    let mut build_options = command.options.clone();
+    build_options.no_std = package.manifest.no_std;
+
     let mut stubs: IndexMap<Symbol, Stub> = IndexMap::new();
+
+    // Prebuild the implicit `std` library once. Every per-unit `Compiler` clones `stubs`,
+    // so the prebuilt stub is shared across the build instead of recompiled per unit.
+    // `inject_std_library` short-circuits when it finds this entry.
+    if !build_options.no_std {
+        let std_stub = Compiler::build_std_stub(
+            handler.clone(),
+            Rc::clone(&node_builder),
+            network,
+            Rc::new(TypeInterner::default()),
+        )?;
+        stubs.insert(Symbol::intern(leo_std::library_name()), std_stub);
+    }
 
     // All programs to validate through snarkVM's bytecode validator, in dependency order
     // (imports must be loaded before the programs that depend on them).
@@ -265,20 +285,18 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
 
                 let is_main = source == &main_source_path;
                 if is_main || unit.kind.is_test() {
-                    // Compile the program (main or test). AST snapshots, if enabled, land
-                    // under this unit's own `build/<name>/snapshots/` directory.
-                    let snapshots_directory = package.unit_snapshots_directory(&unit_name);
+                    // Compile the program (main or test).
                     let compiled = compile_leo_source_directory(
                         source, // entry file
                         &source_dir,
                         unit.name,
                         unit.kind.is_test(),
-                        &snapshots_directory,
                         &handler,
                         &node_builder,
-                        command.options.clone(),
+                        build_options.clone(),
                         stubs.clone(),
                         network,
+                        if is_main { rename_target.clone() } else { None },
                     )?;
 
                     // Write this unit's compiled bytecode. ABI and interface ABIs are
@@ -337,15 +355,13 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
                     // dependencies are parsed only; their semantics are validated when their own
                     // `leo build` is run.
                     let library = if primary_name == Some(unit.name) {
-                        let snapshots_directory = package.unit_snapshots_directory(&unit_name);
                         let (lib, interfaces) = build_leo_source_directory_library(
                             source,
                             &source_dir,
                             unit.name,
-                            &snapshots_directory,
                             &handler,
                             &node_builder,
-                            command.options.clone(),
+                            build_options.clone(),
                             stubs.clone(),
                             network,
                         )?;
@@ -362,7 +378,7 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
                             unit.name,
                             &handler,
                             &node_builder,
-                            command.options.clone(),
+                            build_options.clone(),
                             network,
                         )?
                     };
@@ -377,16 +393,20 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
                         }
                     }
                     stubs.insert(unit.name, library_stub);
-                } else {
-                    // Parse intermediate dependencies only.
+                } else if !unit.kind.is_test() {
+                    // Build a stub for the primary program and intermediate dependencies so other
+                    // programs can resolve their imports; the primary's stub adopts the rename too,
+                    // or its parse would fail the name check. Tests are excluded: nothing imports a
+                    // test, so it needs no stub.
                     let leo_program = parse_leo_source_directory(
                         source,
                         &source_dir,
                         unit.name,
                         &handler,
                         &node_builder,
-                        command.options.clone(),
+                        build_options.clone(),
                         network,
+                        if is_main { rename_target.clone() } else { None },
                     )?;
 
                     stubs.insert(unit.name, leo_program.into());
@@ -408,18 +428,18 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
             continue;
         }
         let source_dir = directory.join("src");
-        let snapshots_directory = package.unit_snapshots_directory(&unit_name);
         let compiled = compile_leo_source_directory(
             source,
             &source_dir,
             unit.name,
             false,
-            &snapshots_directory,
             &handler,
             &node_builder,
-            command.options.clone(),
+            build_options.clone(),
             stubs.clone(),
             network,
+            // Dependencies are never renamed; only the primary deploy target is.
+            None,
         )?;
         let primary_path = package.unit_bytecode_path(&unit_name);
         ensure_parent_dir(&primary_path)?;
@@ -444,6 +464,110 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
     Ok(package)
 }
 
+/// Resolves `leo deploy --rename` and applies it to `package`.
+///
+/// Returns `Ok(None)` when no rename was requested. Otherwise validates the
+/// requested name, rejects conflicts, and rewrites the primary unit's name in
+/// `package` so the build artifacts, the deploy read path, and the compiled
+/// bytecode all share the renamed identity; the canonical `.aleo`-suffixed name
+/// to compile under is returned. Programs that import the original name are
+/// intentionally not redirected to the renamed copy.
+fn apply_rename(command: &LeoBuild, package: &mut Package, primary_name: Option<Symbol>) -> Result<Option<String>> {
+    let Some(requested) = &command.rename else {
+        return Ok(None);
+    };
+
+    // `--rename` rewrites a single primary program, so it cannot apply to a test build:
+    // tests keep their original names and would dangle against the renamed primary.
+    if command.options.build_tests {
+        return Err(crate::errors::custom("`--rename` cannot be combined with `--build-tests`.").into());
+    }
+
+    let renamed = leo_package::canonicalize_program_name(requested);
+    if !leo_package::is_valid_program_name(&renamed) {
+        return Err(crate::errors::custom(format!(
+            "Invalid program name '{requested}' for `--rename`; expected a valid Aleo program name."
+        ))
+        .into());
+    }
+
+    let Some(original) = primary_name else {
+        return Err(crate::errors::custom("`--rename` requires a primary program to rename.").into());
+    };
+
+    // Compare on the bare name: a local primary's name is bare while the target is
+    // `.aleo`-suffixed, so a direct symbol comparison would never flag a no-op rename.
+    let renamed_bare = leo_package::bare_unit_name(&renamed);
+    if renamed_bare == leo_package::bare_unit_name(&original.to_string()) {
+        return Err(crate::errors::custom(format!(
+            "`--rename` target '{renamed}' is identical to the program's current name."
+        ))
+        .into());
+    }
+
+    // Reject renaming onto a name already used by another unit or dependency. Build
+    // artifacts are keyed by bare unit name, so a collision would silently discard the
+    // renamed program and deploy the colliding unit's bytecode instead. Compare on the
+    // bare name to match that keying.
+    if package
+        .compilation_units
+        .iter()
+        .any(|unit| unit.name != original && leo_package::bare_unit_name(&unit.name.to_string()) == renamed_bare)
+    {
+        return Err(crate::errors::custom(format!(
+            "`--rename` target '{renamed}' conflicts with an existing program or dependency in this package; choose a different name."
+        ))
+        .into());
+    }
+
+    let renamed_symbol = Symbol::intern(&renamed);
+    for unit in package.compilation_units.iter_mut() {
+        if !unit.kind.is_test() && unit.name == original {
+            unit.name = renamed_symbol;
+        }
+    }
+
+    Ok(Some(renamed))
+}
+
+/// Collects the program checksum and each entry/view function checksum (the `std::prog::function_checksum` targets).
+fn collect_checksums<N: snarkvm::prelude::Network>(program: &SvmProgram<N>) -> BuildOutput {
+    let mut function_checksums = IndexMap::with_capacity(program.functions().len() + program.views().len());
+    for (name, function) in program.functions() {
+        function_checksums.insert(name.to_string(), function.to_checksum().iter().map(|b| **b).collect());
+    }
+    for (name, view) in program.views() {
+        function_checksums.insert(name.to_string(), view.to_checksum().iter().map(|b| **b).collect());
+    }
+    BuildOutput {
+        program: program.id().to_string(),
+        program_checksum: program.to_checksum().iter().map(|b| **b).collect(),
+        function_checksums,
+    }
+}
+
+/// Computes the checksums for compiled bytecode. Checksums are network-independent, so `network` only
+/// selects the `Program` type to parse into.
+fn program_checksums(network: NetworkName, bytecode: &str) -> Result<BuildOutput> {
+    Ok(match network {
+        NetworkName::MainnetV0 => collect_checksums(&SvmProgram::<MainnetV0>::from_str(bytecode)?),
+        NetworkName::TestnetV0 => collect_checksums(&SvmProgram::<TestnetV0>::from_str(bytecode)?),
+        NetworkName::CanaryV0 => collect_checksums(&SvmProgram::<CanaryV0>::from_str(bytecode)?),
+    })
+}
+
+/// Builds the `leo build` JSON output from the primary program's compiled bytecode on disk.
+pub fn build_output(package: &Package, network: Option<NetworkName>) -> Result<BuildOutput> {
+    let network = get_network(&network).unwrap_or(NetworkName::TestnetV0);
+    let unit =
+        package.primary_unit().ok_or_else(|| crate::errors::custom("No primary program found in the package."))?;
+    let name = unit.name.to_string();
+    let bytecode = std::fs::read_to_string(package.unit_bytecode_path(&name)).map_err(|err| {
+        crate::errors::util_file_io_error(format_args!("Trying to read compiled bytecode for `{name}`"), err)
+    })?;
+    program_checksums(network, &bytecode)
+}
+
 /// Compiles a Leo file. Writes and returns the compiled bytecode and ABI.
 #[allow(clippy::too_many_arguments)]
 fn compile_leo_source_directory(
@@ -451,30 +575,39 @@ fn compile_leo_source_directory(
     source_directory: &Path,
     program_name: Symbol,
     is_test: bool,
-    output_path: &Path,
     handler: &Handler,
     node_builder: &Rc<NodeBuilder>,
     options: BuildOptions,
     stubs: IndexMap<Symbol, Stub>,
     network: NetworkName,
+    rename: Option<String>,
 ) -> Result<Compiled> {
-    // Print a newline for better formatting.
-    println!();
+    if !is_test {
+        println!();
+    }
     tracing::info!("🔨 Compiling '{program_name}'");
+    // Capture before `options` is consumed by the conversion below.
+    let print_checksums = options.checksums;
     // Create a new instance of the Leo compiler.
     let mut compiler = Compiler::new(
         Some(program_name.to_string()),
         is_test,
         handler.clone(),
         Rc::clone(node_builder),
-        output_path.to_path_buf(),
         Some(options.into()),
         stubs,
         network,
     );
+    // When set, recompile the program scope under this on-chain name (`leo deploy --rename`).
+    compiler.rename = rename;
 
-    // Compile the Leo program into Aleo instructions.
-    let compiled = compiler.compile_from_directory(entry_file_path, source_directory)?;
+    // Compile the Leo program into Aleo instructions. A test is a single standalone file:
+    // its siblings in `tests/` are independent test programs, not modules to fold in.
+    let compiled = if is_test {
+        compiler.compile_from_file(entry_file_path)?
+    } else {
+        compiler.compile_from_directory(entry_file_path, source_directory)?
+    };
     let primary_bytecode = &compiled.primary.bytecode;
 
     // Check the program size limit for each bytecode.
@@ -485,47 +618,60 @@ fn compile_leo_source_directory(
         return Err(crate::errors::program_size_limit_exceeded(program_name, program_size, MAX_PROGRAM_SIZE).into());
     }
 
-    // Get the AVM bytecode.
-    let checksum: String = match network {
-        NetworkName::MainnetV0 => SvmProgram::<MainnetV0>::from_str(primary_bytecode)?.to_checksum().iter().join(", "),
-        NetworkName::TestnetV0 => SvmProgram::<TestnetV0>::from_str(primary_bytecode)?.to_checksum().iter().join(", "),
-        NetworkName::CanaryV0 => SvmProgram::<CanaryV0>::from_str(primary_bytecode)?.to_checksum().iter().join(", "),
-    };
-
-    tracing::info!("    {} statements before dead code elimination.", compiler.statements_before_dce);
-    tracing::info!("    {} statements after dead code elimination.", compiler.statements_after_dce);
-    tracing::info!("    The program checksum is: '[{checksum}]'.");
+    if print_checksums {
+        let checksums = program_checksums(network, primary_bytecode)?;
+        let format = |bytes: &[u8]| bytes.iter().map(|b| format!("{b}u8")).join(", ");
+        tracing::info!("    The program checksum is: '[{}]'.", format(&checksums.program_checksum));
+        for (name, function_checksum) in &checksums.function_checksums {
+            tracing::info!("      `{name}` function checksum is: '[{}]'.", format(function_checksum));
+        }
+    }
 
     let (size_kb, max_kb, warning) = format_program_size(program_size, MAX_PROGRAM_SIZE);
-    tracing::info!("    Program size: {size_kb:.2} KB / {max_kb:.2} KB");
     if let Some(msg) = warning {
         tracing::warn!("⚠️  Program '{program_name}' is {msg}.");
     }
 
-    tracing::info!("✅ Compiled '{program_name}' into Aleo instructions.");
+    if !is_test {
+        tracing::info!("    Program size: {size_kb:.2} KB / {max_kb:.2} KB");
+        tracing::info!("✅ Compiled '{program_name}' into Aleo instructions.");
+    }
 
-    // Print checksums for all additional bytecodes (imports).
-    for import in &compiled.imports {
-        // Compute checksum depending on network.
-        let dep_checksum: String = match network {
-            NetworkName::MainnetV0 => {
-                SvmProgram::<MainnetV0>::from_str(&import.bytecode)?.to_checksum().iter().join(", ")
-            }
-            NetworkName::TestnetV0 => {
-                SvmProgram::<TestnetV0>::from_str(&import.bytecode)?.to_checksum().iter().join(", ")
-            }
-            NetworkName::CanaryV0 => {
-                SvmProgram::<CanaryV0>::from_str(&import.bytecode)?.to_checksum().iter().join(", ")
-            }
-        };
+    // Print import checksums only when explicitly requested.
+    if print_checksums {
+        for import in &compiled.imports {
+            // Compute checksum depending on network.
+            let dep_checksum: String = match network {
+                NetworkName::MainnetV0 => {
+                    SvmProgram::<MainnetV0>::from_str(&import.bytecode)?.to_checksum().iter().join(", ")
+                }
+                NetworkName::TestnetV0 => {
+                    SvmProgram::<TestnetV0>::from_str(&import.bytecode)?.to_checksum().iter().join(", ")
+                }
+                NetworkName::CanaryV0 => {
+                    SvmProgram::<CanaryV0>::from_str(&import.bytecode)?.to_checksum().iter().join(", ")
+                }
+            };
 
-        tracing::info!("    Import '{}': checksum = '[{dep_checksum}]'", import.name);
+            tracing::info!("    Import '{}': checksum = '[{dep_checksum}]'", import.name);
+        }
+    }
+
+    // Import sizes track the primary program size rather than the checksums:
+    // both answer "will this fit on chain", so they print together.
+    if !is_test {
+        for import in &compiled.imports {
+            let import_size = import.bytecode.len();
+            let (size_kb, max_kb, _warning) = format_program_size(import_size, MAX_PROGRAM_SIZE);
+            tracing::info!("    Import '{}': program size: {size_kb:.2} KB / {max_kb:.2} KB", import.name);
+        }
     }
 
     Ok(compiled)
 }
 
 /// Parses a Leo file into an AST without generating bytecode.
+#[allow(clippy::too_many_arguments)]
 fn parse_leo_source_directory(
     entry_file_path: &Path,
     source_directory: &Path,
@@ -534,6 +680,7 @@ fn parse_leo_source_directory(
     node_builder: &Rc<NodeBuilder>,
     options: BuildOptions,
     network: NetworkName,
+    rename: Option<String>,
 ) -> Result<Program> {
     // Create a new instance of the Leo compiler.
     let mut compiler = Compiler::new(
@@ -541,11 +688,13 @@ fn parse_leo_source_directory(
         false,
         handler.clone(),
         Rc::clone(node_builder),
-        std::path::PathBuf::default(),
         Some(options.into()),
         IndexMap::new(),
         network,
     );
+    // When set, rewrite the parsed program scope under this on-chain name so the stub
+    // matches the renamed identity (`leo deploy --rename`).
+    compiler.rename = rename;
 
     // Parse the Leo program into an AST.
     compiler.parse_program_from_directory(entry_file_path, source_directory)
@@ -605,7 +754,6 @@ fn parse_leo_source_directory_library(
         false,
         handler.clone(),
         Rc::clone(node_builder),
-        std::path::PathBuf::default(),
         Some(options.into()),
         IndexMap::new(),
         network,
@@ -622,7 +770,6 @@ fn build_leo_source_directory_library(
     entry_file_path: &Path,
     source_directory: &Path,
     library_name: Symbol,
-    snapshots_directory: &Path,
     handler: &Handler,
     node_builder: &Rc<NodeBuilder>,
     options: BuildOptions,
@@ -638,7 +785,6 @@ fn build_leo_source_directory_library(
         false,
         handler.clone(),
         Rc::clone(node_builder),
-        snapshots_directory.to_path_buf(),
         Some(options.into()),
         stubs,
         network,

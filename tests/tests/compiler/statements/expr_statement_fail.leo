@@ -1,4 +1,4 @@
-struct Foo {
+export struct Foo {
     a: u8,
 }
 
@@ -14,4 +14,7 @@ program test.aleo {
         1field;
         return a + b;
     }
+
+    @noupgrade
+    constructor() {}
 }

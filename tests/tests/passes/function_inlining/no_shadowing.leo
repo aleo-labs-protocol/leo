@@ -1,4 +1,7 @@
 program inline_no_shadowing.aleo {
+    @noupgrade
+    constructor() {}
+
     fn main(a: u32, b: u32) -> u32 {
         let first: u32 = square(a);
         let second: u32 = square(b);
@@ -6,6 +9,6 @@ program inline_no_shadowing.aleo {
     }
 }
 
-fn square(x: u32) -> u32 {
+export fn square(x: u32) -> u32 {
     return x * x;
 }

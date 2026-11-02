@@ -43,9 +43,12 @@ program test.aleo {
             );
         };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(
+export final fn finalize(
     bad_vk: u32,
     bad_varuna: u32,
     bad_inputs: [u8; 4],

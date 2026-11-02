@@ -12,6 +12,22 @@
     │ 
     │ Help: The external program's finalize runs concurrently and may invalidate assumptions about `mint_output`. Re-read the value on-chain inside the finalize block.
 ────╯
+[WSAZ0374004] Warning: function accepts an external record and returns a record defined by a different program
+   ╭─[ compiler-test:6:8 ]
+   │
+ 6 │     fn deposit_credits_private(
+ 7 │         input_record: credits.aleo::credits,
+   │         ─────────────────┬─────────────────  
+   │                          ╰─────────────────── external input `input_record` of type `credits.aleo::credits`
+   │ 
+ 9 │     ) -> (credits.aleo::credits, multi_token_support_program.aleo::Token, Final) {
+   │                                  ───────────────────┬───────────────────  
+   │                                                     ╰───────────────────── output record of type `multi_token_support_program.aleo::Token`
+   │ 
+   │ Help: Check that the input records satisfy the requirements for producing the output records.
+   │ 
+   │ Note: This warning compares record origins only. It does not verify record use or validation.
+───╯
 program credits.aleo;
 
 record credits:
@@ -29,6 +45,9 @@ function transfer_private_to_public:
 
 finalize transfer_private_to_public:
     assert.eq 1u8 1u8;
+
+constructor:
+    assert.eq edition 0u16;
 // --- Next Program --- //
 program multi_token_support_program.aleo;
 
@@ -44,6 +63,9 @@ function mint_private:
 
 finalize mint_private:
     assert.eq 1u8 1u8;
+
+constructor:
+    assert.eq edition 0u16;
 // --- Next Program --- //
 import credits.aleo;
 import multi_token_support_program.aleo;
@@ -64,3 +86,6 @@ finalize deposit_credits_private:
     input r1 as multi_token_support_program.aleo/mint_private.future;
     await r0;
     await r1;
+
+constructor:
+    assert.eq edition 0u16;

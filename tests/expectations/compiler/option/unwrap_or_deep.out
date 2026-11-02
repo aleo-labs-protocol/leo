@@ -77,3 +77,6 @@ function unwrap_or_deep:
     ternary r36[0u32].is_some r36[0u32].val r12 into r37;
     ternary r37.val.is_some r37.val.val 99u8 into r38;
     output r38 as u8.private;
+
+constructor:
+    assert.eq edition 0u16;

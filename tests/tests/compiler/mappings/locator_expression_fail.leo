@@ -5,8 +5,11 @@ program relay.aleo {
         let a: u32 = relay.aleo::users;
         return final { finalize_send(addr); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_send(addr: address) {
+export final fn finalize_send(addr: address) {
     let a: bool = Mapping::get(relay.aleo::users, addr);
 }

@@ -23,9 +23,12 @@ program test.aleo {
             );
         };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(
+export final fn finalize(
     too_many_vks: [[u8; 10]; 33],
     too_many_inputs: [[[field; 1]; 1]; 33],
     varuna_version: u8,

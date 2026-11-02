@@ -1,6 +1,9 @@
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}
 
-fn main(x: u32) -> bool {
+export fn main(x: u32) -> bool {
     for i: u32 in 0u32..9u32 {
         return false;
     }

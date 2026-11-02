@@ -1,8 +1,11 @@
 program test.aleo {
     fn t1() {
         let f1 = final {
-            let s = self.signer;
-            let c = self.caller;
+            let s = std::ctx::signer();
+            let c = std::ctx::caller();
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

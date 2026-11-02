@@ -8,4 +8,7 @@ program test.aleo {
     fn select(s: bool, a: Point, b: Point) -> Point {
         return s ? a : b;
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -7,4 +7,7 @@ program test.aleo {
     fn select(s: bool, a: Token, b: Token) -> Token {
         return s ? a : b;
     }
+
+    @noupgrade
+    constructor() {}
 }

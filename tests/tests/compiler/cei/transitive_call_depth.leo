@@ -6,9 +6,12 @@ program dep.aleo {
     fn update(a: u32) -> Final {
         return final { finalize_update(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_update(a: u32) {
+export final fn finalize_update(a: u32) {
     Mapping::set(dep_data, 0u32, a);
 }
 
@@ -22,19 +25,22 @@ program caller.aleo {
         let f: Final = dep.aleo::update(a);
         return final { finalize_do_work(f, a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // Depth 2: calls depth 1
-final fn depth2(f: Final) {
+export final fn depth2(f: Final) {
     depth1(f);
 }
 
 // Depth 1: calls f.run() directly
-final fn depth1(f: Final) {
+export final fn depth1(f: Final) {
     f.run();
 }
 
-final fn finalize_do_work(f: Final, a: u32) {
+export final fn finalize_do_work(f: Final, a: u32) {
     // [I] Interaction hidden two calls deep
     depth2(f);
     // [E] Effect after transitive interaction — should warn

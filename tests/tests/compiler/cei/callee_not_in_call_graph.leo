@@ -8,9 +8,12 @@ program dep.aleo {
     fn update(a: u32) -> Final {
         return final { finalize_update(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_update(a: u32) {
+export final fn finalize_update(a: u32) {
     Mapping::set(dep_data, 0u32, a);
 }
 
@@ -24,15 +27,18 @@ program caller.aleo {
         let f: Final = dep.aleo::update(a);
         return final { finalize_do_work(f, a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // Helper that performs both a check and an effect.
-final fn do_state_ops(val: u32) {
+export final fn do_state_ops(val: u32) {
     let old: u32 = Mapping::get_or_use(balances, 0u32, 0u32);
     Mapping::set(balances, 0u32, old + val);
 }
 
-final fn finalize_do_work(f: Final, a: u32) {
+export final fn finalize_do_work(f: Final, a: u32) {
     // [I] Interaction first
     f.run();
     // [C+E] Helper with checks and effects called after interaction — should warn

@@ -1,4 +1,4 @@
-struct Foo {
+export struct Foo {
     x: u32,
 }
 
@@ -7,4 +7,7 @@ program test.aleo {
         let a: Foo = Foo { x: 1u32 };
         let err = a.y;
     }
+
+    @noupgrade
+    constructor() {}
 }

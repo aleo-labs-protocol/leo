@@ -1,6 +1,6 @@
-const M: u32 = 5;
+export const M: u32 = 5;
 
-struct Goo::[P: u32] {
+export struct Goo::[P: u32] {
     g: M::[6],
     f: baz::[5],
 }
@@ -14,4 +14,7 @@ program test.aleo {
 
         return 0u32;
     }
+
+    @noupgrade
+    constructor() {}
 }

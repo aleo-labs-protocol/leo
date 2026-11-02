@@ -4,7 +4,7 @@
 // three functions and the Token record even though they come from different levels.
 // Verifies that record_names and flatten_interface collect records transitively.
 
-interface IBase {
+export interface IBase {
     record Token {
         owner: address,
         ..
@@ -12,15 +12,18 @@ interface IBase {
     fn mint(owner: address) -> Token;
 }
 
-interface ITransfer: IBase {
+export interface ITransfer: IBase {
     fn transfer(t: Token, to: address) -> Token;
 }
 
-interface IFull: ITransfer {
+export interface IFull: ITransfer {
     fn burn(t: Token) -> address;
 }
 
 program test.aleo: IFull {
+    @noupgrade
+    constructor() {}
+
     record Token {
         owner: address,
         amount: u64,

@@ -1,5 +1,8 @@
-struct Foo {
+export struct Foo {
     foo: Foo,
 }
 
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}

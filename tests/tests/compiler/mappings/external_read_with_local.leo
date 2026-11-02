@@ -2,12 +2,15 @@ program registry.aleo {
     mapping users: address => bool;
 
     fn register() -> Final {
-        let caller = self.caller;
+        let caller = std::ctx::caller();
         return final { finalize_register(caller); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_register(addr: address) {
+export final fn finalize_register(addr: address) {
     Mapping::set(users, addr, true);
 }
 
@@ -20,9 +23,12 @@ program relay.aleo {
     fn send(addr: address) -> Final {
         return final { finalize_send(addr); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_send(addr: address) {
+export final fn finalize_send(addr: address) {
     let a: bool = Mapping::get(relay.aleo::users, addr);
     assert_eq(a, true);
 }

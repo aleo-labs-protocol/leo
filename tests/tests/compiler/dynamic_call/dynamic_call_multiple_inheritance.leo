@@ -1,12 +1,12 @@
-interface Adder {
+export interface Adder {
     fn sum(a: u32, b: u32) -> u32;
 }
 
-interface Multiplier {
+export interface Multiplier {
     fn product(a: u32, b: u32) -> u32;
 }
 
-interface Calculator: Adder + Multiplier {
+export interface Calculator: Adder + Multiplier {
 }
 
 program test.aleo: Calculator {
@@ -23,4 +23,7 @@ program test.aleo: Calculator {
         let p: u32 = Multiplier@(target)::product(x, y);
         return s + p;
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -1,5 +1,8 @@
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}
 
-fn main(a: group) -> group {
+export fn main(a: group) -> group {
     return 0group * a;
 }

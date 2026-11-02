@@ -6,6 +6,9 @@ program test.aleo {
         x = (x & 0u32.sub_wrapped(x)).mul_wrapped(72416175u32);
         return sealsTableLookup(x >> 26u8);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // Right now we do not have any structure that allows
@@ -15,7 +18,7 @@ program test.aleo {
 //  31,11, 5, u, u, u, u, u,   9, u, u,24, u, u,20,26,
 //  30, u, u, u, u,23, u,19,  29, u,22,18,28,17,16, u};
 
-fn sealsTableLookup(i: u32) -> u8 {
+export fn sealsTableLookup(i: u32) -> u8 {
     if i == 0u32 {
         return 32u8;
     } else if i == 1u32 {

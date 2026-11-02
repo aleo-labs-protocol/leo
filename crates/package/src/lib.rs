@@ -33,8 +33,13 @@
 //!
 //! Inside `build`, every compilation unit - the package's own program or
 //! library, its local dependencies, and fetched network imports - gets its own
-//! `build/<name>/` directory with the same shape. When compiler-debug AST
-//! snapshots are requested they appear under `build/<name>/snapshots/`.
+//! `build/<name>/` directory with the same shape.
+//!
+//! For packages that live inside a workspace (a directory whose `workspace.json`
+//! is an ancestor), `build/` moves to the workspace root rather than the
+//! package's own directory. Every member's per-unit subdirectory is then keyed
+//! by unit name under `<workspace_root>/build/<name>/`, so a unit built once
+//! is reused across members instead of being rebuilt per member.
 //!
 //! The file `program.json` is a manifest containing the program name, version, description,
 //! and license, together with information about its dependencies.
@@ -54,7 +59,7 @@
 //! ```no_run
 //! # use leo_ast::NetworkName;
 //! use leo_package::Package;
-//! let package = Package::from_directory("path/to/package", "/home/me/.aleo", false, false, Some(NetworkName::TestnetV0), Some("http://localhost:3030"), 3).unwrap();
+//! let package = Package::from_directory("path/to/package", "/home/me/.aleo", false, false, false, Some(NetworkName::TestnetV0), Some("http://localhost:3030"), 3).unwrap();
 //! ```
 //! This will read the manifest and keep their data in `package.manifest`.
 //! It will also process dependencies and store them in topological order in `package.compilation_units`. This processing
@@ -94,8 +99,19 @@ pub use package::*;
 mod compilation_unit;
 pub use compilation_unit::*;
 
+pub mod git;
+
+mod lock;
+pub use lock::*;
+
 mod workspace;
 pub use workspace::*;
+
+#[cfg(test)]
+mod test_util;
+
+#[cfg(test)]
+mod tests;
 
 pub const SOURCE_DIRECTORY: &str = "src";
 
@@ -109,10 +125,6 @@ pub const ABI_FILENAME: &str = "abi.json";
 
 /// Name of the per-unit subdirectory holding interface ABI JSON files.
 pub const INTERFACES_DIRNAME: &str = "interfaces";
-
-/// Name of the per-unit subdirectory holding compiler-debug AST snapshots.
-/// Created lazily on first write; absent on builds that don't request snapshots.
-pub const SNAPSHOTS_DIRNAME: &str = "snapshots";
 
 pub const TESTS_DIRECTORY: &str = "tests";
 
@@ -131,6 +143,12 @@ pub type Edition = u16;
 /// network programs; build paths key on the bare name so the two are unified.
 pub fn bare_unit_name(name: &str) -> &str {
     name.strip_suffix(".aleo").unwrap_or(name)
+}
+
+/// Canonicalizes a program name to its `.aleo`-suffixed form, appending the
+/// suffix only when it is absent. The inverse of [`bare_unit_name`].
+pub fn canonicalize_program_name(name: &str) -> String {
+    if name.ends_with(".aleo") { name.to_string() } else { format!("{name}.aleo") }
 }
 
 /// Converts a valid program or library name into a `Symbol`.
@@ -167,9 +185,10 @@ pub fn is_valid_library_name(name: &str) -> bool {
 
 /// Checks whether a string satisfies general Aleo package naming rules.
 ///
-/// Names must be nonempty, start with a letter, contain only ASCII alphanumeric
-/// characters or underscores, avoid reserved keywords, and not contain "aleo".
-fn is_valid_package_name(name: &str) -> bool {
+/// Expects a bare name (no `.aleo` suffix; use [`bare_unit_name`] to strip one first). Names must
+/// be nonempty, start with a letter, contain only ASCII alphanumeric characters or underscores,
+/// avoid reserved keywords, and not contain "aleo".
+pub fn is_valid_package_name(name: &str) -> bool {
     // Check that the name is nonempty.
     if name.is_empty() {
         tracing::error!("Aleo names must be nonempty");
@@ -196,12 +215,21 @@ fn is_valid_package_name(name: &str) -> bool {
         return false;
     }
 
-    // Check reserved keywords.
-    if reserved_keywords().any(|kw| kw == name) {
+    if is_leo_keyword(name) {
+        tracing::error!("Aleo names cannot be a Leo keyword.");
+        return false;
+    }
+
+    if is_aleo_keyword(name) {
         tracing::error!(
             "Aleo names cannot be a SnarkVM reserved keyword. Reserved keywords are: {}.",
-            reserved_keywords().collect::<Vec<_>>().join(", ")
+            aleo_reserved_keywords().collect::<Vec<_>>().join(", ")
         );
+        return false;
+    }
+
+    if name == "std" {
+        tracing::error!("`{name}` is reserved by Leo and cannot be used as a package, program, or library name.");
         return false;
     }
 
@@ -217,13 +245,21 @@ fn is_valid_package_name(name: &str) -> bool {
 /// Get the list of all reserved and restricted keywords from snarkVM.
 /// These keywords cannot be used as program names.
 /// See: https://github.com/ProvableHQ/snarkVM/blob/046a2964f75576b2c4afbab9aa9eabc43ceb6dc3/synthesizer/program/src/lib.rs#L192
-pub fn reserved_keywords() -> impl Iterator<Item = &'static str> {
+pub fn aleo_reserved_keywords() -> impl Iterator<Item = &'static str> {
     use snarkvm::prelude::{Program, TestnetV0};
 
     // Flatten RESTRICTED_KEYWORDS by ignoring ConsensusVersion
     let restricted = Program::<TestnetV0>::RESTRICTED_KEYWORDS.iter().flat_map(|(_, kws)| kws.iter().copied());
 
     Program::<TestnetV0>::KEYWORDS.iter().copied().chain(restricted)
+}
+
+fn is_leo_keyword(name: &str) -> bool {
+    leo_parser_rowan::is_keyword(name)
+}
+
+fn is_aleo_keyword(name: &str) -> bool {
+    aleo_reserved_keywords().any(|kw| kw == name)
 }
 
 /// Creates a configured ureq agent for Leo network requests.
@@ -344,4 +380,32 @@ pub fn filename_no_aleo_extension(path: &Path) -> Option<&str> {
 
 fn filename_no_extension<'a>(path: &'a Path, extension: &'static str) -> Option<&'a str> {
     path.file_name().and_then(|os_str| os_str.to_str()).and_then(|s| s.strip_suffix(extension))
+}
+
+#[cfg(test)]
+mod package_tests {
+    use super::{Package, is_valid_library_name, is_valid_program_name};
+
+    #[test]
+    fn package_names_reject_leo_keywords() {
+        assert!(!is_valid_program_name("in.aleo"));
+        assert!(!is_valid_library_name("in"));
+    }
+
+    #[test]
+    fn package_names_accept_keyword_prefixes() {
+        assert!(is_valid_program_name("inside.aleo"));
+        assert!(is_valid_library_name("inside"));
+    }
+
+    #[test]
+    fn package_initialize_rejects_leo_keyword_program_names() {
+        let dir = std::env::temp_dir().join(format!("leo_keyword_program_name_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        assert!(Package::initialize("in", &dir, false).is_err());
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

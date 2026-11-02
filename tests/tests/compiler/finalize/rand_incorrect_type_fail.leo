@@ -4,9 +4,12 @@ program test.aleo {
     fn foo() -> Final {
         return final { finalize_foo(); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_foo() {
+export final fn finalize_foo() {
     let a: scalar = ChaCha::rand_field();
     let b: group = ChaCha::rand_field();
     values.set(a, b);

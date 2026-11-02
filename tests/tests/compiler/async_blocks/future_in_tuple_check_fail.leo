@@ -8,6 +8,9 @@ program credits.aleo {
         let f: Final = final { assert_eq(1u8, 1u8); };
         return (input, f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -17,12 +20,12 @@ program test_credits.aleo {
     fn send_credits(input: credits.aleo::credits, amount: u64) -> (credits.aleo::credits, Final) {
         let result: (credits.aleo::credits, Final) = credits.aleo::transfer_private_to_public(
             input,
-            self.address,
+            std::ctx::addr(),
             amount,
         );
         let result2: (credits.aleo::credits, Final) = credits.aleo::transfer_private_to_public(
             input,
-            self.address,
+            std::ctx::addr(),
             amount,
         );
         return (
@@ -32,4 +35,7 @@ program test_credits.aleo {
             },
         );
     }
+
+    @noupgrade
+    constructor() {}
 }

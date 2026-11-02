@@ -234,6 +234,21 @@ pub(crate) fn can_only_call_inline_function(kind: impl Display, span: Span) -> F
         .with_help("Move the callee out of the `program` block, or call a regular `fn` from this site instead.")
 }
 
+pub(crate) fn call_final_fn_outside_finalize_context(span: Span) -> Formatted {
+    Formatted::error(CODE_PREFIX, CODE_MASK + 42, "a `final fn` can only be called from a finalize context", span)
+        .with_help(
+            "Wrap the call in a `final { … }` block inside an entry point, or move the calling code into a `final fn`.",
+        )
+}
+
+pub(crate) fn call_reaches_offchain_from_onchain_scope(span: Span) -> Formatted {
+    Formatted::error(CODE_PREFIX, CODE_MASK + 42, "this call reads off-chain-only values from on-chain code", span)
+        .with_note("The caller and signer only exist while a transition is being proved off-chain")
+        .with_help(
+            "Read the value in an off-chain scope (an entry point body outside its `final` block) and pass it in.",
+        )
+}
+
 pub(crate) fn cannot_invoke_call_to_local_entry_point_fn(span: Span) -> Formatted {
     Formatted::error(CODE_PREFIX, CODE_MASK + 43, "cannot call a local entry point fn from an entry point fn", span)
         .with_help("Refactor the shared logic into a regular `fn` and call that from both entry points.")
@@ -405,6 +420,12 @@ pub(crate) fn no_entry_points(span: Span) -> Formatted {
         .with_help("Define at least one function inside the `program` block.")
 }
 
+pub(crate) fn missing_constructor(span: Span) -> Formatted {
+    Formatted::error(CODE_PREFIX, CODE_MASK + 84, "a program must declare a constructor", span)
+        .with_primary_span_underline()
+        .with_help("Add a constructor such as `@noupgrade constructor() {}` inside the `program` block.")
+}
+
 pub(crate) fn entry_point_fn_final_invalid_output(span: Span) -> Formatted {
     Formatted::error(
         CODE_PREFIX,
@@ -455,12 +476,6 @@ pub(crate) fn not_all_finals_consumed(unconsumed: impl Display, span: Span) -> F
 pub(crate) fn entry_point_missing_final_to_return(span: Span) -> Formatted {
     Formatted::error(CODE_PREFIX, CODE_MASK + 105, "an entry point fn returning `Final` must return a `Final`", span)
         .with_help("Add a `final { … }` block inside the entry point fn body and return its result.")
-}
-
-pub(crate) fn final_fn_cannot_return_value(span: Span) -> Formatted {
-    Formatted::error(CODE_PREFIX, CODE_MASK + 106, "a `final fn` is not allowed to return a value", span).with_help(
-        "Remove the output type and the `return` statement. The `Final` returned by a `final fn` is inferred automatically and must not be written explicitly.",
-    )
 }
 
 pub(crate) fn cannot_modify_external_container(operation: impl Display, kind: impl Display, span: Span) -> Formatted {
@@ -840,7 +855,7 @@ pub(crate) fn function_cannot_take_option_as_input(name: impl Display, ty: impl 
         format!("the input `{name}` has type `{ty}`, which is or contains an optional"),
         span,
     )
-    .with_help("Inputs to entry point fns cannot be optional. Move the optionality outside the call site.")
+    .with_help("Inputs to entry point fns and view fns cannot be optional. Move the optionality outside the call site.")
 }
 
 pub(crate) fn function_cannot_return_option_as_output(ty: impl Display, span: Span) -> Formatted {
@@ -850,7 +865,9 @@ pub(crate) fn function_cannot_return_option_as_output(ty: impl Display, span: Sp
         format!("this function has output type `{ty}`, which is or contains an optional"),
         span,
     )
-    .with_help("Outputs of entry point fns cannot be optional. Move the optionality outside the call site.")
+    .with_help(
+        "Outputs of entry point fns and view fns cannot be optional. Move the optionality outside the call site.",
+    )
 }
 
 pub(crate) fn invalid_storage_type(type_: impl Display, span: Span) -> Formatted {
@@ -1078,16 +1095,71 @@ pub(crate) fn storage_op_requires_path_receiver(
     .with_help(format!("Call `{operation}` directly on a declared {kind}, not on a temporary expression."))
 }
 
+pub(crate) fn cannot_have_mode(kind: impl Display, span: Span) -> Formatted {
+    Formatted::error(CODE_PREFIX, CODE_MASK + 192, format!("a {kind} cannot have a visibility mode"), span)
+        .with_help("Remove the `public` or `private` modifier.")
+        .with_note(
+            "Records lower to a `.record` marker and `Final`s to a `.future`, neither of which carries a visibility.",
+        )
+}
+
+pub(crate) fn inaccessible_item(kind: impl Display, item: impl Display, span: Span) -> Formatted {
+    Formatted::error(CODE_PREFIX, CODE_MASK + 193, format!("{kind} `{item}` is not accessible from this module"), span)
+        .with_help(format!(
+            "Add `export` to the declaration of `{item}` in its defining module to make it accessible from other modules."
+        ))
+}
+
+pub(crate) fn invalid_operation_outside_onchain(operation: impl Display, span: Span) -> Formatted {
+    Formatted::error(
+        CODE_PREFIX,
+        CODE_MASK + 194,
+        format!("`{operation}` must be inside a `final fn`, a `final` block, or a `view fn`"),
+        span,
+    )
+    .with_help(format!(
+        "Move the `{operation}` call into a `final fn`, a `view fn`, or wrap it in a `final {{ … }}` block."
+    ))
+}
+
+pub(crate) fn view_cannot_write_state(operation: impl Display, span: Span) -> Formatted {
+    Formatted::error(
+        CODE_PREFIX,
+        CODE_MASK + 195,
+        format!("`{operation}` cannot be used in a `view fn`"),
+        span,
+    )
+    .with_note("views are read only.")
+    .with_help(format!(
+        "Move the `{operation}` call into a `final fn` or a `final {{ … }}` block, where state mutations are allowed."
+    ))
+}
+
+pub(crate) fn offchain_op_in_view(operation: impl Display, span: Span) -> Formatted {
+    Formatted::error(CODE_PREFIX, CODE_MASK + 196, format!("`{operation}` is not available in a `view fn`"), span)
+        .with_help("Read the value in an off-chain scope and pass it in.")
+}
+
+pub(crate) fn external_final_fn_writes_state(function: impl Display, span: Span) -> Formatted {
+    Formatted::error(
+        CODE_PREFIX,
+        CODE_MASK + 197,
+        format!("`{function}` cannot be called from another program because it may write on-chain state"),
+        span,
+    )
+    .with_help("Call a transition in that program instead, or make the `final fn` read-only.")
+}
+
 // TypeCheckerWarning builder functions
 
 pub(crate) fn caller_as_record_owner(record_name: impl Display, span: Span) -> Formatted {
     Formatted::warning(
         CODE_PREFIX,
         CODE_MASK + 4,
-        format!("`self.caller` used as the owner of record `{record_name}`"),
+        format!("`std::ctx::caller()` used as the owner of record `{record_name}`"),
         span,
     )
-    .with_help("`self.caller` may refer to a program address, which cannot spend records. Use `self.signer` if you want the user that initiated the transaction.")
+    .with_help("`std::ctx::caller()` may return a program address, which cannot spend records. Use `std::ctx::signer()` if you want the user that initiated the transaction.")
 }
 
 pub(crate) fn no_inline_ignored(name: impl Display, reason: impl Display, span: Span) -> Formatted {

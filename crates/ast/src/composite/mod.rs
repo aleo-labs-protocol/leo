@@ -17,11 +17,11 @@
 pub mod member;
 pub use member::*;
 
-use crate::{ConstParameter, Identifier, Indent, Mode, Node, NodeID, ProgramId, Type};
+use crate::{ConstParameter, Identifier, Indent, Mode, Node, NodeID, ProgramId, TypeKind, TypeNode};
 use leo_span::{Span, Symbol};
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::fmt;
 
 use snarkvm::{
@@ -37,8 +37,12 @@ use snarkvm::{
 /// Type identity is decided by the full path including `identifier`,
 /// as the record is nominal, not structural.
 /// The fields are named so `struct Foo(u8, u16)` is not allowed.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Composite {
+    /// Whether the `export` keyword was written on this composite. `None` when the
+    /// concept doesn't apply (records, program-block composites, and structs
+    /// imported from another unit, all always reachable).
+    pub is_exported: Option<bool>,
     /// The name of the type in the type system in this module.
     pub identifier: Identifier,
     /// The composite's const parameters.
@@ -68,27 +72,33 @@ impl Composite {
         self.identifier.name
     }
 
+    // No interner in scope at disassembly time; stub types get their canonical handle when
+    // the frontend re-interns them during stub merge.
     pub fn from_external_record<N: Network>(input: &RecordType<N>, program_id: ProgramId) -> Self {
         let mut members = Vec::with_capacity(input.entries().len() + 1);
         members.push(Member {
-            mode: if input.owner().is_private() { Mode::Public } else { Mode::Private },
+            mode: if input.owner().is_public() { Mode::Public } else { Mode::Private },
             identifier: Identifier::new(Symbol::intern("owner"), Default::default()),
-            type_: Type::Address,
+            type_: TypeNode::unchecked(TypeKind::Address, Span::default()),
             span: Default::default(),
             id: Default::default(),
         });
-        members.extend(input.entries().iter().map(|(id, entry)| Member {
-            mode: if input.owner().is_public() { Mode::Public } else { Mode::Private },
-            identifier: Identifier::from(id),
-            type_: match entry {
-                Public(t) => Type::from_snarkvm(t, program_id),
-                Private(t) => Type::from_snarkvm(t, program_id),
-                Constant(t) => Type::from_snarkvm(t, program_id),
-            },
-            span: Default::default(),
-            id: Default::default(),
+        members.extend(input.entries().iter().map(|(id, entry)| {
+            let (mode, type_) = match entry {
+                Public(type_) => (Mode::Public, type_),
+                Private(type_) => (Mode::Private, type_),
+                Constant(type_) => (Mode::Constant, type_),
+            };
+            Member {
+                mode,
+                identifier: Identifier::from(id),
+                type_: TypeNode::unchecked(TypeKind::from_snarkvm(type_, program_id), Span::default()),
+                span: Default::default(),
+                id: Default::default(),
+            }
         }));
         Self {
+            is_exported: None,
             identifier: Identifier::from(input.name()),
             const_parameters: Vec::new(),
             members,
@@ -98,8 +108,10 @@ impl Composite {
         }
     }
 
+    // See `from_external_record` for the `unchecked` rationale.
     pub fn from_snarkvm<N: Network>(input: &StructType<N>, program: ProgramId) -> Self {
         Self {
+            is_exported: None,
             identifier: Identifier::from(input.name()),
             const_parameters: Vec::new(),
             members: input
@@ -108,7 +120,7 @@ impl Composite {
                 .map(|(id, type_)| Member {
                     mode: Mode::None,
                     identifier: Identifier::from(id),
-                    type_: Type::from_snarkvm(type_, program),
+                    type_: TypeNode::unchecked(TypeKind::from_snarkvm(type_, program), Span::default()),
                     span: Default::default(),
                     id: Default::default(),
                 })
@@ -122,6 +134,9 @@ impl Composite {
 
 impl fmt::Display for Composite {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.is_exported == Some(true) {
+            f.write_str("export ")?;
+        }
         f.write_str(if self.is_record { "record" } else { "struct" })?;
         write!(f, " {}", self.identifier)?;
         if !self.const_parameters.is_empty() {

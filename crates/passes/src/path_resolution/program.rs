@@ -119,6 +119,7 @@ impl UnitReconstructor for PathResolutionVisitor<'_> {
 
     fn reconstruct_function(&mut self, input: Function) -> Function {
         self.in_scope(input.id, |slf| Function {
+            is_exported: input.is_exported,
             annotations: input.annotations,
             variant: input.variant,
             identifier: input.identifier,
@@ -126,15 +127,17 @@ impl UnitReconstructor for PathResolutionVisitor<'_> {
                 .const_parameters
                 .iter()
                 .map(|const_param| {
-                    let (ty, _) = slf.reconstruct_type(const_param.type_.clone());
+                    let (ty, _) = slf.reconstruct_type_node(const_param.type_.clone());
 
                     if let Err(err) = slf.state.symbol_table.insert_variable(
                         slf.program,
+                        &slf.module,
                         &[const_param.identifier.name],
                         VariableSymbol {
-                            type_: Some(ty.clone()),
+                            type_: Some(ty.kind().clone()),
                             span: const_param.identifier.span,
                             declaration: VariableType::ConstParameter,
+                            is_exported: None,
                         },
                     ) {
                         slf.state.handler.emit_err(err);
@@ -147,14 +150,17 @@ impl UnitReconstructor for PathResolutionVisitor<'_> {
                 .input
                 .iter()
                 .map(|inp| {
-                    let (ty, _) = slf.reconstruct_type(inp.type_.clone());
+                    let (ty, _) = slf.reconstruct_type_node(inp.type_.clone());
                     let name = inp.identifier().name;
 
-                    if let Err(err) = slf.state.symbol_table.insert_variable(slf.program, &[name], VariableSymbol {
-                        type_: Some(ty.clone()),
-                        span: inp.identifier.span,
-                        declaration: VariableType::Input(inp.mode()),
-                    }) {
+                    if let Err(err) =
+                        slf.state.symbol_table.insert_variable(slf.program, &slf.module, &[name], VariableSymbol {
+                            type_: Some(ty.kind().clone()),
+                            span: inp.identifier.span,
+                            declaration: VariableType::Input(inp.mode()),
+                            is_exported: None,
+                        })
+                    {
                         slf.state.handler.emit_err(err);
                     }
 
@@ -164,7 +170,7 @@ impl UnitReconstructor for PathResolutionVisitor<'_> {
             output: input
                 .output
                 .iter()
-                .map(|output| Output { type_: slf.reconstruct_type(output.type_.clone()).0, ..output.clone() })
+                .map(|output| Output { type_: slf.reconstruct_type_node(output.type_.clone()).0, ..output.clone() })
                 .collect(),
             output_type: slf.reconstruct_type(input.output_type).0,
             block: slf.reconstruct_block(input.block).0,
@@ -181,12 +187,12 @@ impl UnitReconstructor for PathResolutionVisitor<'_> {
             input: input
                 .input
                 .iter()
-                .map(|inp| Input { type_: slf.reconstruct_type(inp.type_.clone()).0, ..inp.clone() })
+                .map(|inp| Input { type_: slf.reconstruct_type_node(inp.type_.clone()).0, ..inp.clone() })
                 .collect(),
             output: input
                 .output
                 .iter()
-                .map(|output| Output { type_: slf.reconstruct_type(output.type_.clone()).0, ..output.clone() })
+                .map(|output| Output { type_: slf.reconstruct_type_node(output.type_.clone()).0, ..output.clone() })
                 .collect(),
             output_type: slf.reconstruct_type(input.output_type).0,
             span: input.span,
@@ -202,16 +208,18 @@ impl UnitReconstructor for PathResolutionVisitor<'_> {
                     .iter()
                     .map(|const_param| {
                         // Reconstruct type early
-                        let (ty, _) = slf.reconstruct_type(const_param.type_.clone());
+                        let (ty, _) = slf.reconstruct_type_node(const_param.type_.clone());
 
                         // Insert with reconstructed type
                         if let Err(err) = slf.state.symbol_table.insert_variable(
                             slf.program,
+                            &slf.module,
                             &[const_param.identifier.name],
                             VariableSymbol {
-                                type_: Some(ty.clone()),
+                                type_: Some(ty.kind().clone()),
                                 span: const_param.identifier.span,
                                 declaration: VariableType::ConstParameter,
+                                is_exported: None,
                             },
                         ) {
                             slf.state.handler.emit_err(err);
@@ -226,7 +234,7 @@ impl UnitReconstructor for PathResolutionVisitor<'_> {
                     .members
                     .iter()
                     .map(|member| {
-                        let (ty, _) = slf.reconstruct_type(member.type_.clone());
+                        let (ty, _) = slf.reconstruct_type_node(member.type_.clone());
                         Member { type_: ty, ..member.clone() }
                     })
                     .collect(),

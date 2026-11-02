@@ -1,5 +1,5 @@
 // FAIL: dynamic storage reads are only allowed in a finalize context.
-interface Counter {
+export interface Counter {
     storage total: u64;
     storage entries: [u64];
 }
@@ -18,4 +18,7 @@ program test.aleo {
     fn vector_len(target: field) -> u32 {
         return Counter@(target)::entries.len();
     }
+
+    @noupgrade
+    constructor() {}
 }

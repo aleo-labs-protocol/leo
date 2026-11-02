@@ -22,3 +22,6 @@ function select_inner:
     input r2 as Segment.private;
     ternary r0 r1.lo r2.hi into r3;
     output r3 as Point.private;
+
+constructor:
+    assert.eq edition 0u16;

@@ -3,9 +3,9 @@
     │
   9 │ ╭─▶ program test.aleo: Counter + Resettable {
     ┆ ┆   
- 14 │ ├─▶ }
+ 17 │ ├─▶ }
     │ │       
-    │ ╰─────── 
+    │ ╰─────── here
     │     
     │     Help: Add the missing function `reset` with the exact signature specified in `test.aleo/Resettable`.
 ────╯

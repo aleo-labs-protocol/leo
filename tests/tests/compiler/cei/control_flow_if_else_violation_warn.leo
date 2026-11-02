@@ -5,9 +5,12 @@ program dep.aleo {
     fn update(a: u32) -> Final {
         return final { finalize_update(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_update(a: u32) {
+export final fn finalize_update(a: u32) {
     Mapping::set(dep_data, 0u32, a);
 }
 
@@ -21,9 +24,12 @@ program caller.aleo {
         let f: Final = dep.aleo::update(a);
         return final { finalize_do_work(f, a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_do_work(f: Final, a: u32) {
+export final fn finalize_do_work(f: Final, a: u32) {
     if a > 10u32 {
         // [E] Effect in branch before interaction
         Mapping::set(balances, 0u32, a);

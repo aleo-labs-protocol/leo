@@ -5,9 +5,12 @@ program test.aleo {
     fn check(prog: field, net: field, m: field, key: address) -> Final {
         return final { finalize_check(prog, net, m, key); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_check(prog: field, net: field, m: field, key: address) {
+export final fn finalize_check(prog: field, net: field, m: field, key: address) {
     let exists: bool = _dynamic_contains(prog, net, m, key);
     Mapping::set(result, key, exists);
 }

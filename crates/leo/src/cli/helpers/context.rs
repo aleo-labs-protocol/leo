@@ -16,7 +16,7 @@
 
 use aleo_std;
 use leo_errors::Result;
-use leo_package::{Manifest, Workspace};
+use leo_package::{Lock, Manifest, Workspace};
 
 use aleo_std::aleo_dir;
 use std::{env::current_dir, path::PathBuf};
@@ -67,11 +67,26 @@ impl Context {
         }
     }
 
-    /// Returns the path to the Aleo registry directory.
+    /// Returns the path to the Aleo registry directory, creating it if needed.
     pub fn home(&self) -> Result<PathBuf> {
-        match &self.home {
-            Some(path) => Ok(path.clone()),
-            None => Ok(aleo_dir()),
+        let path = self.home.clone().unwrap_or_else(aleo_dir);
+        std::fs::create_dir_all(&path).map_err(crate::errors::cli_io_error)?;
+        Ok(path)
+    }
+
+    /// Read dependency pins from the enclosing project or workspace.
+    pub fn network_pins(&self) -> Result<Lock> {
+        let mut path = self.dir()?;
+        if path.extension().and_then(|extension| extension.to_str()) == Some("aleo") {
+            path = path.canonicalize().map_err(crate::errors::cli_io_error)?;
+            path.pop();
+        }
+        if let Some(root) = Workspace::discover_root(&path)? {
+            Lock::read(&root)
+        } else if let Some(root) = path.ancestors().find(|dir| dir.join(leo_package::MANIFEST_FILENAME).is_file()) {
+            Lock::read(root)
+        } else {
+            Ok(Lock::default())
         }
     }
 
@@ -83,14 +98,18 @@ impl Context {
         Ok(manifest)
     }
 
-    /// Returns the ordered list of member directories to operate on, respecting
-    /// `--package` filtering and workspace discovery.
+    /// Returns the workspace root and the ordered list of member directories to
+    /// operate on, respecting `--package` filtering and workspace discovery.
     ///
     /// - At workspace root without `--package`: all members in dependency order.
     /// - At workspace root with `--package`: just that member.
     /// - Inside a member directory: just that member.
     /// - No workspace found: `None` (caller falls through to single-package behavior).
-    pub fn resolve_targets(&self) -> Result<Option<Vec<PathBuf>>> {
+    ///
+    /// When `Some`, the first tuple element is the canonicalized workspace root,
+    /// so callers needing it (e.g. `leo clean` removing the shared `build/`) do
+    /// not have to re-walk for it.
+    pub fn resolve_targets(&self) -> Result<Option<(PathBuf, Vec<PathBuf>)>> {
         let dir = self.dir()?;
 
         let workspace = match Workspace::discover(&dir)? {
@@ -103,21 +122,21 @@ impl Context {
             }
         };
 
+        let root = workspace.root_directory.clone();
+
         if let Some(ref filter) = self.package_filter {
             match workspace.find_member(filter) {
-                Some(path) => Ok(Some(vec![path.clone()])),
-                None => {
-                    Err(crate::errors::workspace_package_not_found(filter, workspace.root_directory.display()).into())
-                }
+                Some(path) => Ok(Some((root, vec![path.clone()]))),
+                None => Err(crate::errors::workspace_package_not_found(filter, root.display()).into()),
             }
         } else {
             let canonical = dir.canonicalize().unwrap_or_else(|_| dir.clone());
             if canonical == workspace.root_directory {
                 // At workspace root - operate on all members.
-                Ok(Some(workspace.member_paths))
+                Ok(Some((root, workspace.member_paths)))
             } else if workspace.is_member(&canonical) {
                 // Inside a member - operate on just this member.
-                Ok(Some(vec![canonical]))
+                Ok(Some((root, vec![canonical])))
             } else {
                 // Inside the workspace tree but not in a member directory.
                 Ok(None)

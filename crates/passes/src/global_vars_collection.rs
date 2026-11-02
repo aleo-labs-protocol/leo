@@ -119,10 +119,11 @@ impl AstVisitor for GlobalVarsCollectionVisitor<'_> {
         // Just add the const to the symbol table without validating it; that will happen later
         // in type checking.
         let const_path: Vec<Symbol> = self.module.iter().cloned().chain(std::iter::once(input.place.name)).collect();
-        if let Err(err) = self.state.symbol_table.insert_variable(self.unit_name, &const_path, VariableSymbol {
+        if let Err(err) = self.state.symbol_table.insert_variable(self.unit_name, &[], &const_path, VariableSymbol {
             type_: None,
             span: input.place.span,
             declaration: VariableType::Const,
+            is_exported: input.is_exported,
         }) {
             self.state.handler.emit_err(err);
         }
@@ -154,7 +155,7 @@ impl UnitVisitor for GlobalVarsCollectionVisitor<'_> {
     fn visit_mapping(&mut self, input: &Mapping) {
         if let Err(err) = self.state.symbol_table.insert_global(
             Location::new(self.unit_name, vec![input.identifier.name]),
-            VariableSymbol { type_: None, span: input.span, declaration: VariableType::Storage },
+            VariableSymbol { type_: None, span: input.span, declaration: VariableType::Storage, is_exported: None },
         ) {
             self.state.handler.emit_err(err);
         }
@@ -163,7 +164,7 @@ impl UnitVisitor for GlobalVarsCollectionVisitor<'_> {
     fn visit_storage_variable(&mut self, input: &StorageVariable) {
         if let Err(err) = self.state.symbol_table.insert_global(
             Location::new(self.unit_name, vec![input.identifier.name]),
-            VariableSymbol { type_: None, span: input.span, declaration: VariableType::Storage },
+            VariableSymbol { type_: None, span: input.span, declaration: VariableType::Storage, is_exported: None },
         ) {
             self.state.handler.emit_err(err);
         }

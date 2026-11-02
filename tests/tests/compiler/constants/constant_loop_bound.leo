@@ -1,6 +1,6 @@
-const START: u8 = 0u8;
-const START_2: u8 = 1u8;
-const STOP_2: u8 = 20u8;
+export const START: u8 = 0u8;
+export const START_2: u8 = 1u8;
+export const STOP_2: u8 = 20u8;
 
 program test.aleo {
     fn foo(a: u8, b: u8, flag: bool) -> u8 {
@@ -20,4 +20,7 @@ program test.aleo {
         }
         return c;
     }
+
+    @noupgrade
+    constructor() {}
 }

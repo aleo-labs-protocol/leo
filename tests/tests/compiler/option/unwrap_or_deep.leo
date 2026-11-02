@@ -1,16 +1,16 @@
-struct Inner {
+export struct Inner {
     val: u8?,
 }
 
-struct Wrapper {
+export struct Wrapper {
     arr: [Inner?; 1]?,
 }
 
-struct Container {
+export struct Container {
     wrappers: [Wrapper?; 1]?,
 }
 
-struct Top {
+export struct Top {
     container: Container?,
 }
 
@@ -37,4 +37,7 @@ program unwrap_or_deep.aleo {
         }).arr.unwrap_or([fallback_inner])[0].unwrap_or(fallback_inner).val.unwrap_or(99u8);
         return val;
     }
+
+    @noupgrade
+    constructor() {}
 }

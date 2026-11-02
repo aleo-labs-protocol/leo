@@ -1,4 +1,4 @@
-struct Info {
+export struct Info {
     inner: u64,
 }
 
@@ -13,4 +13,7 @@ program test.aleo {
         let info: Info = d.data;
         return info.inner;
     }
+
+    @noupgrade
+    constructor() {}
 }

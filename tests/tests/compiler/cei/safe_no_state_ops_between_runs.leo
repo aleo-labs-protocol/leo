@@ -5,9 +5,12 @@ program dep_a.aleo {
     fn update(a: u32) -> Final {
         return final { finalize_update(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_update(a: u32) {
+export final fn finalize_update(a: u32) {
     Mapping::set(data_a, 0u32, a);
 }
 
@@ -18,9 +21,12 @@ program dep_b.aleo {
     fn update(a: u32) -> Final {
         return final { finalize_update(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_update(a: u32) {
+export final fn finalize_update(a: u32) {
     Mapping::set(data_b, 0u32, a);
 }
 
@@ -34,9 +40,12 @@ program caller.aleo {
         let fb: Final = dep_b.aleo::update(a + 1u32);
         return final { finalize_do_work(fa, fb); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_do_work(fa: Final, fb: Final) {
+export final fn finalize_do_work(fa: Final, fb: Final) {
     // [I] Only interactions, no state ops between them
     fa.run();
     fb.run();

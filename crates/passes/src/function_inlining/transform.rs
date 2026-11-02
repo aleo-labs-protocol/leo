@@ -21,6 +21,8 @@ use crate::{
     common::{items_at_path, program_functions, stub_functions},
     static_single_assignment::visitor::SsaFormingVisitor,
 };
+
+use super::iterative::PendingIterativeInline;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use leo_ast::{Function, Location, *};
@@ -29,7 +31,7 @@ use leo_span::{Symbol, sym};
 pub struct TransformVisitor<'a> {
     pub state: &'a mut CompilerState,
     /// Functions that should always be inlined.
-    pub always_inline: IndexSet<Vec<Symbol>>,
+    pub always_inline: IndexSet<Location>,
     /// A map of reconstructed functions, keyed by `Location` for O(1) lookup during inlining.
     pub reconstructed_functions: IndexMap<Location, Function>,
     /// The main program.
@@ -38,19 +40,46 @@ pub struct TransformVisitor<'a> {
     pub function_map: IndexMap<Location, Function>,
     /// Whether or not we are currently traversing a block that's executed onchain (either final block or final fn block).
     pub is_finalize_context: bool,
+    /// An inlined callee body that cannot be reduced to a single value at its call expression;
+    /// see the [`super::iterative`] module.
+    pub pending_iterative_inline: Option<PendingIterativeInline>,
 }
 
 impl<'a> TransformVisitor<'a> {
     /// Check if a names an optional type. We don't need to check the type
     /// recursively with the sumbol table, hiding optionals behind structs is
     /// allowed.
-    fn names_optional_type(ty: &Type) -> bool {
+    fn names_optional_type(ty: &TypeKind) -> bool {
         match ty {
-            Type::Optional(_) => true,
-            Type::Tuple(tuple) => tuple.elements().iter().any(Self::names_optional_type),
-            Type::Array(array) => Self::names_optional_type(array.element_type()),
+            TypeKind::Optional(_) => true,
+            TypeKind::Tuple(tuple) => tuple.elements().iter().any(Self::names_optional_type),
+            TypeKind::Array(array) => Self::names_optional_type(array.element_type()),
             _ => false,
         }
+    }
+
+    /// Reconstructs the statements of a block. When a statement inlines an iterative callee, the
+    /// rest of the block becomes that callee's continuation.
+    fn reconstruct_statements(&mut self, statements: Vec<Statement>) -> Vec<Statement> {
+        let mut out = Vec::new();
+        let mut iter = statements.into_iter();
+        while let Some(statement) = iter.next() {
+            let (reconstructed_statement, additional_statements) = self.reconstruct_statement(statement);
+            out.extend(additional_statements);
+            if let Some(pending) = self.pending_iterative_inline.take() {
+                // SSA hoists calls to statement level (a definition RHS or an expression
+                // statement), and both forms dissolve themselves when they stash a pending inline.
+                assert!(
+                    matches!(&reconstructed_statement, Statement::Block(b) if b.statements.is_empty()),
+                    "an iterative inline must be consumed by the statement that produced it"
+                );
+                let continuation = self.reconstruct_statements(iter.collect());
+                out.extend(self.lower_iterative_inline(pending, continuation));
+                return out;
+            }
+            out.push(reconstructed_statement);
+        }
+        out
     }
 }
 
@@ -124,6 +153,7 @@ impl UnitReconstructor for TransformVisitor<'_> {
 
     fn reconstruct_function(&mut self, input: Function) -> Function {
         Function {
+            is_exported: input.is_exported,
             annotations: input.annotations,
             variant: input.variant,
             identifier: input.identifier,
@@ -204,6 +234,10 @@ impl AstReconstructor for TransformVisitor<'_> {
     type AdditionalInput = ();
     type AdditionalOutput = Vec<Statement>;
 
+    fn interner(&self) -> &TypeInterner {
+        &self.state.types
+    }
+
     /* Expressions */
     fn reconstruct_call(&mut self, input: CallExpression, _additional: &()) -> (Expression, Self::AdditionalOutput) {
         let function_location = input.function.expect_global_location();
@@ -258,11 +292,11 @@ impl AstReconstructor for TransformVisitor<'_> {
                     "this function returns a type naming an optional",
                 ) ||
                 mandatory_cond(
-                    callee.input.iter().any(|arg| Self::names_optional_type(&arg.type_)),
+                    callee.input.iter().any(|arg| Self::names_optional_type(arg.type_.kind())),
                     "this function has an argument naming an optional",
                 ) ||
                 mandatory_cond(
-                    self.always_inline.contains(&vec![callee.identifier.name]),
+                    self.always_inline.contains(function_location),
                     "this function has been called from another function",
                 ) ||
                 // Called only once
@@ -270,7 +304,7 @@ impl AstReconstructor for TransformVisitor<'_> {
                 // Has no arguments
                 optional_cond(callee.input.is_empty()) ||
                 // Has only empty arguments
-                optional_cond(callee.input.iter().all(|arg| arg.type_.is_empty()))
+                optional_cond(callee.input.iter().all(|arg| arg.type_.kind().is_empty()))
                 }
                 Variant::EntryPoint | Variant::Finalize | Variant::View => false,
             };
@@ -302,9 +336,22 @@ impl AstReconstructor for TransformVisitor<'_> {
                 .0;
 
             // Run SSA formation on the inlined block and rename definitions. Renaming is necessary to avoid shadowing variables.
-            let mut inlined_statements =
+            let inlined_statements =
                 SsaFormingVisitor::new(self.state, SsaFormingInput { rename_defs: true }, self.program)
                     .consume_block(reconstructed_block);
+
+            // A body with a `return` under live control flow has no single value to substitute
+            // here; only the enclosing block, which owns the continuation, can lower it (see
+            // the `iterative` module).
+            let mut inlined_statements = match PendingIterativeInline::try_from_body(inlined_statements) {
+                Ok(pending) => {
+                    self.pending_iterative_inline = Some(pending);
+                    let id = self.state.node_builder.next_id();
+                    self.state.type_table.insert(id, Type::UNIT);
+                    return (UnitExpression { span: Default::default(), id }.into(), Vec::new());
+                }
+                Err(statements) => statements,
+            };
 
             // If the inlined block returns a value, then use the value in place of the call expression; otherwise, use the unit expression.
             let result = match inlined_statements.last() {
@@ -317,7 +364,7 @@ impl AstReconstructor for TransformVisitor<'_> {
                 }
                 _ => {
                     let id = self.state.node_builder.next_id();
-                    self.state.type_table.insert(id, Type::Unit);
+                    self.state.type_table.insert(id, Type::UNIT);
                     UnitExpression { span: Default::default(), id }.into()
                 }
             };
@@ -335,14 +382,8 @@ impl AstReconstructor for TransformVisitor<'_> {
 
     /// Reconstructs the statements inside a basic block, accumulating any statements produced by function inlining.
     fn reconstruct_block(&mut self, block: Block) -> (Block, Self::AdditionalOutput) {
-        let mut statements = Vec::with_capacity(block.statements.len());
-
-        for statement in block.statements {
-            let (reconstructed_statement, additional_statements) = self.reconstruct_statement(statement);
-            statements.extend(additional_statements);
-            statements.push(reconstructed_statement);
-        }
-
+        let statements = self.reconstruct_statements(block.statements);
+        debug_assert!(self.pending_iterative_inline.is_none(), "a pending iterative inline must not escape its block");
         (Block { span: block.span, statements, id: block.id }, Default::default())
     }
 
@@ -369,6 +410,13 @@ impl AstReconstructor for TransformVisitor<'_> {
     /// This function also segments tuple assignment statements into multiple assignment statements.
     fn reconstruct_definition(&mut self, mut input: DefinitionStatement) -> (Statement, Self::AdditionalOutput) {
         let (value, mut statements) = self.reconstruct_expression(input.value, &());
+
+        // An iterative inline takes over the binding: every return site binds this place itself.
+        if let Some(pending) = self.pending_iterative_inline.as_mut() {
+            pending.bind_to(input.place);
+            return (Statement::dummy(), statements);
+        }
+
         match (input.place, value) {
             // If we just inlined the production of a tuple literal, we need multiple definition statements.
             (DefinitionPlace::Multiple(left), Expression::Tuple(right)) => {
@@ -402,6 +450,11 @@ impl AstReconstructor for TransformVisitor<'_> {
         // Note that type checking guarantees that the expression is a function call.
         let (expression, additional_statements) = self.reconstruct_expression(input.expression, &());
 
+        // An iterative inline replaces this statement entirely; its result was discarded anyway.
+        if self.pending_iterative_inline.is_some() {
+            return (Statement::dummy(), additional_statements);
+        }
+
         // If the resulting expression is a unit expression, return a dummy statement.
         let statement = match expression {
             Expression::Unit(_) => Statement::dummy(),
@@ -422,15 +475,19 @@ impl TransformVisitor<'_> {
     /// Assembles a `FromLeo` stub's program from `reconstructed_functions`. `input.stubs` is
     /// always empty on a stub's program (only the top-level `Program` carries stubs), so it
     /// passes through unchanged.
-    fn assemble_from_leo_program(&self, input: Program) -> Program {
+    fn assemble_from_leo_program(&mut self, input: Program) -> Program {
+        let caller_program = self.program;
         let program_scopes =
             input.program_scopes.into_iter().map(|(id, scope)| (id, self.assemble_from_leo_scope(id, scope))).collect();
         let modules = input.modules.into_iter().map(|(mid, m)| (mid, self.assemble_module(m))).collect();
+        self.program = caller_program;
         Program { program_scopes, modules, stubs: input.stubs, imports: input.imports }
     }
 
     /// Assembles a single ProgramScope for a FromLeo stub from reconstructed_functions.
-    fn assemble_from_leo_scope(&self, program_name: Symbol, input: ProgramScope) -> ProgramScope {
+    fn assemble_from_leo_scope(&mut self, program_name: Symbol, input: ProgramScope) -> ProgramScope {
+        self.program = program_name;
+
         // Entry-point functions must appear before finalize functions so the type checker
         // can populate async_function_callers before visiting finalizers. Top-level closures
         // stay in the stub — same-program callers (in the stub's own entry points) and cross-
@@ -448,7 +505,7 @@ impl TransformVisitor<'_> {
             storage_variables: input.storage_variables,
             functions,
             interfaces: input.interfaces,
-            constructor: input.constructor,
+            constructor: input.constructor.map(|constructor| self.reconstruct_constructor(constructor)),
             consts: input.consts,
             span: input.span,
         }

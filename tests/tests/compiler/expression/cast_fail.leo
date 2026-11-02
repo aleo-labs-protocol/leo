@@ -1,4 +1,4 @@
-struct Foo {
+export struct Foo {
     data: field,
 }
 
@@ -16,9 +16,12 @@ program test.aleo {
         let f: field = e as field;
         return final { finalize_main(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_main(a: field) {
+export final fn finalize_main(a: field) {
     // Cannot cast a mapping.
     let b: field = balances as field;
     assert_eq(b, a);

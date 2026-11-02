@@ -1,11 +1,11 @@
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-   ╭─[ interfaces.leo:2:18 ]
+   ╭─[ interfaces.leo:2:25 ]
    │
- 2 │ ╭─▶ interface IBase {
+ 2 │ ╭─▶ export interface IBase {
    ┆ ┆   
  6 │ ├─▶     }
    │ │           
-   │ ╰─────────── 
+   │ ╰─────────── here
    │     
    │     Help: Simplify the declaration to `record Token;`.
 ───╯

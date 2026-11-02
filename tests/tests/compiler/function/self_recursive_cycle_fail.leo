@@ -1,5 +1,5 @@
 @no_inline
-fn fib(n: u8) -> u8 {
+export fn fib(n: u8) -> u8 {
     if n <= 1u8 {
         return n;
     } else {
@@ -15,4 +15,7 @@ program test.aleo {
             return foo(n - 1u8) + foo(n - 2u8);
         }
     }
+
+    @noupgrade
+    constructor() {}
 }

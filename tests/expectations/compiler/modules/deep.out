@@ -6,6 +6,10 @@ struct Foo__8n3BEGIXogs:
 struct Foo__2Rn9ACFPIh3:
     a as [u32; 3u32];
 
+struct Wrapper:
+    outer as Foo__8n3BEGIXogs;
+    inner as Foo__2Rn9ACFPIh3;
+
 struct Foo__KN4SHuYiDFN:
     a as [u32; 4u32];
 
@@ -25,3 +29,6 @@ function main:
     add 4u32 r8[2u32] into r12;
     add r11 r12 into r13;
     output r13 as u32.private;
+
+constructor:
+    assert.eq edition 0u16;

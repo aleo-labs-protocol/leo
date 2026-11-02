@@ -1,10 +1,13 @@
 // Test: Function signature doesn't match interface requirement (should fail)
 
-interface Processor {
+export interface Processor {
     fn process(value: u64, multiplier: u64) -> u64;
 }
 
 program test.aleo: Processor {
+    @noupgrade
+    constructor() {}
+
     // Wrong parameter type: `u32` instead of `u64`
     fn process(value: u64, multiplier: u32) -> u64 {
         return value;

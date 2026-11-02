@@ -25,12 +25,10 @@
 //! In finalize (onchain) functions the pass preserves `ConditionalStatement`s, `ReturnStatement`s,
 //! and `AssertStatement`s verbatim, since finalize code can use Aleo branch instructions directly.
 //!
-//! In both contexts the pass rewrites ternary expressions whose branches are tuples into
-//! per-element ternary expressions and ternaries over records into per-field ternaries followed
-//! by a composite init, since the Aleo `ternary` instruction only accepts plaintext operands.
-//! Ternaries over literal, array, and plaintext struct types are left intact;
-//! `ConsensusVersion::V15` accepts these as direct operands of the `ternary` instruction
-//! (snarkVM PR #3222).
+//! In both contexts the pass rewrites tuple ternaries as separate selections for each element.
+//! It rewrites record ternaries as separate selections for each field, followed by a record construction.
+//! Ternaries over literals, arrays, and plaintext structs remain intact.
+//! Array, struct, and identifier operands require `ConsensusVersion::V23`.
 //!
 //! Consider the following Leo code, output by the SSA pass.
 //! ```leo

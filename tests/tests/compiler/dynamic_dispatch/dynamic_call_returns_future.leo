@@ -6,8 +6,11 @@ program test.aleo {
         let (val, f): (u32, Final) = _dynamic_call::[(u32, Final)](target, net, func, x);
         return (val, final { finalize_main(f); });
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_main(f: Final) {
+export final fn finalize_main(f: Final) {
     f.run();
 }

@@ -1,4 +1,4 @@
-struct foo {
+export struct foo {
     a: u8,
     b: scalar,
 }
@@ -15,4 +15,7 @@ program test.aleo {
         let second: bool = s.verify(v, a);
         assert_eq(first, second);
     }
+
+    @noupgrade
+    constructor() {}
 }

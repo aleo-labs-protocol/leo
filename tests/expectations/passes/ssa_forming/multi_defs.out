@@ -1,4 +1,7 @@
 program test.aleo {
+    @noupgrade
+    async constructor() {
+    }
     fn main(a$$0: u16, b$$1: u16) -> u32 {
         let $var$4 = a$$0 as u32;
         let $var$5 = b$$1 as u32;
@@ -7,7 +10,7 @@ program test.aleo {
         return $var$6;
     }
 }
-    fn foo(x$$7: u32, y$$8: u32) -> (u32, u32) {
+    export fn foo(x$$7: u32, y$$8: u32) -> (u32, u32) {
         return (x$$7, y$$8);
     }
 

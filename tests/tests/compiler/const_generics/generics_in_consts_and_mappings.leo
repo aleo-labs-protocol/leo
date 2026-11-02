@@ -1,8 +1,8 @@
-struct Foo::[N: bool] {
+export struct Foo::[N: bool] {
     x: bool,
 }
 
-const F: Foo::[true] = Foo::[true] { x: true };
+export const F: Foo::[true] = Foo::[true] { x: true };
 
 program b28668.aleo {
     mapping map: Foo::[true] => Foo::[false];
@@ -15,8 +15,11 @@ program b28668.aleo {
             },
         );
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn f() {
+export final fn f() {
     map.set(Foo::[true] { x: false }, Foo::[false] { x: true });
 }

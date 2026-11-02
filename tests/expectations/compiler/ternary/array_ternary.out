@@ -27,3 +27,6 @@ function select_nested:
     input r2 as [[u8; 2u32]; 3u32].private;
     ternary r0 r1 r2 into r3;
     output r3 as [[u8; 2u32]; 3u32].private;
+
+constructor:
+    assert.eq edition 0u16;

@@ -9,7 +9,7 @@ fn fn2(t: other.aleo::Token) -> other.aleo::Token
     ┆ ┆   
  18 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Function signatures must match exactly: same parameter types, modes, order, and return type.
 ────╯
@@ -24,18 +24,18 @@ fn fn1(t: other.aleo::Token) -> other.aleo::Token
     ┆ ┆   
  14 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Function signatures must match exactly: same parameter types, modes, order, and return type.
 ────╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-    ╭─[ compiler-test:11:16 ]
+    ╭─[ compiler-test:11:23 ]
     │
- 11 │ ╭─▶ interface IGP {
+ 11 │ ╭─▶ export interface IGP {
     ┆ ┆   
  15 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Simplify the declaration to `record Token;`.
 ────╯
@@ -47,33 +47,33 @@ Note: Treating dependencies as Aleo produces different results:
 [ECHI03712000] Error: interface `grandparent.aleo/IGP` not found
    ╭─[ compiler-test:4:1 ]
    │
- 4 │ ╭─▶ interface IP: grandparent.aleo::IGP {
+ 4 │ ╭─▶ export interface IP: grandparent.aleo::IGP {
    ┆ ┆   
  6 │ ├─▶ }
    │ │       
-   │ ╰─────── 
+   │ ╰─────── here
    │     
    │     Help: Make sure the interface is defined in the current program or an imported program.
 ───╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-    ╭─[ compiler-test:11:16 ]
+    ╭─[ compiler-test:11:23 ]
     │
- 11 │ ╭─▶ interface IGP {
+ 11 │ ╭─▶ export interface IGP {
     ┆ ┆   
  15 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Simplify the declaration to `record Token;`.
 ────╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-    ╭─[ compiler-test:11:16 ]
+    ╭─[ compiler-test:11:23 ]
     │
- 11 │ ╭─▶ interface IGP {
+ 11 │ ╭─▶ export interface IGP {
     ┆ ┆   
  15 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Simplify the declaration to `record Token;`.
 ────╯

@@ -20,7 +20,11 @@
 //! generated after type checking to ensure all types are resolved.
 
 pub mod aleo;
+pub mod compatibility;
 pub mod interfaces;
+
+#[cfg(test)]
+mod tests;
 
 pub use leo_abi_types::*;
 
@@ -31,8 +35,8 @@ use leo_span::Symbol;
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
-pub(crate) fn interface_ref_from_type(ty: &ast::Type, current_program: &str) -> Option<abi::InterfaceRef> {
-    let ast::Type::Composite(ct) = ty else { return None };
+pub(crate) fn interface_ref_from_type(ty: &ast::TypeKind, current_program: &str) -> Option<abi::InterfaceRef> {
+    let ast::TypeKind::Composite(ct) = ty else { return None };
     let loc = ct.path.try_global_location()?;
     let prog_str = loc.program.to_string();
     let program = if prog_str == current_program { None } else { Some(prog_str) };
@@ -83,11 +87,7 @@ pub fn generate(ast: &ast::Program) -> abi::Program {
     let views =
         scope.functions.iter().filter(|(_, f)| f.variant.is_view()).map(|(_, f)| convert_function(f, &ctx)).collect();
 
-    let implements: Vec<abi::InterfaceRef> =
-        scope.parents.iter().filter_map(|(_, ty)| interface_ref_from_type(ty, &program)).collect();
-
-    let mut program =
-        abi::Program { program, implements, structs, records, mappings, storage_variables, functions, views };
+    let mut program = abi::Program { program, structs, records, mappings, storage_variables, functions, views };
 
     // Prune types not used in the public interface.
     prune_non_interface_types(&mut program);
@@ -110,13 +110,13 @@ fn convert_record(composite: &ast::Composite, module_path: &[Symbol]) -> abi::Re
 }
 
 fn convert_field(member: &ast::Member) -> abi::StructField {
-    abi::StructField { name: member.identifier.name.to_string(), ty: convert_plaintext(&member.type_) }
+    abi::StructField { name: member.identifier.name.to_string(), ty: convert_plaintext(member.type_.kind()) }
 }
 
 fn convert_record_field(member: &ast::Member) -> abi::RecordField {
     abi::RecordField {
         name: member.identifier.name.to_string(),
-        ty: convert_plaintext(&member.type_),
+        ty: convert_plaintext(member.type_.kind()),
         mode: convert_mode(member.mode),
     }
 }
@@ -130,90 +130,105 @@ fn convert_mapping(mapping: &ast::Mapping) -> abi::Mapping {
 }
 
 fn convert_storage_variable(sv: &ast::StorageVariable) -> abi::StorageVariable {
-    abi::StorageVariable { name: sv.identifier.name.to_string(), ty: convert_storage_type(&sv.type_) }
+    abi::StorageVariable { name: sv.identifier.name.to_string(), ty: convert_storage_type(sv.type_.kind()) }
 }
 
-fn convert_storage_type(ty: &ast::Type) -> abi::StorageType {
+fn convert_storage_type(ty: &ast::TypeKind) -> abi::StorageType {
     match ty {
-        ast::Type::Vector(v) => abi::StorageType::Vector(Box::new(convert_storage_type(&v.element_type))),
+        ast::TypeKind::Vector(v) => abi::StorageType::Vector(Box::new(convert_storage_type(&v.element_type))),
         other => abi::StorageType::Plaintext(convert_plaintext(other)),
     }
 }
 
 fn convert_function(function: &ast::Function, ctx: &Ctx) -> abi::Function {
     let name = function.identifier.name.to_string();
-    let is_final = function.has_final_output();
-    let inputs = function.input.iter().map(|i| convert_input(i, ctx)).collect();
-    let outputs = function.output.iter().map(|o| convert_output(o, ctx)).collect();
-    abi::Function { name, is_final, const_parameters: vec![], inputs, outputs }
+    let is_view = function.variant.is_view();
+    let inputs = function.input.iter().map(|i| convert_input(i, ctx, is_view)).collect();
+    let outputs = function.output.iter().map(|o| convert_output(o, ctx, is_view)).collect();
+    abi::Function { name, inputs, outputs }
 }
 
-fn convert_input(input: &ast::Input, ctx: &Ctx) -> abi::Input {
-    abi::Input {
-        name: input.identifier.name.to_string(),
-        ty: convert_function_input(&input.type_, ctx),
-        mode: convert_mode(input.mode),
+fn convert_input(input: &ast::Input, ctx: &Ctx, is_view: bool) -> abi::FunctionInput {
+    convert_function_input(input.type_.kind(), ctx, resolve_io_mode(input.mode, is_view))
+}
+
+fn convert_output(output: &ast::Output, ctx: &Ctx, is_view: bool) -> abi::FunctionOutput {
+    convert_function_output(output.type_.kind(), ctx, resolve_io_mode(output.mode, is_view))
+}
+
+/// Converts a record-field visibility mode. Unmoded record fields lower to private, so they are
+/// recorded as [`abi::Mode::Private`].
+fn convert_mode(mode: ast::Mode) -> abi::Mode {
+    match mode {
+        ast::Mode::Constant => abi::Mode::Constant,
+        ast::Mode::Public => abi::Mode::Public,
+        ast::Mode::None | ast::Mode::Private => abi::Mode::Private,
     }
 }
 
-fn convert_output(output: &ast::Output, ctx: &Ctx) -> abi::Output {
-    abi::Output { ty: convert_function_output(&output.type_, ctx), mode: convert_mode(output.mode) }
-}
-
-fn convert_mode(mode: ast::Mode) -> abi::Mode {
+/// Resolves a function input/output visibility mode for the ABI. An unmoded item lowers to public
+/// for view functions and private for transitions, matching code generation; the ABI records the
+/// resolved visibility rather than a "none" placeholder.
+pub(crate) fn resolve_io_mode(mode: ast::Mode, is_view: bool) -> abi::Mode {
     match mode {
-        ast::Mode::None => abi::Mode::None,
         ast::Mode::Constant => abi::Mode::Constant,
         ast::Mode::Private => abi::Mode::Private,
         ast::Mode::Public => abi::Mode::Public,
+        ast::Mode::None => {
+            if is_view {
+                abi::Mode::Public
+            } else {
+                abi::Mode::Private
+            }
+        }
     }
 }
 
-fn convert_plaintext(ty: &ast::Type) -> abi::Plaintext {
+fn convert_plaintext(ty: &ast::TypeKind) -> abi::Plaintext {
     match ty {
-        ast::Type::Address => abi::Plaintext::Primitive(abi::Primitive::Address),
-        ast::Type::Boolean => abi::Plaintext::Primitive(abi::Primitive::Boolean),
-        ast::Type::Field => abi::Plaintext::Primitive(abi::Primitive::Field),
-        ast::Type::Group => abi::Plaintext::Primitive(abi::Primitive::Group),
-        ast::Type::Scalar => abi::Plaintext::Primitive(abi::Primitive::Scalar),
-        ast::Type::Identifier => abi::Plaintext::Primitive(abi::Primitive::Identifier),
-        ast::Type::Signature => abi::Plaintext::Primitive(abi::Primitive::Signature),
-        ast::Type::Integer(int_ty) => abi::Plaintext::Primitive(convert_integer(*int_ty)),
-        ast::Type::Array(arr_ty) => abi::Plaintext::Array(abi::Array {
+        ast::TypeKind::Address => abi::Plaintext::Primitive(abi::Primitive::Address),
+        ast::TypeKind::Boolean => abi::Plaintext::Primitive(abi::Primitive::Boolean),
+        ast::TypeKind::Field => abi::Plaintext::Primitive(abi::Primitive::Field),
+        ast::TypeKind::Group => abi::Plaintext::Primitive(abi::Primitive::Group),
+        ast::TypeKind::Scalar => abi::Plaintext::Primitive(abi::Primitive::Scalar),
+        ast::TypeKind::Identifier => abi::Plaintext::Primitive(abi::Primitive::Identifier),
+        ast::TypeKind::Signature => abi::Plaintext::Primitive(abi::Primitive::Signature),
+        ast::TypeKind::Integer(int_ty) => abi::Plaintext::Primitive(convert_integer(*int_ty)),
+        ast::TypeKind::Array(arr_ty) => abi::Plaintext::Array(abi::Array {
             element: Box::new(convert_plaintext(arr_ty.element_type())),
             length: extract_array_length(&arr_ty.length),
         }),
-        ast::Type::Composite(comp_ty) => abi::Plaintext::Struct(abi::StructRef {
+        ast::TypeKind::Composite(comp_ty) => abi::Plaintext::Struct(abi::StructRef {
             path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
             program: comp_ty.path.program().map(|s| s.to_string()),
         }),
-        ast::Type::Optional(opt_ty) => {
+        ast::TypeKind::Optional(opt_ty) => {
             abi::Plaintext::Optional(abi::Optional(Box::new(convert_plaintext(&opt_ty.inner))))
         }
         // These types cannot appear in plaintext contexts:
         // - Tuple: not allowed in storage or transition inputs/outputs
         // - Vector: only allowed in storage variables (handled by convert_storage_type)
         // - Others: resolved or invalid after type checking
-        ast::Type::Future(_)
-        | ast::Type::Mapping(_)
-        | ast::Type::Tuple(_)
-        | ast::Type::Vector(_)
-        | ast::Type::String
-        | ast::Type::Unit
-        | ast::Type::Ident(_)
-        | ast::Type::Numeric
-        | ast::Type::DynRecord
-        | ast::Type::Err => {
+        ast::TypeKind::Future(_)
+        | ast::TypeKind::Mapping(_)
+        | ast::TypeKind::Tuple(_)
+        | ast::TypeKind::Vector(_)
+        | ast::TypeKind::String
+        | ast::TypeKind::Unit
+        | ast::TypeKind::Ident(_)
+        | ast::TypeKind::Numeric
+        | ast::TypeKind::DynRecord
+        | ast::TypeKind::Err => {
             unreachable!("unexpected type in plaintext context: {ty}")
         }
     }
 }
 
-fn convert_function_input(ty: &ast::Type, ctx: &Ctx) -> abi::FunctionInput {
-    if let ast::Type::DynRecord = ty {
+fn convert_function_input(ty: &ast::TypeKind, ctx: &Ctx, mode: abi::Mode) -> abi::FunctionInput {
+    if let ast::TypeKind::DynRecord = ty {
         return abi::FunctionInput::DynamicRecord;
     }
-    if let ast::Type::Composite(comp_ty) = ty
+    if let ast::TypeKind::Composite(comp_ty) = ty
         && is_record(comp_ty, ctx)
     {
         return abi::FunctionInput::Record(abi::RecordRef {
@@ -221,21 +236,18 @@ fn convert_function_input(ty: &ast::Type, ctx: &Ctx) -> abi::FunctionInput {
             program: comp_ty.path.program().map(|s| s.to_string()),
         });
     }
-    if matches!(ty, ast::Type::DynRecord) {
-        return abi::FunctionInput::DynamicRecord;
-    }
-    abi::FunctionInput::Plaintext(convert_plaintext(ty))
+    abi::FunctionInput::Plaintext { ty: convert_plaintext(ty), mode }
 }
 
-fn convert_function_output(ty: &ast::Type, ctx: &Ctx) -> abi::FunctionOutput {
+fn convert_function_output(ty: &ast::TypeKind, ctx: &Ctx, mode: abi::Mode) -> abi::FunctionOutput {
     match ty {
-        ast::Type::Future(_) => abi::FunctionOutput::Final,
-        ast::Type::DynRecord => abi::FunctionOutput::DynamicRecord,
-        ast::Type::Composite(comp_ty) if is_record(comp_ty, ctx) => abi::FunctionOutput::Record(abi::RecordRef {
+        ast::TypeKind::Future(_) => abi::FunctionOutput::Final,
+        ast::TypeKind::DynRecord => abi::FunctionOutput::DynamicRecord,
+        ast::TypeKind::Composite(comp_ty) if is_record(comp_ty, ctx) => abi::FunctionOutput::Record(abi::RecordRef {
             path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
             program: comp_ty.path.program().map(|s| s.to_string()),
         }),
-        _ => abi::FunctionOutput::Plaintext(convert_plaintext(ty)),
+        _ => abi::FunctionOutput::Plaintext { ty: convert_plaintext(ty), mode },
     }
 }
 
@@ -316,10 +328,10 @@ pub fn prune_non_interface_types(program: &mut abi::Program) {
     // Phase 1: Collect from interface items
     for function in program.functions.iter().chain(program.views.iter()) {
         for input in &function.inputs {
-            collect_from_function_input(&input.ty, program_name, &mut used_types);
+            collect_from_function_input(input, program_name, &mut used_types);
         }
         for output in &function.outputs {
-            collect_from_function_output(&output.ty, program_name, &mut used_types);
+            collect_from_function_output(output, program_name, &mut used_types);
         }
     }
 
@@ -375,7 +387,7 @@ fn collect_from_abi_storage_type(ty: &abi::StorageType, program_name: &str, used
 
 fn collect_from_function_input(ty: &abi::FunctionInput, program_name: &str, used: &mut HashSet<abi::Path>) {
     match ty {
-        abi::FunctionInput::Plaintext(p) => collect_from_plaintext(p, program_name, used),
+        abi::FunctionInput::Plaintext { ty, .. } => collect_from_plaintext(ty, program_name, used),
         abi::FunctionInput::Record(rec_ref) => {
             if is_local_type(rec_ref.program.as_deref(), program_name) {
                 used.insert(rec_ref.path.clone());
@@ -387,7 +399,7 @@ fn collect_from_function_input(ty: &abi::FunctionInput, program_name: &str, used
 
 fn collect_from_function_output(ty: &abi::FunctionOutput, program_name: &str, used: &mut HashSet<abi::Path>) {
     match ty {
-        abi::FunctionOutput::Plaintext(p) => collect_from_plaintext(p, program_name, used),
+        abi::FunctionOutput::Plaintext { ty, .. } => collect_from_plaintext(ty, program_name, used),
         abi::FunctionOutput::Record(rec_ref) => {
             if is_local_type(rec_ref.program.as_deref(), program_name) {
                 used.insert(rec_ref.path.clone());

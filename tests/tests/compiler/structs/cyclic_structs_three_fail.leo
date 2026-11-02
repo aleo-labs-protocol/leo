@@ -1,18 +1,21 @@
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}
 
-struct One {
+export struct One {
     two: Two,
 }
 
-struct Two {
+export struct Two {
     three: Three,
     four: Four,
 }
 
-struct Three {
+export struct Three {
     one: One,
 }
 
-struct Four {
+export struct Four {
     one: One,
 }

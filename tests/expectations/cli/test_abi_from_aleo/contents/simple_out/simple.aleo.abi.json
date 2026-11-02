@@ -1,6 +1,5 @@
 {
   "program": "simple.aleo",
-  "implements": [],
   "structs": [
     {
       "path": [
@@ -30,6 +29,38 @@
     {
       "path": [
         "Token"
+      ],
+      "fields": [
+        {
+          "name": "owner",
+          "ty": {
+            "Primitive": "Address"
+          },
+          "mode": "Private"
+        },
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U64"
+            }
+          },
+          "mode": "Public"
+        },
+        {
+          "name": "tag",
+          "ty": {
+            "Primitive": {
+              "UInt": "U8"
+            }
+          },
+          "mode": "Constant"
+        }
+      ]
+    },
+    {
+      "path": [
+        "PublicToken"
       ],
       "fields": [
         {
@@ -68,110 +99,117 @@
   "functions": [
     {
       "name": "add_numbers",
-      "is_final": false,
-      "const_parameters": [],
       "inputs": [
         {
-          "name": "arg1",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U32"
               }
-            }
-          },
-          "mode": "Private"
+            },
+            "mode": "Private"
+          }
         },
         {
-          "name": "arg2",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U32"
               }
-            }
-          },
-          "mode": "Private"
+            },
+            "mode": "Private"
+          }
         }
       ],
       "outputs": [
         {
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U32"
               }
-            }
-          },
-          "mode": "Private"
+            },
+            "mode": "Private"
+          }
         }
       ]
     },
     {
       "name": "get_point",
-      "is_final": false,
-      "const_parameters": [],
       "inputs": [
         {
-          "name": "arg1",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Struct": {
                 "path": [
                   "Point"
                 ],
                 "program": "simple.aleo"
               }
-            }
-          },
-          "mode": "Private"
+            },
+            "mode": "Private"
+          }
         }
       ],
       "outputs": [
         {
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Struct": {
                 "path": [
                   "Point"
                 ],
                 "program": "simple.aleo"
               }
-            }
-          },
-          "mode": "Private"
+            },
+            "mode": "Private"
+          }
         }
       ]
     },
     {
       "name": "get_token",
-      "is_final": false,
-      "const_parameters": [],
       "inputs": [
         {
-          "name": "arg1",
-          "ty": {
-            "Record": {
-              "path": [
-                "Token"
-              ],
-              "program": "simple.aleo"
-            }
-          },
-          "mode": "None"
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "simple.aleo"
+          }
         }
       ],
       "outputs": [
         {
-          "ty": {
-            "Record": {
-              "path": [
-                "Token"
-              ],
-              "program": "simple.aleo"
-            }
-          },
-          "mode": "None"
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "simple.aleo"
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_public_token",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "PublicToken"
+            ],
+            "program": "simple.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "PublicToken"
+            ],
+            "program": "simple.aleo"
+          }
         }
       ]
     }

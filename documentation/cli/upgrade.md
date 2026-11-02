@@ -1,0 +1,127 @@
+---
+id: cli_upgrade
+title: ""
+sidebar_label: Upgrade
+toc_min_heading_level: 2
+toc_max_heading_level: 2
+---
+
+[general tags]: # "cli, leo_upgrade, upgrade, program"
+
+# `leo upgrade`
+
+Upgrades a program that is already deployed on the network. Leo checks the current deployed edition of the program being upgraded, even if an older dependency lock exists for that program. Other network dependencies use their locked editions and checksums.
+
+See the **[Upgrading Programs](./../guides/program_upgradability.md)** guide for more details.
+
+## Flags
+
+### `--private-key <PRIVATE_KEY>`
+
+Specifies the private key to use for the deployment. Overrides any `$PRIVATE_KEY` environment variable set manually or in a `.env` file.
+
+### `--network <NETWORK>`
+
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+
+### `--endpoint <ENDPOINT>`
+
+The endpoint to deploy to. Overrides any `ENDPOINT` environment variable set manually or in a `.env` file.
+
+**Common Endpoints:**
+
+<!-- markdown-link-check-disable -->
+
+|    Network     |                Endpoint                |
+| :------------: | :------------------------------------: |
+| Devnet (local) |        <https://localhost:3030>        |
+|    Testnet     | <https://api.explorer.provable.com/v1> |
+|    Mainnet     | <https://api.explorer.provable.com/v1> |
+
+<!-- markdown-link-check-enable -->
+
+### `--network-retries <N>`
+
+Number of times to retry a network request on transient transport failure, with exponential backoff (1 s, 2 s, 4 s, … capped at 64 s). Overrides the `NETWORK_RETRIES` environment variable. Defaults to `2`. HTTP errors (4xx/5xx) and broadcast calls are not retried.
+
+### `--devnet`
+
+Specifies whether the network being deployed to is a devnet. If not set, defaults to the `DEVNET` environment variable.
+
+:::info
+This flag requires a devnet to be running locally. See INSERT DEVNET GUIDE HERE for more information
+:::
+
+### `--print`
+
+Prints the transaction to the terminal/stdout in JSON format.
+
+### `--broadcast`
+
+Broadcasts the transaction to the network upon successful execution. Without passing this flag, the transaction will just be generated locally.
+
+### `--save <SAVE>`
+
+Saves the transaction to the directory located at the `<SAVE>` path.
+
+### `--yes`
+
+### `-y`
+
+The CLI will ask for manual confirmation on several steps throughout the deployment process. Setting this flag automatically agrees to all confirmations.
+
+:::warning
+Do not use this feature unless you know what you are doing!
+:::
+
+### `--skip-deploy-certificate`
+
+Skips deployment certificate generation, using placeholder certificate and verifying keys. Intended for testing. Bumps the program edition by one and is not valid for production use.
+
+### `--priority-fees <PRIORITY_FEES>`
+
+Specifies the priority fee for the deployment transaction(s) delimited by `|` and used in order. The fees are in microcredits and must either be valid `u64` or `default`. Defaults to 0.
+
+:::tip
+1 Credit == 1,000,000 Microcredits
+:::
+
+### `--fee-records <FEE_RECORDS>`
+
+### `-f <FEE_RECORDS>`
+
+Specifies the record(s) to pay for fees privately, delimited by `|` and used in order. The fees must either be valid plaintext, ciphertext, or `default`. If not specified, then transaction fees will be public.
+
+### `--consensus-heights <CONSENSUS_HEIGHTS>`
+
+Specifies the consensus heights to use, delimited by `,`. This should only be set if you are using a custom devnet.
+
+The following settings enable each consensus version at its corresponding block:
+
+```bash
+--consensus-heights 0,1,2,3....
+```
+
+### `--consensus-version <CONSENSUS_VERSION>`
+
+Specifies the consensus version to use. If one is not provided, the CLI will attempt to determine it from the latest block.
+
+### `--max-wait <MAX_WAIT>`
+
+Specifies the number of seconds to wait for a block to appear when searching for a transaction. Defaults to 8 seconds.
+
+### `--blocks-to-check <BLOCKS_TO_CHECK>`
+
+Specifies the number of blocks to look at when searching for a transaction. Defaults to 12 blocks
+
+```text
+Options:
+--skip <SKIP>...
+  Skips the upgrade of any program that contains one of the given substrings.
+--build-tests
+    Build tests along with the main program and dependencies.
+--no-cache
+    Download network dependencies again and verify locked checksums. Keep locked editions.
+--no-local
+    Don't use the local source code.
+```

@@ -24,6 +24,10 @@ impl AstReconstructor for FlatteningVisitor<'_> {
     type AdditionalInput = ();
     type AdditionalOutput = Vec<Statement>;
 
+    fn interner(&self) -> &TypeInterner {
+        &self.state.types
+    }
+
     /* Expressions */
     /// Reconstructs a composite init expression, flattening any tuples in the expression.
     fn reconstruct_composite_init(
@@ -52,10 +56,9 @@ impl AstReconstructor for FlatteningVisitor<'_> {
         (CompositeExpression { members, ..input }.into(), statements)
     }
 
-    /// Reconstructs ternary expressions. Tuple operands are destructured element-wise and record
-    /// operands are destructured field-wise, since the Aleo `ternary` instruction only accepts
-    /// plaintext operands. Ternaries over literal, array, and plaintext struct types are left
-    /// intact; `ConsensusVersion::V15` accepts these as direct operands (snarkVM PR #3222).
+    /// Reconstructs ternary expressions over tuples and records as separate selections for each element or field.
+    /// Preserves ternary expressions over literals, arrays, and plaintext structs.
+    /// Array, struct, and identifier operands require `ConsensusVersion::V23`.
     ///
     /// Example: `cond ? (a, b) : (c, d)` flattens to:
     /// ```leo
@@ -68,19 +71,21 @@ impl AstReconstructor for FlatteningVisitor<'_> {
         input: TernaryExpression,
         _additional: &(),
     ) -> (Expression, Self::AdditionalOutput) {
-        let if_true_type = self
-            .state
-            .type_table
-            .get(&input.if_true.id())
-            .expect("Type checking guarantees that all expressions are typed.");
-        let if_false_type = self
-            .state
-            .type_table
-            .get(&input.if_false.id())
-            .expect("Type checking guarantees that all expressions are typed.");
+        let if_true_type = self.state.types.resolve(
+            self.state
+                .type_table
+                .get(&input.if_true.id())
+                .expect("Type checking guarantees that all expressions are typed."),
+        );
+        let if_false_type = self.state.types.resolve(
+            self.state
+                .type_table
+                .get(&input.if_false.id())
+                .expect("Type checking guarantees that all expressions are typed."),
+        );
 
         // Note that type checking guarantees that both expressions have the same same type. This is a sanity check.
-        assert!(if_true_type.eq_flat_relaxed(&if_false_type));
+        assert!(if_true_type.types_equivalent(&if_false_type));
 
         fn as_identifier(path_expr: Expression) -> Identifier {
             let Expression::Path(path) = path_expr else {
@@ -90,12 +95,11 @@ impl AstReconstructor for FlatteningVisitor<'_> {
         }
 
         match &if_true_type {
-            Type::Tuple(if_true_type) => {
+            TypeKind::Tuple(if_true_type) => {
                 self.ternary_tuple(if_true_type, &input.condition, &input.if_true, &input.if_false)
             }
-            Type::Composite(composite_type) => {
-                // The Aleo `ternary` instruction accepts plaintext structs but not records, so we
-                // destructure record ternaries field-wise and leave struct ternaries intact.
+            TypeKind::Composite(composite_type) => {
+                // The Aleo `ternary` instruction accepts plaintext structs but not records.
                 let composite_location = composite_type.path.expect_global_location();
                 if let Some(record) = self.state.symbol_table.lookup_record(self.program, composite_location) {
                     let composite_path = composite_type.path.clone();
@@ -192,7 +196,7 @@ impl AstReconstructor for FlatteningVisitor<'_> {
                     // Create a new node ID for the unary expression.
                     let id = self.state.node_builder.next_id();
                     // Update the type table with the type of the unary expression.
-                    self.state.type_table.insert(id, Type::Boolean);
+                    self.state.type_table.insert(id, Type::BOOLEAN);
                     id
                 },
             }
@@ -229,7 +233,7 @@ impl AstReconstructor for FlatteningVisitor<'_> {
                     span: Default::default(),
                     id: self.state.node_builder.next_id(),
                 };
-                self.state.type_table.insert(binary.id, Type::Boolean);
+                self.state.type_table.insert(binary.id, Type::BOOLEAN);
                 let (identifier, statement) = self.unique_simple_definition(binary.into());
                 statements.push(statement);
                 Path::from(identifier).to_local().into()
@@ -247,7 +251,7 @@ impl AstReconstructor for FlatteningVisitor<'_> {
                 span: Default::default(),
                 id: self.state.node_builder.next_id(),
             };
-            self.state.type_table.insert(binary.id(), Type::Boolean);
+            self.state.type_table.insert(binary.id(), Type::BOOLEAN);
             let (identifier, statement) = self.unique_simple_definition(binary.into());
             statements.push(statement);
             expression = Path::from(identifier).to_local().into();
@@ -312,7 +316,7 @@ impl AstReconstructor for FlatteningVisitor<'_> {
             span: Default::default(),
             id: {
                 let id = self.state.node_builder.next_id();
-                self.state.type_table.insert(id, Type::Boolean);
+                self.state.type_table.insert(id, Type::BOOLEAN);
                 id
             },
         };
@@ -343,7 +347,7 @@ impl AstReconstructor for FlatteningVisitor<'_> {
                 span: Default::default(),
                 id: {
                     let id = self.state.node_builder.next_id();
-                    self.state.type_table.insert(id, Type::Boolean);
+                    self.state.type_table.insert(id, Type::BOOLEAN);
                     id
                 },
             };
@@ -373,14 +377,16 @@ impl AstReconstructor for FlatteningVisitor<'_> {
         match (definition.place, &value) {
             (DefinitionPlace::Single(identifier), _) => (self.simple_definition(identifier, value), statements),
             (DefinitionPlace::Multiple(identifiers), expression) => {
-                let output_type = match &self.state.type_table.get(&expression.id()) {
-                    Some(Type::Tuple(tuple_type)) => tuple_type.clone(),
+                let output_type = match self.state.type_table.get(&expression.id()).map(|t| self.state.types.resolve(t))
+                {
+                    Some(TypeKind::Tuple(tuple_type)) => tuple_type,
                     _ => panic!("Type checking guarantees that the output type is a tuple."),
                 };
 
                 for (identifier, type_) in identifiers.iter().zip_eq(output_type.elements().iter()) {
                     // Add the type of each identifier to the type table.
-                    self.state.type_table.insert(identifier.id, type_.clone());
+                    let ty_id = self.state.types.intern(type_);
+                    self.state.type_table.insert(identifier.id, ty_id);
                 }
 
                 (

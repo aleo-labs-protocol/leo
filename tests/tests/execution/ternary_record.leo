@@ -18,8 +18,8 @@ program test.aleo {
     }
 
     fn mint_and_select(s: bool, a: u64, b: u64) -> Token {
-        let t1: Token = Token { owner: self.signer, amount: a };
-        let t2: Token = Token { owner: self.signer, amount: b };
+        let t1: Token = Token { owner: std::ctx::signer(), amount: a };
+        let t2: Token = Token { owner: std::ctx::signer(), amount: b };
         return s ? t1 : t2;
     }
 

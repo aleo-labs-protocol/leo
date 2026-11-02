@@ -104,11 +104,11 @@ finalize combine:
     cast false 0u32 into r17 as Optional__JzunLORyB8U;
     ternary r14 r16 r17 into r18;
     ternary r18.is_some r18.val 0u32 into r19;
-    get.or_use sum_vec__len__[false] 0u32 into r20;
-    add r20 1u32 into r21;
-    set r21 into sum_vec__len__[false];
-    add r12 r19 into r22;
-    set r22 into sum_vec__[r20];
+    add r12 r19 into r20;
+    get.or_use sum_vec__len__[false] 0u32 into r21;
+    add r21 1u32 into r22;
+    set r22 into sum_vec__len__[false];
+    set r20 into sum_vec__[r21];
     get.or_use vec_program_a.aleo/numbers__len__[false] 0u32 into r23;
     lt 1u32 r23 into r24;
     get.or_use vec_program_a.aleo/numbers__[1u32] 0u32 into r25;
@@ -123,11 +123,11 @@ finalize combine:
     cast false 0u32 into r34 as Optional__JzunLORyB8U;
     ternary r31 r33 r34 into r35;
     ternary r35.is_some r35.val 0u32 into r36;
-    get.or_use sum_vec__len__[false] 0u32 into r37;
-    add r37 1u32 into r38;
-    set r38 into sum_vec__len__[false];
-    add r29 r36 into r39;
-    set r39 into sum_vec__[r37];
+    add r29 r36 into r37;
+    get.or_use sum_vec__len__[false] 0u32 into r38;
+    add r38 1u32 into r39;
+    set r39 into sum_vec__len__[false];
+    set r37 into sum_vec__[r38];
     get.or_use vec_program_a.aleo/numbers__len__[false] 0u32 into r40;
     lt 2u32 r40 into r41;
     get.or_use vec_program_a.aleo/numbers__[2u32] 0u32 into r42;
@@ -142,11 +142,11 @@ finalize combine:
     cast false 0u32 into r51 as Optional__JzunLORyB8U;
     ternary r48 r50 r51 into r52;
     ternary r52.is_some r52.val 0u32 into r53;
-    get.or_use sum_vec__len__[false] 0u32 into r54;
-    add r54 1u32 into r55;
-    set r55 into sum_vec__len__[false];
-    add r46 r53 into r56;
-    set r56 into sum_vec__[r54];
+    add r46 r53 into r54;
+    get.or_use sum_vec__len__[false] 0u32 into r55;
+    add r55 1u32 into r56;
+    set r56 into sum_vec__len__[false];
+    set r54 into sum_vec__[r55];
     get.or_use sum_vec__len__[false] 0u32 into r57;
     lt 0u32 r57 into r58;
     get.or_use sum_vec__[0u32] 0u32 into r59;
@@ -182,52 +182,52 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1d6wx6h9p94awwy0s7d3yj4e4eu4w95waqaj2glfhxva6sfnscu8selaepp",
+      "id": "au194uzputnygg4cjw9fkt6drfyccknx0pzgpcladmt6wwuzc8vl5rsjvwx0r",
       "program": "vec_program_a.aleo",
       "function": "push_a",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "6851274430128542082164635701350186258164372769745643994717434492720942574115field",
+          "id": "1633250362452835312147401187605898178648575280840639228520607247785363511447field",
           "value": "{\n  program_id: vec_program_a.aleo,\n  function_name: push_a,\n  arguments: []\n}"
         }
       ],
-      "tpk": "6558503890840138850880121092372425406890823592034652481439625986456238841998group",
-      "tcm": "7422481647302964131762741423896869519668322964112443801971777646647850786860field",
-      "scm": "6880818639492575671344261738303779886148232533224264415621330306086981058639field"
+      "tpk": "856620745745033191253488073612975748466573482876019849653702831795142861258group",
+      "tcm": "1531226440065314772394767640091739869332245316461343971993571336533245212245field",
+      "scm": "6822404101412209239980323331207380593307810608612881422815076652288377253459field"
     },
     {
-      "id": "au1l3x90pd6xzg65g6dydsy5hmc4afw9fvrkmgc9jg86h0u3w9sxvzs906hah",
+      "id": "au16t5ye9pl2n4mr54nx2qv9pljwdmu66ncp4gh5vqu0e4e39ns0vpqcqwjr4",
       "program": "vec_program_b.aleo",
       "function": "push_b",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "2104627290314167702497872231081530959514975230441258154706197546349355148560field",
+          "id": "1030682665365560843020337407681612764407579394642537272031678659563506308370field",
           "value": "{\n  program_id: vec_program_b.aleo,\n  function_name: push_b,\n  arguments: []\n}"
         }
       ],
-      "tpk": "3763454567216771539030964333939296719133129056035879892340484472914795027201group",
-      "tcm": "8037284555495068957048720909070204557539282114441257022099460374602036841959field",
-      "scm": "6880818639492575671344261738303779886148232533224264415621330306086981058639field"
+      "tpk": "8289179391136856185082474676608970653987387068456511369728187863712402065730group",
+      "tcm": "719185708187153838044485997967793495138384169641592341452878910127287874889field",
+      "scm": "6822404101412209239980323331207380593307810608612881422815076652288377253459field"
     },
     {
-      "id": "au1v8d22xumpk6md8luf2w6s6k5wq2tqtt3csyvj9d5twj44gyz8ypswfkec3",
+      "id": "au15pmnn06qqy4ssq6ygvkmj6k2huc6lcs7j6fd49hthw6fmynvjvys47c6nk",
       "program": "vec_program_c.aleo",
       "function": "combine",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "8108796750952748861911454606871539475987251178930138677840234421079290018033field",
+          "id": "1449740384096319090557586505956070812677605543750143264883045918044996249610field",
           "value": "{\n  program_id: vec_program_c.aleo,\n  function_name: combine,\n  arguments: [\n    {\n      program_id: vec_program_a.aleo,\n      function_name: push_a,\n      arguments: []\n    },\n    {\n      program_id: vec_program_b.aleo,\n      function_name: push_b,\n      arguments: []\n    }\n  \n  ]\n}"
         }
       ],
-      "tpk": "4435182414136183130262225239916202916754973933386625330210643288715243337617group",
-      "tcm": "850142209754567944166319722250339409916042600529796761178314418357457776240field",
-      "scm": "6880818639492575671344261738303779886148232533224264415621330306086981058639field"
+      "tpk": "1832300881891220569453675224116941050832232032471753639583359396852880711872group",
+      "tcm": "7816391739998701420004245450879888331090137470535105551801410479682670851377field",
+      "scm": "6822404101412209239980323331207380593307810608612881422815076652288377253459field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"

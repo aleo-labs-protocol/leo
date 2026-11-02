@@ -14,4 +14,7 @@ program test.aleo {
     fn select_nested(s: bool, a: [[u8; 2]; 3], b: [[u8; 2]; 3]) -> [[u8; 2]; 3] {
         return s ? a : b;
     }
+
+    @noupgrade
+    constructor() {}
 }

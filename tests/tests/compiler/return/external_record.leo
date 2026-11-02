@@ -4,8 +4,11 @@ program test0.aleo {
     }
 
     fn foo() -> R {
-        return R { owner: self.signer };
+        return R { owner: std::ctx::signer() };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -16,4 +19,7 @@ program test1.aleo {
     fn bar(x: test0.aleo::R) -> test0.aleo::R {
         return x;
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -1,0 +1,61 @@
+---
+id: cli_test
+title: ""
+sidebar_label: Test
+toc_min_heading_level: 2
+toc_max_heading_level: 2
+---
+
+[general tags]: # "cli, leo_test, testing"
+
+# `leo test`
+
+This command runs all the test cases specified in the Leo file in `tests/`.
+
+If you want to run a specific set of tests, run the following command:
+
+```bash
+leo test <TEST_NAME>
+```
+
+where `<TEST_NAME>` is the string to match against the qualified name of each test.
+
+Leo compiles each `.leo` file in `tests/` as a separate test program. The test output shows the qualified name `file.leo::test_name`. A filter can match this name or the compiled name `program.aleo/test_name`.
+
+```bash
+leo test test_math.leo::adds
+leo test test_math.aleo/adds
+```
+
+Check out the [**Testing**](./../guides/testing.md) guide for more information.
+
+## Flags
+
+```text
+--build-tests
+    Build tests along with the main program and dependencies.
+--prove
+    Generate a full ZK proof for each executed transaction. Proof generation is disabled by default to keep test runs fast.
+--no-cache
+    Download network dependencies again and verify locked checksums. Keep locked editions.
+--no-local
+    Don't use the local source code.
+--offline
+    Resolve git dependencies from the lock file and local cache only; don't fetch from remotes.
+```
+
+## Workspace Behavior
+
+When run inside a [workspace](../guides/workspaces.md):
+
+- **From workspace root:** Runs tests for all members in dependency order.
+- **From a member directory:** Runs tests only for that member.
+- **With `--package <NAME>`:** Runs tests only for the specified member.
+
+```bash
+# Test all workspace members
+leo test
+
+# Test only the token member
+leo test -p token
+```

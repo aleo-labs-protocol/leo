@@ -1,15 +1,18 @@
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-    ╭─[ test:10:18 ]
+    ╭─[ test:10:25 ]
     │
- 10 │ ╭─▶ interface IBase {
+ 10 │ ╭─▶ export interface IBase {
     ┆ ┆   
  14 │ ├─▶     }
     │ │           
-    │ ╰─────────── 
+    │ ╰─────────── here
     │     
     │     Help: Simplify the declaration to `record Token;`.
 ────╯
 program test.aleo {
+    @noupgrade
+    async constructor() {
+    }
     record Token {
         owner: address,
         amount: u64,

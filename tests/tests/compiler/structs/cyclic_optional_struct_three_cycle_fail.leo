@@ -1,14 +1,17 @@
 // Regression for #29405: 3-cycle A -> B? -> C? -> A?.
-struct A {
+export struct A {
     b: B?,
 }
 
-struct B {
+export struct B {
     c: C?,
 }
 
-struct C {
+export struct C {
     a: A?,
 }
 
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}

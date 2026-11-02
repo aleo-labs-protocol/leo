@@ -1,4 +1,4 @@
-struct Amount {
+export struct Amount {
     amount: u64,
     amt: u64,
 }
@@ -26,4 +26,7 @@ program test.aleo {
         };
         return c + c;
     }
+
+    @noupgrade
+    constructor() {}
 }

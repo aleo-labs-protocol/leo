@@ -11,28 +11,31 @@ input = []
 // input = []
 */
 
-struct Foo {
+export struct Foo {
     bar: [Bar; 1],
 }
 
-struct Bar {
+export struct Bar {
     baz: [Baz; 2],
 }
 
-struct Baz {
+export struct Baz {
     one: One,
 }
 
-struct One {
+export struct One {
     two: [Two; 2],
 }
 
-struct Two {
+export struct Two {
     val1: u32,
     val2: u32,
 }
 
 program child.aleo {
+    @noupgrade
+    constructor() {}
+
     record Boo {
         owner: address,
         val: u32,
@@ -64,7 +67,7 @@ program child.aleo {
                     },
                 ],
             },
-            Boo { owner: self.signer, val: 10u32 },
+            Boo { owner: std::ctx::signer(), val: 10u32 },
         );
     }
 }
@@ -72,12 +75,15 @@ program child.aleo {
 // --- Next Program --- //
 import child.aleo;
 
-struct Woo {
+export struct Woo {
     a: u32,
     b: u32,
 }
 
 program parent.aleo {
+    @noupgrade
+    constructor() {}
+
     record BooHoo {
         owner: address,
         val: u32,
@@ -142,7 +148,7 @@ program parent.aleo {
         return (
             f1, b1,
             BooHoo {
-                owner: self.signer,
+                owner: std::ctx::signer(),
                 val: 10u32,
                 woo: Woo { a: 1u32, b: 2u32 },
             },
@@ -156,6 +162,9 @@ import parent.aleo;
 import child.aleo;
 
 program grandparent.aleo {
+    @noupgrade
+    constructor() {}
+
     fn main(b: u32) -> u32 {
         let a: u32 = 1u32 + b;
         return a;

@@ -7,9 +7,12 @@ program child.aleo {
             assert(f() != 4);
         };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-fn f() -> u32 {
+export fn f() -> u32 {
     return 4;
 }
 
@@ -20,8 +23,11 @@ program parent.aleo {
     fn foo() -> Final {
         return final { assert(f() == 4); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-fn f() -> u32 {
+export fn f() -> u32 {
     return 4;
 }

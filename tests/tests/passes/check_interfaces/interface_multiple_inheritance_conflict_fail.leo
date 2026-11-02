@@ -1,14 +1,17 @@
 // Test: Interface inheriting conflicting members
 
-interface A {
+export interface A {
     fn process() -> u64;
 }
 
-interface B {
+export interface B {
     fn process() -> u32;
 }
 
-interface C: A + B {
+export interface C: A + B {
 }
 
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}

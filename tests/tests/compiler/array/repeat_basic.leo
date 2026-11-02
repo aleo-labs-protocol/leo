@@ -1,5 +1,5 @@
-const N: u32 = 2u32;
-const M: u32 = 1u32;
+export const N: u32 = 2u32;
+export const M: u32 = 1u32;
 
 program test.aleo {
     fn main() -> u32 {
@@ -10,4 +10,7 @@ program test.aleo {
         arr3 = [0; N + M];
         return arr3[0] as u32 + [42u32; 3][2];
     }
+
+    @noupgrade
+    constructor() {}
 }

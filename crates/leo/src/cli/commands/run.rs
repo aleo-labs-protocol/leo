@@ -23,6 +23,7 @@ use leo_package::{Package, ProgramData};
 use aleo_std::StorageMode;
 
 use clap::Parser;
+use std::path::PathBuf;
 
 #[cfg(not(feature = "only_testnet"))]
 use snarkvm::circuit::{AleoCanaryV0, AleoV0};
@@ -53,7 +54,15 @@ pub struct LeoRun {
     #[clap(flatten)]
     pub(crate) env_override: EnvOptions,
     #[clap(flatten)]
+    pub(crate) key_override: PrivateKeyOptions,
+    #[clap(flatten)]
     pub(crate) build_options: BuildOptions,
+    #[clap(
+        long,
+        value_name = "DIR",
+        help = "Directory containing local .aleo imports when --path points to an Aleo bytecode file; other imports are fetched from the network"
+    )]
+    pub(crate) imports_dir: Option<PathBuf>,
     #[clap(
         long = "with",
         help = "Additional programs to load into the VM (comma-separated). \
@@ -77,6 +86,41 @@ impl Command for LeoRun {
         let path = context.dir()?;
         // Get the path to the home directory.
         let home_path = context.home()?;
+        if path.extension().and_then(|extension| extension.to_str()) == Some("aleo") {
+            if context.package_filter.is_some() {
+                return Err(crate::errors::custom("`--package` cannot be used with an Aleo bytecode file.").into());
+            }
+            let network = match get_network(&self.env_override.network) {
+                Ok(network) => network,
+                Err(_) => {
+                    println!("⚠️ No network specified, defaulting to 'testnet'.");
+                    NetworkName::TestnetV0
+                }
+            };
+            let endpoint = match get_endpoint(&self.env_override.endpoint) {
+                Ok(endpoint) => endpoint,
+                Err(_) => {
+                    println!("⚠️ No endpoint specified, defaulting to '{DEFAULT_ENDPOINT}'.");
+                    DEFAULT_ENDPOINT.to_string()
+                }
+            };
+            return Package::from_aleo_file(
+                path,
+                home_path,
+                self.imports_dir.as_deref(),
+                self.build_options.no_cache,
+                self.build_options.no_local,
+                Some(network),
+                Some(&endpoint),
+                self.env_override.network_retries,
+            )
+            .map(Some);
+        }
+        if self.imports_dir.is_some() {
+            return Err(
+                crate::errors::custom("`--imports-dir` requires `--path` to point to an Aleo bytecode file.").into()
+            );
+        }
         // If the current directory is a valid Leo package, then build it.
         if Package::from_directory_no_graph(
             path,
@@ -87,8 +131,9 @@ impl Command for LeoRun {
         )
         .is_ok()
         {
-            let package = LeoBuild { env_override: self.env_override.clone(), options: self.build_options.clone() }
-                .execute(context)?;
+            let package =
+                LeoBuild { env_override: self.env_override.clone(), options: self.build_options.clone(), rename: None }
+                    .execute(context)?;
             // Return the package.
             Ok(Some(package))
         } else {
@@ -140,7 +185,7 @@ fn handle_run<A: Aleo>(
     package: Option<Package>,
 ) -> Result<<LeoRun as Command>::Output> {
     // Get the private key, defaulting to a test key.
-    let private_key = match get_private_key::<A::Network>(&command.env_override.private_key) {
+    let private_key = match get_private_key::<A::Network>(&command.key_override.private_key) {
         Ok(private_key) => private_key,
         Err(_) => {
             println!("⚠️ No valid private key specified, defaulting to '{TEST_PRIVATE_KEY}'.");
@@ -269,12 +314,13 @@ fn handle_run<A: Aleo>(
         let endpoint = get_endpoint(&command.env_override.endpoint)?;
         println!("⬇️ Downloading {program_name} and its dependencies from {endpoint}...");
         // Load the programs from the network.
-        programs = load_latest_programs_from_network(
+        programs = load_programs_from_network(
             &context,
             program_id,
             network,
             &endpoint,
             command.env_override.network_retries,
+            None,
         )?;
     };
 

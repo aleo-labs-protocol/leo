@@ -40,6 +40,7 @@ use leo_ast::{
     TupleExpression,
     TupleType,
     Type,
+    TypeKind,
     UnitExpression,
 };
 use leo_span::Symbol;
@@ -161,7 +162,7 @@ impl FlatteningVisitor<'_> {
                 span: Default::default(),
                 id: self.state.node_builder.next_id(),
             };
-            self.state.type_table.insert(binary.id(), Type::Boolean);
+            self.state.type_table.insert(binary.id(), Type::BOOLEAN);
 
             // Assign that Or to a new Identifier.
             let place = Identifier {
@@ -220,7 +221,7 @@ impl FlatteningVisitor<'_> {
                 span: Default::default(),
                 id: self.state.node_builder.next_id(),
             };
-            self.state.type_table.insert(binary.id(), Type::Boolean);
+            self.state.type_table.insert(binary.id(), Type::BOOLEAN);
 
             // Assign that And to a new Identifier.
             let place = Identifier {
@@ -348,7 +349,7 @@ impl FlatteningVisitor<'_> {
         // Otherwise, push a dummy return statement to the end of the block.
         else {
             let unit_id = self.state.node_builder.next_id();
-            self.state.type_table.insert(unit_id, Type::Unit);
+            self.state.type_table.insert(unit_id, Type::UNIT);
             block.statements.push(
                 ReturnStatement {
                     expression: UnitExpression { span: Default::default(), id: unit_id }.into(),
@@ -360,7 +361,7 @@ impl FlatteningVisitor<'_> {
         }
     }
 
-    /// Construct an access expression `inner.name` bound to a fresh identifier.
+    /// Constructs an access expression `inner.name` bound to a fresh identifier.
     fn make_composite_access_definition(
         &mut self,
         inner: Identifier,
@@ -378,9 +379,8 @@ impl FlatteningVisitor<'_> {
         self.unique_simple_definition(expr)
     }
 
-    /// Destructure a ternary over a composite (record) type into per-field ternaries followed by a
-    /// composite init. This is only used for records — plaintext structs are passed to the Aleo
-    /// `ternary` instruction directly.
+    /// Constructs a record from separate ternary selections for each field.
+    /// Plaintext structs use the Aleo `ternary` instruction directly.
     pub fn ternary_composite(
         &mut self,
         composite_path: &Path,
@@ -394,9 +394,10 @@ impl FlatteningVisitor<'_> {
             .members
             .iter()
             .map(|Member { identifier, type_, .. }| {
-                let (first, stmt) = self.make_composite_access_definition(*first, *identifier, type_.clone());
+                let member_ty = type_.ty();
+                let (first, stmt) = self.make_composite_access_definition(*first, *identifier, member_ty);
                 statements.push(stmt);
-                let (second, stmt) = self.make_composite_access_definition(*second, *identifier, type_.clone());
+                let (second, stmt) = self.make_composite_access_definition(*second, *identifier, member_ty);
                 statements.push(stmt);
                 let ternary = TernaryExpression {
                     condition: condition.clone(),
@@ -405,7 +406,7 @@ impl FlatteningVisitor<'_> {
                     span: Default::default(),
                     id: self.state.node_builder.next_id(),
                 };
-                self.state.type_table.insert(ternary.id(), type_.clone());
+                self.state.type_table.insert(ternary.id(), member_ty);
                 let (expression, stmts) = self.reconstruct_ternary(ternary, &());
                 statements.extend(stmts);
 
@@ -423,13 +424,15 @@ impl FlatteningVisitor<'_> {
                 path: composite_path.clone(),
                 const_arguments: Vec::new(),
                 members,
+                base: None,
                 span: Default::default(),
                 id: {
                     let id = self.state.node_builder.next_id();
-                    self.state.type_table.insert(
-                        id,
-                        Type::Composite(CompositeType { path: composite_path.clone(), const_arguments: Vec::new() }),
-                    );
+                    let comp_ty = self.state.types.intern(&TypeKind::Composite(CompositeType {
+                        path: composite_path.clone(),
+                        const_arguments: Vec::new(),
+                    }));
+                    self.state.type_table.insert(id, comp_ty);
                     id
                 },
             },
@@ -476,11 +479,12 @@ impl FlatteningVisitor<'_> {
             .iter()
             .enumerate()
             .map(|(i, type_)| {
+                let elem_ty = self.state.types.intern(type_);
                 // Create an assignment statement for the first access expression.
-                let access1 = make_access(first, i, type_.clone(), self);
+                let access1 = make_access(first, i, elem_ty, self);
                 let (first, stmt) = self.unique_simple_definition(access1);
                 statements.push(stmt);
-                let access2 = make_access(second, i, type_.clone(), self);
+                let access2 = make_access(second, i, elem_ty, self);
                 // Create an assignment statement for the second access expression.
                 let (second, stmt) = self.unique_simple_definition(access2);
                 statements.push(stmt);
@@ -493,7 +497,7 @@ impl FlatteningVisitor<'_> {
                     span: Default::default(),
                     id: self.state.node_builder.next_id(),
                 };
-                self.state.type_table.insert(ternary.id(), type_.clone());
+                self.state.type_table.insert(ternary.id(), elem_ty);
                 let (expression, stmts) = self.reconstruct_ternary(ternary, &());
 
                 // Accumulate any statements generated.
@@ -511,7 +515,8 @@ impl FlatteningVisitor<'_> {
                 // Create a new node ID for the tuple expression.
                 let id = self.state.node_builder.next_id();
                 // Set the type of the node ID.
-                self.state.type_table.insert(id, Type::Tuple(tuple_type.clone()));
+                let tuple_ty = self.state.types.intern(&TypeKind::Tuple(tuple_type.clone()));
+                self.state.type_table.insert(id, tuple_ty);
                 id
             },
         };

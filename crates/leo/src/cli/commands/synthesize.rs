@@ -47,12 +47,10 @@ pub struct LeoSynthesize {
     pub(crate) local: bool,
     #[arg(short, long, help = "Skip functions that contain any of the given substrings")]
     pub(crate) skip: Vec<String>,
-    #[clap(flatten)]
-    pub(crate) action: TransactionAction,
+    #[arg(long, help = "Save the synthesized keys to the provided directory.")]
+    pub(crate) save: Option<String>,
     #[clap(flatten)]
     pub(crate) env_override: EnvOptions,
-    #[clap(flatten)]
-    build_options: BuildOptions,
 }
 
 impl Command for LeoSynthesize {
@@ -68,11 +66,9 @@ impl Command for LeoSynthesize {
         if self.local {
             let package = LeoBuild {
                 env_override: self.env_override.clone(),
-                options: {
-                    let mut options = self.build_options.clone();
-                    options.no_cache = true;
-                    options
-                },
+                // Synthesis must reflect the current source, so always build without the cache.
+                options: BuildOptions { no_cache: true, ..Default::default() },
+                rename: None,
             }
             .execute(context)?;
             // Return the package.
@@ -83,19 +79,6 @@ impl Command for LeoSynthesize {
     }
 
     fn apply(self, context: Context, input: Self::Input) -> Result<Self::Output> {
-        // Verify that the transaction action is not "broadcast" or "print"
-        if self.action.broadcast {
-            println!(
-                "❌ `--broadcast` is not a valid option for `leo synthesize`. Please use `--save` and specify a valid directory."
-            );
-            return Ok(SynthesizeOutput::default());
-        } else if self.action.print {
-            println!(
-                "❌ `--print` is not a valid option for `leo synthesize`. Please use `--save` and specify a valid directory."
-            );
-            return Ok(SynthesizeOutput::default());
-        }
-
         // Get the network, accounting for overrides.
         let network = get_network(&self.env_override.network)?;
         // Handle each network with the appropriate parameterization.
@@ -190,12 +173,13 @@ fn handle_synthesize<A: Aleo>(
     // Note: The dependencies are downloaded in "post-order" (child before parent).
     if !is_local {
         println!("⬇️ Downloading {program_id} and its dependencies from {endpoint}...");
-        programs = load_latest_programs_from_network(
+        programs = load_programs_from_network(
             &context,
             program_id,
             network,
             &endpoint,
             command.env_override.network_retries,
+            None,
         )?;
     };
 
@@ -254,7 +238,7 @@ fn handle_synthesize<A: Aleo>(
         println!("\n🔑 Synthesized {label} for {program_id}/{name} (edition {edition})");
         println!("ℹ️ Circuit Information:");
         println!("    - Public Inputs: {}", verifying_key.circuit_info.num_public_inputs);
-        println!("    - Variables: {}", verifying_key.circuit_info.num_public_and_private_variables);
+        println!("    - Variables: {}", verifying_key.num_variables());
         println!("    - Constraints: {}", verifying_key.circuit_info.num_constraints);
         println!("    - Non-Zero Entries in A: {}", verifying_key.circuit_info.num_non_zero_a);
         println!("    - Non-Zero Entries in B: {}", verifying_key.circuit_info.num_non_zero_b);
@@ -277,7 +261,7 @@ fn handle_synthesize<A: Aleo>(
 
         let circuit_info = CircuitInfo {
             num_public_inputs: verifying_key.circuit_info.num_public_inputs as u64,
-            num_variables: verifying_key.circuit_info.num_public_and_private_variables as u64,
+            num_variables: verifying_key.num_variables(),
             num_constraints: verifying_key.circuit_info.num_constraints as u64,
             num_non_zero_a: verifying_key.circuit_info.num_non_zero_a as u64,
             num_non_zero_b: verifying_key.circuit_info.num_non_zero_b as u64,
@@ -291,7 +275,7 @@ fn handle_synthesize<A: Aleo>(
             metadata: metadata.clone(),
         });
 
-        if let Some(path) = &command.action.save {
+        if let Some(path) = &command.save {
             std::fs::create_dir_all(path)
                 .map_err(|e| crate::errors::custom(format!("Failed to create directory: {e}")))?;
             let timestamp = chrono::Utc::now().timestamp();

@@ -1,4 +1,4 @@
-struct TokenInfo {
+export struct TokenInfo {
     id: u64,
 }
 
@@ -24,4 +24,7 @@ program test.aleo {
             try_get_token = (try_get_token.id == 0u64) ? TokenInfo { id: 10u64 } : try_get_token;
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

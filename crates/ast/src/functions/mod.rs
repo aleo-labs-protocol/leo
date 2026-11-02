@@ -32,16 +32,21 @@ pub use output::*;
 mod mode;
 pub use mode::*;
 
-use crate::{Block, ConstParameter, FunctionStub, Identifier, Indent, Node, NodeID, TupleType, Type};
+use crate::{Block, ConstParameter, FunctionStub, Identifier, Indent, Node, NodeID, TupleType, TypeKind};
 use leo_span::{Span, Symbol};
 
 use itertools::Itertools as _;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::fmt;
 
 /// A function definition.
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize)]
 pub struct Function {
+    /// Whether the `export` keyword was written on this function. `None` means the
+    /// visibility concept does not apply (e.g., program-block functions and
+    /// stubs, which are always reachable as part of the program's public
+    /// interface, and compiler-synthesized helpers).
+    pub is_exported: Option<bool>,
     /// Annotations on the function.
     pub annotations: Vec<Annotation>,
     /// Is this function a transition, inlined, or a regular function?.
@@ -55,7 +60,7 @@ pub struct Function {
     /// The function's output declarations.
     pub output: Vec<Output>,
     /// The function's output type.
-    pub output_type: Type,
+    pub output_type: TypeKind,
     /// The body of the function.
     pub block: Block,
     /// The entire span of the function definition.
@@ -76,6 +81,7 @@ impl Function {
     /// Initialize a new function.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        is_exported: Option<bool>,
         annotations: Vec<Annotation>,
         variant: Variant,
         identifier: Identifier,
@@ -87,12 +93,24 @@ impl Function {
         id: NodeID,
     ) -> Self {
         let output_type = match output.len() {
-            0 => Type::Unit,
-            1 => output[0].type_.clone(),
-            _ => Type::Tuple(TupleType::new(output.iter().map(|o| o.type_.clone()).collect())),
+            0 => TypeKind::Unit,
+            1 => output[0].type_.kind().clone(),
+            _ => TypeKind::Tuple(TupleType::new(output.iter().map(|o| o.type_.kind().clone()).collect())),
         };
 
-        Function { annotations, variant, identifier, const_parameters, input, output, output_type, block, span, id }
+        Function {
+            is_exported,
+            annotations,
+            variant,
+            identifier,
+            const_parameters,
+            input,
+            output,
+            output_type,
+            block,
+            span,
+            id,
+        }
     }
 
     /// Returns function name.
@@ -102,13 +120,19 @@ impl Function {
 
     /// Returns `true` if any output of the function is a `Final`
     pub fn has_final_output(&self) -> bool {
-        self.output.iter().any(|o| matches!(o.type_, Type::Future(_)))
+        self.output.iter().any(|o| matches!(o.type_.kind(), TypeKind::Future(_)))
+    }
+
+    /// Returns `true` if the function carries an `@test` annotation.
+    pub fn is_test(&self) -> bool {
+        self.annotations.iter().any(|a| a.identifier.name == leo_span::sym::test)
     }
 }
 
 impl From<FunctionStub> for Function {
     fn from(function: FunctionStub) -> Self {
         Self {
+            is_exported: None,
             annotations: function.annotations,
             variant: function.variant,
             identifier: function.identifier,
@@ -135,6 +159,10 @@ impl fmt::Display for Function {
             writeln!(f, "{annotation}")?;
         }
 
+        if self.is_exported == Some(true) {
+            write!(f, "export ")?;
+        }
+
         match self.variant {
             Variant::FinalFn => write!(f, "final fn ")?,
             Variant::Fn => write!(f, "fn ")?,
@@ -152,7 +180,7 @@ impl fmt::Display for Function {
         match self.output.len() {
             0 => {}
             1 => {
-                if !matches!(self.output[0].type_, Type::Unit) {
+                if !matches!(self.output[0].type_.kind(), TypeKind::Unit) {
                     write!(f, " -> {}", self.output[0])?;
                 }
             }

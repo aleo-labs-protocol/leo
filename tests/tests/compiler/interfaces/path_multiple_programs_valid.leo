@@ -1,19 +1,25 @@
-interface InterfaceA {
+export interface InterfaceA {
     fn fn_a() -> u64;
 }
 
 program lib_a.aleo {
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
 
-interface InterfaceB {
+export interface InterfaceB {
     fn fn_b() -> u64;
 }
 
 program lib_b.aleo {
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -32,4 +38,7 @@ program test.aleo: lib_a.aleo::InterfaceA + lib_b.aleo::InterfaceB {
     fn main(x: u64) -> u64 {
         return 0;
     }
+
+    @noupgrade
+    constructor() {}
 }

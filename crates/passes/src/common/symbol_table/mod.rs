@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the Leo library. If not, see <https://www.gnu.org/licenses/>.
 
-use leo_ast::{Composite, Expression, Function, Interface, Location, NodeBuilder, NodeID, Path, Type};
+use leo_ast::{Composite, Expression, Function, Interface, Location, NodeBuilder, NodeID, Path, TypeKind};
 use leo_errors::{Color, Label, LeoError, Result};
 use leo_span::{Span, Symbol};
 
@@ -502,10 +502,11 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// Insert a function at this location.
-    pub fn insert_function(&mut self, location: Location, function: Function) -> Result<()> {
+    /// Insert a function at this location. `is_stub` marks functions whose
+    /// body comes from an external program stub rather than local Leo source.
+    pub fn insert_function(&mut self, location: Location, function: Function, is_stub: bool) -> Result<()> {
         self.check_shadow_global(&location, function.identifier.span)?;
-        self.functions.insert(location, FunctionSymbol { function, finalizer: None });
+        self.functions.insert(location, FunctionSymbol { function, finalizer: None, is_stub });
         Ok(())
     }
 
@@ -530,7 +531,7 @@ impl SymbolTable {
     }
 
     /// Sets the type of a local using its name. Returns `false` if the local is not found.
-    pub fn set_local_type(&mut self, name: Symbol, ty: Type) -> bool {
+    pub fn set_local_type(&mut self, name: Symbol, ty: TypeKind) -> bool {
         let mut current = self.local.as_ref();
 
         while let Some(table) = current {
@@ -548,7 +549,7 @@ impl SymbolTable {
     }
 
     /// Sets the type of a global using its location. Returns `false` if the global is not found.
-    pub fn set_global_type(&mut self, location: &Location, ty: Type) -> bool {
+    pub fn set_global_type(&mut self, location: &Location, ty: TypeKind) -> bool {
         if let Some(sym) = self.globals.get_mut(location) {
             sym.type_ = Some(ty);
             return true;
@@ -576,7 +577,7 @@ impl SymbolTable {
             .map_or_else(|| Ok(()), |prev_span| Err(Self::emit_shadow_error(*name, span, prev_span)))
     }
 
-    fn check_shadow_variable(&self, program: Symbol, path: &[Symbol], span: Span) -> Result<()> {
+    fn check_shadow_variable(&self, program: Symbol, module: &[Symbol], path: &[Symbol], span: Span) -> Result<()> {
         let mut current = self.local.as_ref();
 
         while let Some(table) = current {
@@ -590,12 +591,25 @@ impl SymbolTable {
 
         self.check_shadow_global(&Location::new(program, path.to_vec()), span)?;
 
+        if self.local.is_some() && !module.is_empty() {
+            let mut global_path = Vec::with_capacity(module.len() + path.len());
+            global_path.extend_from_slice(module);
+            global_path.extend_from_slice(path);
+            self.check_shadow_global(&Location::new(program, global_path), span)?;
+        }
+
         Ok(())
     }
 
     /// Insert a variable into the current scope.
-    pub fn insert_variable(&mut self, program: Symbol, path: &[Symbol], var: VariableSymbol) -> Result<()> {
-        self.check_shadow_variable(program, path, var.span)?;
+    pub fn insert_variable(
+        &mut self,
+        program: Symbol,
+        module: &[Symbol],
+        path: &[Symbol],
+        var: VariableSymbol,
+    ) -> Result<()> {
+        self.check_shadow_variable(program, module, path, var.span)?;
 
         if let Some(table) = self.local.as_mut() {
             let [name] = &path else { panic!("Local variables cannot have paths with more than 1 segment.") };
@@ -613,7 +627,7 @@ impl SymbolTable {
         caller: Location,
         callee: Location,
         future_inputs: Vec<Location>,
-        inferred_inputs: Vec<Type>,
+        inferred_inputs: Vec<TypeKind>,
     ) -> Result<()> {
         let callee_location = Location::new(callee.program, callee.path);
 

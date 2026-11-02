@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the Leo library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Identifier, Node, NodeID, Type, indent_display::Indent};
+use crate::{Identifier, Node, NodeID, TypeKind, indent_display::Indent};
 use leo_span::{Span, Symbol};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::fmt;
 
 pub use prototypes::{FunctionPrototype, MappingPrototype, RecordPrototype, StorageVariablePrototype};
@@ -24,12 +24,16 @@ pub use prototypes::{FunctionPrototype, MappingPrototype, RecordPrototype, Stora
 mod prototypes;
 
 /// An interface definition.
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize)]
 pub struct Interface {
+    /// Whether the `export` keyword was written on this interface. `None` when
+    /// visibility doesn't apply (program-block interfaces, which are always
+    /// reachable).
+    pub is_exported: Option<bool>,
     /// The interface identifier, e.g., `Foo` in `interface Foo { ... }`.
     pub identifier: Identifier,
     /// The interfaces this interface inherits from (supports multiple inheritance)
-    pub parents: Vec<(Span, Type)>,
+    pub parents: Vec<(Span, TypeKind)>,
     /// The entire span of the interface definition.
     pub span: Span,
     /// The ID of the node.
@@ -50,8 +54,8 @@ impl Interface {
     }
 
     /// Returns `true` if `ty` is a composite type whose name matches a record declared in this interface.
-    pub fn is_record_type(&self, ty: &Type) -> bool {
-        if let Type::Composite(ct) = ty
+    pub fn is_record_type(&self, ty: &TypeKind) -> bool {
+        if let TypeKind::Composite(ct) = ty
             && let Some(loc) = ct.path.try_global_location()
             && let Some(&name) = loc.path.first()
         {
@@ -77,6 +81,9 @@ impl fmt::Debug for Interface {
 
 impl fmt::Display for Interface {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.is_exported == Some(true) {
+            write!(f, "export ")?;
+        }
         writeln!(
             f,
             "interface {}{} {{",

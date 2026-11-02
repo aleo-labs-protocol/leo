@@ -137,3 +137,6 @@ function main:
     ternary r64 1u8 r69 into r71;
     output r70 as Board.private;
     output r71 as u8.private;
+
+constructor:
+    assert.eq edition 0u16;

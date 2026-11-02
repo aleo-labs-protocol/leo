@@ -3,8 +3,11 @@ program test.aleo {
     record Token {
         owner: bool,
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-fn main(x: field) -> bool {
+export fn main(x: field) -> bool {
     return true;
 }

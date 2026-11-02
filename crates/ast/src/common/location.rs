@@ -17,11 +17,11 @@ use crate::ProgramId;
 
 use itertools::Itertools;
 use leo_span::{Symbol, sym};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use snarkvm::prelude::{Locator, Network};
 use std::fmt::Display;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct Location {
     /// The program name. e.g. `credits.aleo` or `my_library`.
     pub program: Symbol,
@@ -42,6 +42,16 @@ impl Location {
     /// Check whether this location is the dynamic sentinel.
     pub fn is_dynamic(&self) -> bool {
         self.program == sym::__dynamic__
+    }
+
+    /// The portion of the path *above* the item, i.e. the module path the item lives in.
+    /// For program-block items and library top-level items the path has length 1 and
+    /// this returns an empty slice; for module items it returns the module segments.
+    pub fn module_path(&self) -> &[Symbol] {
+        match self.path.split_last() {
+            Some((_, module)) => module,
+            None => &[],
+        }
     }
 }
 

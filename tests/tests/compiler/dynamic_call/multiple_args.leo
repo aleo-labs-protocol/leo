@@ -1,4 +1,4 @@
-interface Processor {
+export interface Processor {
     fn process(a: address, amount: u64) -> bool;
 }
 
@@ -10,4 +10,7 @@ program test.aleo: Processor {
     fn main(target: field, addr: address, val: u64) -> bool {
         return Processor@(target)::process(addr, val);
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -1,5 +1,5 @@
 // FAIL: Interface@() dynamic calls cannot be used inside a conditional.
-interface Adder {
+export interface Adder {
     fn sum(a: u32, b: u32) -> u32;
 }
 
@@ -14,4 +14,7 @@ program test.aleo : Adder {
         }
         return 0u32;
     }
+
+    @noupgrade
+    constructor() {}
 }

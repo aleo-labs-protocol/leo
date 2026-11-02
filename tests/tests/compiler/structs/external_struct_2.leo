@@ -1,20 +1,20 @@
-struct Foo {
+export struct Foo {
     bar: [Bar; 1],
 }
 
-struct Bar {
+export struct Bar {
     baz: [Baz; 2],
 }
 
-struct Baz {
+export struct Baz {
     one: One,
 }
 
-struct One {
+export struct One {
     two: [Two; 2],
 }
 
-struct Two {
+export struct Two {
     val1: u32,
     val2: u32,
 }
@@ -51,15 +51,18 @@ program child.aleo {
                     },
                 ],
             },
-            Boo { owner: self.signer, val: 10u32 },
+            Boo { owner: std::ctx::signer(), val: 10u32 },
         );
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
 import child.aleo;
 
-struct Woo {
+export struct Woo {
     a: u32,
     b: u32,
 }
@@ -129,13 +132,16 @@ program parent.aleo {
         return (
             f1, b1,
             BooHoo {
-                owner: self.signer,
+                owner: std::ctx::signer(),
                 val: 10u32,
                 woo: Woo { a: 1u32, b: 2u32 },
             },
             Woo { a: 3u32, b: 4u32 },
         );
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -152,4 +158,7 @@ program grandparent.aleo {
         let (f, b, bh, w): (child.aleo::Foo, child.aleo::Boo, parent.aleo::BooHoo, parent.aleo::Woo) = parent.aleo::create_another_wrapper();
         return parent.aleo::create_another_wrapper();
     }
+
+    @noupgrade
+    constructor() {}
 }

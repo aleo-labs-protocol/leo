@@ -1,13 +1,10 @@
 
        Leo 🔨 Compiling 'some_sample_leo_program.aleo'
-       Leo     8 statements before dead code elimination.
-       Leo     8 statements after dead code elimination.
-       Leo     The program checksum is: '[109u8, 115u8, 37u8, 36u8, 104u8, 211u8, 71u8, 47u8, 167u8, 121u8, 76u8, 58u8, 12u8, 161u8, 114u8, 2u8, 167u8, 69u8, 23u8, 209u8, 243u8, 251u8, 90u8, 233u8, 85u8, 135u8, 145u8, 25u8, 18u8, 86u8, 72u8, 144u8]'.
-       Leo     Program size: 0.68 KB / 500.00 KB
+       Leo     Program size: 0.75 KB / 2000.00 KB
        Leo ✅ Compiled 'some_sample_leo_program.aleo' into Aleo instructions.
        Leo ✅ Generated ABI for program 'some_sample_leo_program.aleo'.
 
-📢 Using the following consensus heights: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14
+📢 Using the following consensus heights: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21
   To override, pass in `--consensus-heights` or override the environment variable `CONSENSUS_VERSION_HEIGHTS`.
 
 Attempting to determine the consensus version from the latest block height at http://localhost:3030...
@@ -19,7 +16,7 @@ Attempting to determine the consensus version from the latest block height at ht
   Address:            aleo1rhgdu77hgyqd3xjj8uc...
   Endpoint:           http://localhost:3030
   Network:            testnet
-  Consensus Version:  15
+  Consensus Version:  22
 
 📦 Deployment Tasks:
   • some_sample_leo_program.aleo  │ priority fee: 0  │ fee record: no (public fee)
@@ -34,7 +31,7 @@ Attempting to determine the consensus version from the latest block height at ht
 🔧 Your program 'some_sample_leo_program.aleo' has the following constructor.
 ──────────────────────────────────────────────
 constructor:
-    assert.eq edition 0u16;
+    assert.eq program_owner aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px;
 ──────────────────────────────────────────────
 Once it is deployed, it CANNOT be changed.
 
@@ -43,19 +40,19 @@ Once it is deployed, it CANNOT be changed.
 
 📊 Deployment Summary for some_sample_leo_program.aleo
 ──────────────────────────────────────────────
-  Program Size:         0.68 KB / 500.00 KB
+  Program Size:         0.75 KB / 2000.00 KB
   Total Variables:      99,771
   Total Constraints:    76,101
   Max Variables:        XXXXXX
   Max Constraints:      XXXXXX
 
 💰 Cost Breakdown (credits)
-  Transaction Storage:  3.270000
+  Transaction Storage:  3.300000
   Program Synthesis:    0.175872
   Namespace:            1.000000
   Constructor:          0.002000
   Priority Fee:         0.000000
-  Total Fee:            4.447872
+  Total Fee:            4.477872
   Function 'main'
     Total Execution Cost:   0.001334
     |- Storage Cost:        0.001334
@@ -83,3 +80,145 @@ Once it is deployed, it CANNOT be changed.
 Explored XXXXXX blocks.
 Transaction accepted.
 ✅ Deployment confirmed!
+Remote run, execute, synthesize, and --with work without a supplied lock.
+
+📢 Using the following consensus heights: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21
+  To override, pass in `--consensus-heights` or override the environment variable `CONSENSUS_VERSION_HEIGHTS`.
+
+Attempting to determine the consensus version from the latest block height at http://localhost:3030...
+
+🛠️  Deployment Plan Summary
+──────────────────────────────────────────────
+🔧 Configuration:
+  Private Key:        APrivateKey1zkp8CZNn3yeC...
+  Address:            aleo1rhgdu77hgyqd3xjj8uc...
+  Endpoint:           http://localhost:3030
+  Network:            testnet
+  Consensus Version:  22
+
+📦 Deployment Tasks:
+  • some_sample_leo_program.aleo  │ priority fee: 0  │ fee record: no (public fee)
+
+⚙️ Actions:
+  • Transaction(s) will NOT be printed to the console.
+  • Transaction(s) will NOT be saved to a file.
+  • Transaction(s) will be broadcast to http://localhost:3030
+──────────────────────────────────────────────
+
+Loaded the following programs into the VM:
+ - credits.aleo (default)
+ - some_sample_leo_program.aleo (edition 0)
+
+📦 Creating deployment transaction for 'some_sample_leo_program.aleo'...
+
+
+📊 Deployment Summary for some_sample_leo_program.aleo
+──────────────────────────────────────────────
+  Program Size:         0.75 KB / 2000.00 KB
+  Total Variables:      99,771
+  Total Constraints:    76,101
+  Max Variables:        XXXXXX
+  Max Constraints:      XXXXXX
+
+💰 Cost Breakdown (credits)
+  Transaction Storage:  3.300000
+  Program Synthesis:    0.175872
+  Namespace:            1.000000
+  Constructor:          0.002000
+  Priority Fee:         0.000000
+  Total Fee:            4.477872
+  Function 'main'
+    Total Execution Cost:   0.001334
+    |- Storage Cost:        0.001334
+    |- Finalize Cost:       0.000000
+  Function 'mint'
+    Total Execution Cost:   0.001536
+    |- Storage Cost:        0.001536
+    |- Finalize Cost:       0.000000
+  Function 'dynamic_transfer'
+    Total Execution Cost:   0.000000 (lower bound)
+    |- Storage Cost:        N/A (dynamic call)
+    |- Finalize Cost:       0.000000 (lower bound)
+──────────────────────────────────────────────
+📡 Broadcasting upgrade for some_sample_leo_program.aleo...
+💰Your current public balance is XXXXXX credits.
+
+✉️ Broadcasted transaction with:
+  - transaction ID: 'XXXXXX'
+  - fee ID: 'XXXXXX'
+  - fee transaction ID: 'XXXXXX'
+    (use this to check for rejected transactions)
+
+🔄 Searching up to 12 blocks to confirm transaction (this may take several seconds)...
+Explored XXXXXX blocks.
+Transaction accepted.
+✅ Upgrade confirmed!
+Upgrade uses the current root edition; dependency updates preserve dry runs and exact constraints.
+
+📢 Using the following consensus heights: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21
+  To override, pass in `--consensus-heights` or override the environment variable `CONSENSUS_VERSION_HEIGHTS`.
+
+Attempting to determine the consensus version from the latest block height at http://localhost:3030...
+
+➕Adding programs to the VM in the following order:
+  - some_sample_leo_program.aleo (local)
+
+⚙️ Preparing calls for review: some_sample_leo_program.aleo/main...
+
+🚀 Execution Plan Summary
+──────────────────────────────────────────────
+🔧 Configuration:
+  Address:            aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px
+  Endpoint:           http://localhost:3030
+  Network:            testnet
+  Consensus Version:  22
+
+🎯 Execution Target:
+  Program:        some_sample_leo_program.aleo
+  Function:       main
+  Source:         local
+
+Calls to approve:
+  Call 1: some_sample_leo_program.aleo/main
+    Signer: aleo1rhgdu77hgyqd3xjj8ucu3jj9r2krwz6mnzyd80gncr5fxcwlh5rsvzp9px
+    Input 1: 1u32
+    Input 2: <private input>
+  Final balances depend on on-chain state.
+
+💸 Fee Info:
+  Priority Fee:   0 μcredits
+  Fee Record:     no (public fee)
+
+⚙️ Actions:
+  - Transaction will NOT be printed to the console.
+  - Transaction will NOT be saved to a file.
+  - Transaction will be broadcast to http://localhost:3030
+──────────────────────────────────────────────
+
+
+📊 Execution Cost Summary for some_sample_leo_program.aleo
+──────────────────────────────────────────────
+💰 Cost Breakdown (credits)
+  Transaction Storage:  0.001334
+  On-chain Execution:   0.000000
+  Priority Fee:         0.000000
+  Total Fee:            0.001334
+──────────────────────────────────────────────
+
+➡️  Output
+
+ • 3u32
+
+📡 Broadcasting execution for some_sample_leo_program.aleo...
+💰Your current public balance is XXXXXX credits.
+
+✉️ Broadcasted transaction with:
+  - transaction ID: 'XXXXXX'
+  - fee ID: 'XXXXXX'
+  - fee transaction ID: 'XXXXXX'
+    (use this to check for rejected transactions)
+
+🔄 Searching up to 12 blocks to confirm transaction (this may take several seconds)...
+Explored XXXXXX blocks.
+Transaction accepted.
+✅ Execution confirmed!

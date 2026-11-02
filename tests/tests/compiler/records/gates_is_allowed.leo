@@ -9,6 +9,9 @@ program test.aleo {
     }
 
     fn main(a: u64, b: u64) -> Token {
-        return Token { owner: self.signer, amount: a, gates: b };
+        return Token { owner: std::ctx::signer(), amount: a, gates: b };
     }
+
+    @noupgrade
+    constructor() {}
 }

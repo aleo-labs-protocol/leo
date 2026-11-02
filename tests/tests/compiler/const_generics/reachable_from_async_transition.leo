@@ -3,14 +3,17 @@ program const_generics.aleo {
         let f = final { bar(); };
         return (abc::[0](), f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn bar() {}
+export final fn bar() {}
 
-fn abc::[C: field]() -> field {
+export fn abc::[C: field]() -> field {
     return def::[C]();
 }
 
-fn def::[C: field]() -> field {
+export fn def::[C: field]() -> field {
     return C;
 }

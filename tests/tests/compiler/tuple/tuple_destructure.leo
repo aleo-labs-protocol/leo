@@ -1,4 +1,4 @@
-fn bax(baq: u8) -> (u8, u8) {
+export fn bax(baq: u8) -> (u8, u8) {
     return (baq + baq, baq * baq);
 }
 
@@ -9,4 +9,7 @@ program test.aleo {
         let result: u8 = a + b + c + d;
         return result;
     }
+
+    @noupgrade
+    constructor() {}
 }

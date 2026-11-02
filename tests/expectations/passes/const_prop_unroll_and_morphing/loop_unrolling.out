@@ -1,4 +1,7 @@
 program test.aleo {
+    @noupgrade
+    async constructor() {
+    }
     fn main() -> u32 {
         let sum = 0u32;
         {
@@ -25,6 +28,16 @@ program test.aleo {
             {
                 {
                     sum = sum + 4u32;
+                }
+            }
+        }
+        sum = sum + 1u32;
+        sum = sum + 1u32;
+        sum = sum + 1u32;
+        {
+            {
+                {
+                    sum = sum + 1u32;
                 }
             }
         }

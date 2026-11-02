@@ -1,4 +1,4 @@
-interface AbstractProgram {
+export interface AbstractProgram {
     fn foo() -> u64;
     fn bar(a: u64);
     fn baz(a: u64, b: u8, c: u32) -> Final;
@@ -14,4 +14,7 @@ program test.aleo: AbstractProgram {
     }
 
     fn baz(a: u32, b: u8, c: u32) {}
+
+    @noupgrade
+    constructor() {}
 }

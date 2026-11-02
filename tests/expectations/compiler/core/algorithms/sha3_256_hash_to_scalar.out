@@ -1,5 +1,9 @@
 program test.aleo;
 
+struct Foo:
+    a as u128;
+    b as u128;
+
 function main:
     input r0 as i8.private;
     input r1 as i16.private;
@@ -40,3 +44,6 @@ function main:
     output r21 as scalar.private;
     output r22 as scalar.private;
     output 1738280538978140554481286439585842208890450981519357325322164799916241986793scalar as scalar.private;
+
+constructor:
+    assert.eq edition 0u16;

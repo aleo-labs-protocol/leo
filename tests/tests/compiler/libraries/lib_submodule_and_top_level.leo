@@ -1,13 +1,13 @@
 // --- library: mixed_lib --- //
 
-const BASE: u32 = 10u32;
+export const BASE: u32 = 10u32;
 
 // --- Next Module: ops.leo --- //
-fn scale(x: u32) -> u32 {
+export fn scale(x: u32) -> u32 {
     return x * mixed_lib::BASE;
 }
 
-fn offset(x: u32) -> u32 {
+export fn offset(x: u32) -> u32 {
     return x + mixed_lib::BASE;
 }
 
@@ -19,4 +19,7 @@ program submodule_and_top_level.aleo {
         let shifted: u32 = mixed_lib::ops::offset(mixed_lib::BASE);
         return scaled + shifted;
     }
+
+    @noupgrade
+    constructor() {}
 }

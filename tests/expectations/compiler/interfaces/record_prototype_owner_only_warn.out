@@ -1,22 +1,22 @@
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-   ╭─[ compiler-test:1:27 ]
+   ╭─[ compiler-test:1:34 ]
    │
- 1 │ ╭─▶ interface TokenInterface {
+ 1 │ ╭─▶ export interface TokenInterface {
    ┆ ┆   
  5 │ ├─▶     }
    │ │           
-   │ ╰─────────── 
+   │ ╰─────────── here
    │     
    │     Help: Simplify the declaration to `record Token;`.
 ───╯
 [WPAR0370002] Warning: record prototype `Token` does not constrain any fields beyond the implicit `owner: address`
-   ╭─[ compiler-test:1:27 ]
+   ╭─[ compiler-test:1:34 ]
    │
- 1 │ ╭─▶ interface TokenInterface {
+ 1 │ ╭─▶ export interface TokenInterface {
    ┆ ┆   
  5 │ ├─▶     }
    │ │           
-   │ ╰─────────── 
+   │ ╰─────────── here
    │     
    │     Help: Simplify the declaration to `record Token;`.
 ───╯
@@ -27,3 +27,6 @@ record Token:
     amount as u64.private;
 
 function main:
+
+constructor:
+    assert.eq edition 0u16;

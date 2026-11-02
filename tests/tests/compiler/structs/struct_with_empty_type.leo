@@ -1,4 +1,4 @@
-struct Baz {
+export struct Baz {
     a: u32,
     b: [u32; 0],
 }
@@ -9,8 +9,11 @@ program scratch.aleo {
     fn prepare(a: [u32; 0]) -> Final {
         return final { finalize(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(a: [u32; 0]) {
+export final fn finalize(a: [u32; 0]) {
     Mapping::set(baz, Baz { a: 0, b: [] }, 3);
 }

@@ -1,4 +1,4 @@
-interface Producer {
+export interface Producer {
     fn produce(a: u32) -> (u32, Final);
 }
 
@@ -15,4 +15,7 @@ program test.aleo: Producer {
         let val: u32 = Producer@(target)::produce(x);
         return val;
     }
+
+    @noupgrade
+    constructor() {}
 }

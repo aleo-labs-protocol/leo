@@ -1,4 +1,4 @@
-struct s1 {
+export struct s1 {
     f1: u32,
     f2: u32,
 }
@@ -9,4 +9,7 @@ program test.aleo {
         x = x + 1i8;
         return x;
     }
+
+    @noupgrade
+    constructor() {}
 }

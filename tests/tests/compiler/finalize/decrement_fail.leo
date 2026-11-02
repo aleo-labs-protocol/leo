@@ -2,11 +2,14 @@ program test.aleo {
     mapping amounts: address => u128;
 
     fn decrease_self(amount: u128) -> Final {
-        let caller = self.caller;
+        let caller = std::ctx::caller();
         return final { finalize_dec(caller, amount); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_dec(addr: address, amount: u128) {
+export final fn finalize_dec(addr: address, amount: u128) {
     decrement(amounts, addr, amount);
 }

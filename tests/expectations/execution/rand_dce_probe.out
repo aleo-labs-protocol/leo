@@ -1,0 +1,107 @@
+program rand_dce_probe.aleo;
+
+mapping values:
+    key as u8.public;
+    value as u8.public;
+
+function with_unused:
+    async with_unused into r0;
+    output r0 as rand_dce_probe.aleo/with_unused.future;
+
+finalize with_unused:
+    rand.chacha into r0 as u8;
+    rand.chacha into r1 as u8;
+    set r1 into values[0u8];
+
+function without_unused:
+    async without_unused into r0;
+    output r0 as rand_dce_probe.aleo/without_unused.future;
+
+finalize without_unused:
+    rand.chacha into r0 as u8;
+    set r0 into values[0u8];
+
+function with_used:
+    async with_used into r0;
+    output r0 as rand_dce_probe.aleo/with_used.future;
+
+finalize with_used:
+    rand.chacha into r0 as u8;
+    rand.chacha into r1 as u8;
+    set r0 into values[1u8];
+    set r1 into values[0u8];
+
+constructor:
+    assert.eq edition 0u16;
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1vk9p4hxkwjuhnrd0pwfg5xzzjxs9jq5l8488qce5uneptuk3m5ys6kkhpe",
+      "program": "rand_dce_probe.aleo",
+      "function": "with_unused",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "4493789635199358297772854531013456530579171053409038981970454111579733627204field",
+          "value": "{\n  program_id: rand_dce_probe.aleo,\n  function_name: with_unused,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "59517101639069244690218806718172759817774084448733030979634609300207556343group",
+      "tcm": "3439287105411081472002244584104526469221102650797619533190690523741340896533field",
+      "scm": "1816974850713937437026517823493448391070390307098007095178907976258948759676field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au16szszkvy45qj05em24065maa3ets88ja5tc82ut7980sk4yh9qgq6fxqdm",
+      "program": "rand_dce_probe.aleo",
+      "function": "without_unused",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "4768319014552751374679734585199759311796186308748634063725881546746407313577field",
+          "value": "{\n  program_id: rand_dce_probe.aleo,\n  function_name: without_unused,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "2753374030312161871450361392031928722826287503339781494984117079966387459367group",
+      "tcm": "6809153655920260121602585521825097414660559397692049432875352307494719388413field",
+      "scm": "7473951525490561254990631822515526281415762788185587230110351869701223720015field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1ttlk6z2dhkr6vr2a7zdpa58an2ye4rw9cprxt3vslkw4vggtjvxqrgeqt6",
+      "program": "rand_dce_probe.aleo",
+      "function": "with_used",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "6831042936214098729614399252097437206608152610344772684659693156306209651801field",
+          "value": "{\n  program_id: rand_dce_probe.aleo,\n  function_name: with_used,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "789770717831599564714991648052354773986823660818291815634627404001583047552group",
+      "tcm": "3538186387192713931437096468271593375872372449929395252153783611737422176848field",
+      "scm": "5370469273829144508805751149315482906871503310645405798391545449408782233446field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+

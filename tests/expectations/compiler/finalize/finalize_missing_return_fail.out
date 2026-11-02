@@ -1,22 +1,11 @@
-[ETYC0372106] Error: a `final fn` is not allowed to return a value
-    ╭─[ compiler-test:9:1 ]
-    │
-  9 │ ╭─▶ final fn fin_mint(receiver: address, amount: u64) -> u64 {
-    ┆ ┆   
- 11 │ ├─▶ }
-    │ │       
-    │ ╰─────── 
-    │     
-    │     Help: Remove the output type and the `return` statement. The `Final` returned by a `final fn` is inferred automatically and must not be written explicitly.
-────╯
 [ETYC0372036] Error: function must return a value
-    ╭─[ compiler-test:9:1 ]
+    ╭─[ compiler-test:12:1 ]
     │
-  9 │ ╭─▶ final fn fin_mint(receiver: address, amount: u64) -> u64 {
+ 12 │ ╭─▶ export final fn fin_mint(receiver: address, amount: u64) -> u64 {
     ┆ ┆   
- 11 │ ├─▶ }
+ 14 │ ├─▶ }
     │ │       
-    │ ╰─────── 
+    │ ╰─────── here
     │     
     │     Help: Ensure every path through the function ends in a `return` expression matching the declared output type.
 ────╯

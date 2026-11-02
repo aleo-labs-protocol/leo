@@ -1,4 +1,4 @@
-fn main(a: u32, b: u32, y: bool) -> u32 {
+export fn main(a: u32, b: u32, y: bool) -> u32 {
     if y {
         return adder(a, b);
     } else {
@@ -14,4 +14,7 @@ program test.aleo {
     fn subber(a: u32, b: u32) -> u32 {
         return a - b;
     }
+
+    @noupgrade
+    constructor() {}
 }

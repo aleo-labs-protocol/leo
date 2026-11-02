@@ -3,10 +3,7 @@
 ⚠️ No endpoint specified, defaulting to 'https://api.explorer.provable.com/v1'.
 
        Leo 🔨 Compiling 'foo.aleo'
-       Leo     4 statements before dead code elimination.
-       Leo     4 statements after dead code elimination.
-       Leo     The program checksum is: '[19u8, 92u8, 200u8, 0u8, 59u8, 132u8, 136u8, 114u8, 118u8, 24u8, 197u8, 212u8, 163u8, 107u8, 30u8, 114u8, 154u8, 45u8, 217u8, 136u8, 90u8, 134u8, 43u8, 162u8, 243u8, 207u8, 241u8, 28u8, 81u8, 119u8, 140u8, 57u8]'.
-       Leo     Program size: 0.29 KB / 500.00 KB
+       Leo     Program size: 0.29 KB / 2000.00 KB
        Leo ✅ Compiled 'foo.aleo' into Aleo instructions.
        Leo ✅ Generated ABI for program 'foo.aleo'.
        Leo ✅ Generated 2 interface ABI(s).
@@ -14,20 +11,6 @@ build exit code: 0
 --- program ABI ---
 {
   "program": "foo.aleo",
-  "implements": [
-    {
-      "program": null,
-      "path": [
-        "Adder"
-      ]
-    },
-    {
-      "program": null,
-      "path": [
-        "Doubler"
-      ]
-    }
-  ],
   "structs": [],
   "records": [],
   "mappings": [],
@@ -35,72 +18,65 @@ build exit code: 0
   "functions": [
     {
       "name": "compute_sum",
-      "is_final": false,
-      "const_parameters": [],
       "inputs": [
         {
-          "name": "a",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         },
         {
-          "name": "b",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         }
       ],
       "outputs": [
         {
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         }
       ]
     },
     {
       "name": "compute_double",
-      "is_final": false,
-      "const_parameters": [],
       "inputs": [
         {
-          "name": "x",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         }
       ],
       "outputs": [
         {
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         }
       ]
     }
@@ -117,42 +93,38 @@ build exit code: 0
   "functions": [
     {
       "name": "compute_sum",
-      "is_final": false,
-      "const_parameters": [],
       "inputs": [
         {
-          "name": "a",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         },
         {
-          "name": "b",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         }
       ],
       "outputs": [
         {
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         }
       ]
     }
@@ -173,31 +145,28 @@ build exit code: 0
   "functions": [
     {
       "name": "compute_double",
-      "is_final": false,
-      "const_parameters": [],
       "inputs": [
         {
-          "name": "x",
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         }
       ],
       "outputs": [
         {
-          "ty": {
-            "Plaintext": {
+          "Plaintext": {
+            "ty": {
               "Primitive": {
                 "UInt": "U64"
               }
-            }
-          },
-          "mode": "None"
+            },
+            "mode": "Private"
+          }
         }
       ]
     }

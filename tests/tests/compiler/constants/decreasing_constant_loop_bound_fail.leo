@@ -1,4 +1,4 @@
-const START: u8 = 10u8;
+export const START: u8 = 10u8;
 
 program test.aleo {
     fn foo(a: u8, b: u8, flag: bool) -> u8 {
@@ -9,4 +9,7 @@ program test.aleo {
         }
         return c;
     }
+
+    @noupgrade
+    constructor() {}
 }

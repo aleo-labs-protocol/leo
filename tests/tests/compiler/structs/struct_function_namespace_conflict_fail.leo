@@ -1,11 +1,14 @@
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}
 
-struct Foo {
+export struct Foo {
     x: u8,
 }
 
-fn Foo() {}
+export fn Foo() {}
 
-fn main(y: bool) -> bool {
+export fn main(y: bool) -> bool {
     return y;
 }

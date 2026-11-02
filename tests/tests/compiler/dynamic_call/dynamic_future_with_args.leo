@@ -1,4 +1,4 @@
-interface Setter {
+export interface Setter {
     fn set_val(key: u32, val: u32) -> (bool, Final);
 }
 
@@ -19,9 +19,12 @@ program test.aleo: Setter {
             },
         );
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_main(f: Final, extra: u32) {
+export final fn finalize_main(f: Final, extra: u32) {
     f.run();
     assert(extra > 0u32);
 }

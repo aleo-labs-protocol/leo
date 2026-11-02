@@ -1,4 +1,4 @@
-fn foo(a: u8, b: u8) -> (u8, u8) {
+export fn foo(a: u8, b: u8) -> (u8, u8) {
     if (a == b) {
         return (a, b);
     }
@@ -17,4 +17,7 @@ program test.aleo {
         }
         return start;
     }
+
+    @noupgrade
+    constructor() {}
 }

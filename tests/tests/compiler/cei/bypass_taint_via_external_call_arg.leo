@@ -23,9 +23,12 @@ program oracle.aleo {
         // Proof-time snapshot: the "current" price at proving time.
         return (500u64, f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_get_price(id: u32) {
+export final fn finalize_get_price(id: u32) {
     // The oracle's finalize may update the price, making the
     // proof-time snapshot stale by the time other finalizes run.
     Mapping::set(prices, id, 50u64);
@@ -38,9 +41,12 @@ program exchange.aleo {
     fn execute_trade(id: u32, amount: u64) -> Final {
         return final { finalize_execute_trade(id, amount); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_execute_trade(id: u32, amount: u64) {
+export final fn finalize_execute_trade(id: u32, amount: u64) {
     // Records the trade at the given amount.
     // If amount was derived from a stale price, this is incorrect.
     Mapping::set(trades, id, amount);

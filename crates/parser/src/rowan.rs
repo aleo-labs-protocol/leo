@@ -30,7 +30,7 @@
 use itertools::Itertools as _;
 use snarkvm::prelude::{Address, Signature, TestnetV0};
 
-use leo_ast::{NetworkName, NodeBuilder, NodeID};
+use leo_ast::{NetworkName, NodeBuilder, NodeID, TypeInterner};
 use leo_errors::{Handler, Result};
 use leo_parser_rowan::{SyntaxElement, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken, TextRange};
 use leo_span::{
@@ -41,13 +41,13 @@ use leo_span::{
 };
 
 /// Type parameters and const arguments extracted from a `CONST_ARG_LIST` node.
-type ConstArgList = (Vec<(leo_ast::Type, Span)>, Vec<leo_ast::Expression>);
+type ConstArgList = (Vec<(leo_ast::TypeKind, Span)>, Vec<leo_ast::Expression>);
 
 /// Annotated types with visibility modes, used for `_dynamic_call` input/return types.
-type AnnotatedTypes = Vec<(leo_ast::Mode, leo_ast::Type, Span)>;
+type AnnotatedTypes = Vec<(leo_ast::Mode, leo_ast::TypeKind, Span)>;
 
 /// Parent declarations for inheritance
-type Parents = Vec<(Span, leo_ast::Type)>;
+type Parents = Vec<(Span, leo_ast::TypeKind)>;
 
 // =============================================================================
 // ConversionContext
@@ -57,6 +57,7 @@ type Parents = Vec<(Span, leo_ast::Type)>;
 struct ConversionContext<'a> {
     handler: &'a Handler,
     builder: &'a NodeBuilder,
+    interner: &'a TypeInterner,
     /// The absolute start position to offset spans by.
     start_pos: u32,
     /// When true, suppress `unexpected_str` errors during conversion.
@@ -69,8 +70,14 @@ struct ConversionContext<'a> {
 
 impl<'a> ConversionContext<'a> {
     /// Create a new conversion context.
-    fn new(handler: &'a Handler, builder: &'a NodeBuilder, start_pos: u32, suppress_cascade: bool) -> Self {
-        Self { handler, builder, start_pos, suppress_cascade }
+    fn new(
+        handler: &'a Handler,
+        builder: &'a NodeBuilder,
+        interner: &'a TypeInterner,
+        start_pos: u32,
+        suppress_cascade: bool,
+    ) -> Self {
+        Self { handler, builder, interner, start_pos, suppress_cascade }
     }
 
     /// Emit an `unexpected_str` error, unless cascade suppression is active.
@@ -206,17 +213,6 @@ impl<'a> ConversionContext<'a> {
         }
     }
 
-    /// Find a type child node or emit an error and return `Type::Err`.
-    fn require_type(&self, node: &SyntaxNode, label: &str) -> Result<leo_ast::Type> {
-        match children(node).find(|n| n.kind().is_type()) {
-            Some(type_node) => self.to_type(&type_node),
-            None => {
-                self.emit_unexpected_str(label, node.text(), self.to_span(node));
-                Ok(leo_ast::Type::Err)
-            }
-        }
-    }
-
     /// Find an expression child node or emit an error and return `ErrExpression`.
     fn require_expression(&self, node: &SyntaxNode, label: &str) -> Result<leo_ast::Expression> {
         match children(node).find(|n| n.kind().is_expression()) {
@@ -259,7 +255,7 @@ impl<'a> ConversionContext<'a> {
         if text.starts_with('_') {
             self.handler.emit_err(crate::errors::identifier_cannot_start_with_underscore(ident.span));
         }
-        if symbol_is_keyword(ident.name) {
+        if leo_parser_rowan::is_keyword(&text) {
             self.emit_unexpected_str("an identifier", &text, ident.span);
         }
     }
@@ -268,8 +264,8 @@ impl<'a> ConversionContext<'a> {
     // Type Conversions
     // =========================================================================
 
-    /// Convert a type syntax node to a Leo AST Type.
-    fn to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    /// Convert a type syntax node to a `TypeKind`.
+    fn to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         let ty = match node.kind() {
             TYPE_PRIMITIVE => self.type_primitive_to_type(node)?,
             TYPE_LOCATOR => self.type_locator_to_type(node)?,
@@ -280,18 +276,37 @@ impl<'a> ConversionContext<'a> {
             TYPE_OPTIONAL => self.type_optional_to_type(node)?,
             TYPE_FINAL => self.type_final_to_type(node)?,
             TYPE_MAPPING => self.type_mapping_to_type(node)?,
-            TYPE_DYN_RECORD => leo_ast::Type::DynRecord,
+            TYPE_DYN_RECORD => leo_ast::TypeKind::DynRecord,
             ERROR => {
                 // Parse errors already emitted by emit_parse_errors().
-                leo_ast::Type::Err
+                leo_ast::TypeKind::Err
             }
             kind => panic!("unexpected type node kind: {:?}", kind),
         };
         Ok(ty)
     }
 
-    /// Convert a TYPE_PRIMITIVE node to a Type.
-    fn type_primitive_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    /// Convert a type syntax node to a `TypeNode`, carrying the node's span.
+    fn to_type_repr(&self, node: &SyntaxNode) -> Result<leo_ast::TypeNode> {
+        let span = self.to_span(node);
+        let kind = self.to_type(node)?;
+        Ok(leo_ast::TypeNode::new(self.interner, kind, span))
+    }
+
+    /// Find a type child node or emit an error and return a node with `TypeKind::Err`.
+    fn require_type_repr(&self, node: &SyntaxNode, label: &str) -> Result<leo_ast::TypeNode> {
+        match children(node).find(|n| n.kind().is_type()) {
+            Some(type_node) => self.to_type_repr(&type_node),
+            None => {
+                let span = self.to_span(node);
+                self.emit_unexpected_str(label, node.text(), span);
+                Ok(leo_ast::TypeNode::new(self.interner, leo_ast::TypeKind::Err, span))
+            }
+        }
+    }
+
+    /// Convert a TYPE_PRIMITIVE node to a `TypeKind`.
+    fn type_primitive_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_PRIMITIVE);
         let prim = tokens(node)
             .next()
@@ -300,10 +315,10 @@ impl<'a> ConversionContext<'a> {
         Ok(prim)
     }
 
-    /// Convert a TYPE_LOCATOR node to a Type.
+    /// Convert a TYPE_LOCATOR node to a `TypeKind`.
     ///
     /// TYPE_LOCATOR represents `program.aleo::Type` or `program.aleo::module::Type`.
-    fn type_locator_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    fn type_locator_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_LOCATOR);
 
         // Collect all IDENT tokens; the first is the program name and the rest
@@ -327,7 +342,7 @@ impl<'a> ConversionContext<'a> {
         let program_id = leo_ast::ProgramId { name: program_ident, network: network_ident };
 
         if all_idents.len() < 2 {
-            // program.aleo without ::Type — a program ID used as a type reference.
+            // program.aleo without `::Type` — a program ID used as a type reference.
             let span = self.content_span(node);
             let path = leo_ast::Path::new(Some(program_id), Vec::new(), program_ident, span, self.builder.next_id());
             Ok(leo_ast::CompositeType { path, const_arguments: Vec::new() }.into())
@@ -344,10 +359,10 @@ impl<'a> ConversionContext<'a> {
         }
     }
 
-    /// Convert a TYPE_PATH node to a Type.
+    /// Convert a TYPE_PATH node to a `TypeKind`.
     ///
     /// TYPE_PATH represents named/composite types: `Foo`, `Foo::Bar`, `Foo::[N]`.
-    fn type_path_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    fn type_path_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_PATH);
 
         // Regular path: collect identifiers and const generic args
@@ -379,7 +394,7 @@ impl<'a> ConversionContext<'a> {
     }
 
     /// Convert a TYPE_ARRAY node to an ArrayType.
-    fn type_array_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    fn type_array_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_ARRAY);
 
         match children(node).find(|n| n.kind().is_type()) {
@@ -392,13 +407,13 @@ impl<'a> ConversionContext<'a> {
                 // Error recovery: the rowan parser produced a TYPE_ARRAY with no element type.
                 let span = self.to_span(node);
                 self.emit_unexpected_str("element type", node.text(), span);
-                Ok(leo_ast::Type::Err)
+                Ok(leo_ast::TypeKind::Err)
             }
         }
     }
 
     /// Convert a TYPE_VECTOR node to a VectorType.
-    fn type_vector_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    fn type_vector_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_VECTOR);
 
         match children(node).find(|n| n.kind().is_type()) {
@@ -411,7 +426,7 @@ impl<'a> ConversionContext<'a> {
                 // (e.g. `[]` or `[1]` where the content is not a valid type).
                 let span = self.to_span(node);
                 self.emit_unexpected_str("element type", node.text(), span);
-                Ok(leo_ast::Type::Err)
+                Ok(leo_ast::TypeKind::Err)
             }
         }
     }
@@ -463,7 +478,7 @@ impl<'a> ConversionContext<'a> {
     }
 
     /// Convert a TYPE_TUPLE node to a TupleType or Unit.
-    fn type_tuple_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    fn type_tuple_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_TUPLE);
         let span = self.to_span(node);
 
@@ -471,7 +486,7 @@ impl<'a> ConversionContext<'a> {
 
         if type_nodes.is_empty() {
             // Unit type: ()
-            return Ok(leo_ast::Type::Unit);
+            return Ok(leo_ast::TypeKind::Unit);
         }
 
         let elements = type_nodes.iter().map(|n| self.to_type(n)).collect::<Result<Vec<_>>>()?;
@@ -487,17 +502,17 @@ impl<'a> ConversionContext<'a> {
     }
 
     /// Convert a TYPE_OPTIONAL node to an OptionalType.
-    fn type_optional_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    fn type_optional_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_OPTIONAL);
 
         let inner_node = children(node).find(|n| n.kind().is_type()).expect("optional type should have inner type");
 
         let inner = self.to_type(&inner_node)?;
-        Ok(leo_ast::Type::Optional(leo_ast::OptionalType { inner: Box::new(inner) }))
+        Ok(leo_ast::TypeKind::Optional(leo_ast::OptionalType { inner: Box::new(inner) }))
     }
 
     /// Convert a TYPE_FINAL node to a FutureType.
-    fn type_final_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    fn type_final_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_FINAL);
 
         // Collect any type children (for Future<fn(T) -> R> syntax)
@@ -514,12 +529,12 @@ impl<'a> ConversionContext<'a> {
         Ok(leo_ast::FutureType::new(types, None, true).into())
     }
 
-    fn type_mapping_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::Type> {
+    fn type_mapping_to_type(&self, node: &SyntaxNode) -> Result<leo_ast::TypeKind> {
         debug_assert_eq!(node.kind(), TYPE_MAPPING);
         let mut type_nodes = children(node).filter(|n| n.kind().is_type());
-        let key = type_nodes.next().map(|n| self.to_type(&n)).transpose()?.unwrap_or(leo_ast::Type::Err);
-        let value = type_nodes.next().map(|n| self.to_type(&n)).transpose()?.unwrap_or(leo_ast::Type::Err);
-        Ok(leo_ast::Type::Mapping(leo_ast::MappingType { key: Box::new(key), value: Box::new(value) }))
+        let key = type_nodes.next().map(|n| self.to_type(&n)).transpose()?.unwrap_or(leo_ast::TypeKind::Err);
+        let value = type_nodes.next().map(|n| self.to_type(&n)).transpose()?.unwrap_or(leo_ast::TypeKind::Err);
+        Ok(leo_ast::TypeKind::Mapping(leo_ast::MappingType { key: Box::new(key), value: Box::new(value) }))
     }
 
     // =========================================================================
@@ -558,9 +573,13 @@ impl<'a> ConversionContext<'a> {
             PATH_EXPR => self.path_expr_to_expression(node)?,
             PATH_LOCATOR_EXPR => self.path_locator_expr_to_expression(node)?,
             PROGRAM_REF_EXPR => self.program_ref_expr_to_expression(node)?,
-            SELF_EXPR => self.keyword_expr_to_path(node, sym::SelfLower)?,
-            BLOCK_KW_EXPR => self.keyword_expr_to_path(node, sym::block)?,
-            NETWORK_KW_EXPR => self.keyword_expr_to_path(node, sym::network)?,
+            SELF_EXPR => self.error_removed_context_keyword(node, sym::SelfLower),
+            BLOCK_KW_EXPR => self.error_removed_context_keyword(node, sym::block),
+            NETWORK_KW_EXPR => self.error_removed_context_keyword(node, sym::network),
+            SELF_UPPER_EXPR => {
+                self.handler.emit_err(crate::errors::reserved_identifier("Self", self.trimmed_span(node)));
+                self.error_expression(span)
+            }
             PAREN_EXPR => {
                 // Parenthesized expression - just unwrap
                 if let Some(inner) = children(node).find(|n| n.kind().is_expression()) {
@@ -787,7 +806,7 @@ impl<'a> ConversionContext<'a> {
     fn extract_dynamic_call_types(
         &self,
         callee_node: &SyntaxNode,
-        type_parameters: &[(leo_ast::Type, Span)],
+        type_parameters: &[(leo_ast::TypeKind, Span)],
     ) -> Result<(AnnotatedTypes, AnnotatedTypes)> {
         let Some(arg_list) = children(callee_node).find(|n| n.kind() == CONST_ARG_LIST) else {
             return Ok((Vec::new(), Vec::new()));
@@ -824,8 +843,8 @@ impl<'a> ConversionContext<'a> {
                 // - Tuple `(T1, T2)` is unpacked into individual elements.
                 // - Anything else is a single return type.
                 match ty {
-                    leo_ast::Type::Unit => {}
-                    leo_ast::Type::Tuple(tuple) => {
+                    leo_ast::TypeKind::Unit => {}
+                    leo_ast::TypeKind::Tuple(tuple) => {
                         for elem in tuple.elements() {
                             return_types.push((*mode, elem.clone(), *sp));
                         }
@@ -857,7 +876,7 @@ impl<'a> ConversionContext<'a> {
 
         // Collect arguments (remaining expression children)
         let arguments = children(node)
-            .skip(1)  // Skip the callee
+            .skip(1) // Skip the callee
             .filter(|n| n.kind().is_expression())
             .map(|n| self.to_expression(&n))
             .collect::<Result<Vec<_>>>()?;
@@ -883,6 +902,25 @@ impl<'a> ConversionContext<'a> {
                     id,
                 }
                 .into());
+            }
+            // `Program::*` used to desugar to the program-metadata intrinsics. The replacement
+            // lives in `std::prog::*`; emit a tailored migration error.
+            if module == sym::ProgramCore {
+                let replacement = match name {
+                    sym::checksum => Some("std::prog::checksum::[PROG_ID]()"),
+                    sym::edition => Some("std::prog::edition::[PROG_ID]()"),
+                    sym::program_owner => Some("std::prog::program_owner::[PROG_ID]()"),
+                    sym::function_checksum => Some("std::prog::function_checksum::[PROG_ID, FN_NAME]()"),
+                    _ => None,
+                };
+                if let Some(replacement) = replacement {
+                    self.handler.emit_err(crate::errors::obsolete_context_access(
+                        format!("Program::{}", name),
+                        replacement,
+                        span,
+                    ));
+                    return Ok(self.error_expression(span));
+                }
             }
         }
 
@@ -1122,7 +1160,12 @@ impl<'a> ConversionContext<'a> {
         let (inner, first_child_kind) = match children(node).find(|n| n.kind().is_expression()) {
             Some(n) => {
                 let kind = n.kind();
-                (self.to_expression(&n)?, kind)
+                let lowered = if matches!(kind, SELF_EXPR | BLOCK_KW_EXPR | NETWORK_KW_EXPR) {
+                    self.error_expression(self.trimmed_span(&n))
+                } else {
+                    self.to_expression(&n)?
+                };
+                (lowered, kind)
             }
             None => {
                 self.emit_unexpected_str("expression in field access", node.text(), span);
@@ -1131,7 +1174,7 @@ impl<'a> ConversionContext<'a> {
         };
 
         // Get the field name (token after DOT).
-        // Field names can be identifiers or keywords (e.g. `self.address`).
+        // Field names can be identifiers or keywords.
         let field_token = match find_name_after_dot(node) {
             Some(token) => token,
             None => {
@@ -1152,37 +1195,42 @@ impl<'a> ConversionContext<'a> {
             return Ok(leo_ast::Literal::address(full_name, span, id).into());
         }
 
-        // Check for special accesses: self.caller, block.height, etc.
+        // `self.X`, `block.X`, and `network.X` used to be sugar for execution-context
+        // intrinsics. The sugar has been removed; the same values are now reached
+        // through the `std::ctx` module. Emit a targeted migration error that names
+        // the replacement.
         let field_name = Symbol::intern(field_token.text());
-
-        let special = match (first_child_kind, field_name) {
-            (SELF_EXPR, sym::address) => Some(sym::_self_address),
-            (SELF_EXPR, sym::caller) => Some(sym::_self_caller),
-            (SELF_EXPR, sym::checksum) => Some(sym::_self_checksum),
-            (SELF_EXPR, sym::edition) => Some(sym::_self_edition),
-            (SELF_EXPR, sym::id) => Some(sym::_self_id),
-            (SELF_EXPR, sym::program_owner) => Some(sym::_self_program_owner),
-            (SELF_EXPR, sym::signer) => Some(sym::_self_signer),
-            (BLOCK_KW_EXPR, sym::height) => Some(sym::_block_height),
-            (BLOCK_KW_EXPR, sym::timestamp) => Some(sym::_block_timestamp),
-            (NETWORK_KW_EXPR, sym::id) => Some(sym::_network_id),
-            (SELF_EXPR | BLOCK_KW_EXPR | NETWORK_KW_EXPR, _) => {
-                self.handler.emit_err(crate::errors::custom("Unsupported special access", span));
-                return Ok(self.error_expression(span));
-            }
+        let removed_access = match (first_child_kind, field_name) {
+            (SELF_EXPR, sym::address) => Some(("self.address", "std::ctx::addr()")),
+            (SELF_EXPR, sym::caller) => Some(("self.caller", "std::ctx::caller()")),
+            (SELF_EXPR, sym::checksum) => Some(("self.checksum", "std::ctx::checksum()")),
+            (SELF_EXPR, sym::edition) => Some(("self.edition", "std::ctx::edition()")),
+            (SELF_EXPR, sym::id) => Some(("self.id", "std::ctx::id()")),
+            (SELF_EXPR, sym::program_owner) => Some(("self.program_owner", "std::ctx::program_owner()")),
+            (SELF_EXPR, sym::signer) => Some(("self.signer", "std::ctx::signer()")),
+            (BLOCK_KW_EXPR, sym::height) => Some(("block.height", "std::ctx::block_height()")),
+            (BLOCK_KW_EXPR, sym::timestamp) => Some(("block.timestamp", "std::ctx::block_timestamp()")),
+            (NETWORK_KW_EXPR, sym::id) => Some(("network.id", "std::ctx::network_id()")),
             _ => None,
         };
-
-        if let Some(intrinsic_name) = special {
-            return Ok(self.intrinsic_expression(intrinsic_name, Vec::new(), span));
+        if let Some((old, replacement)) = removed_access {
+            self.handler.emit_err(crate::errors::obsolete_context_access(old, replacement, span));
+            return Ok(self.error_expression(span));
+        }
+        if matches!(first_child_kind, SELF_EXPR | BLOCK_KW_EXPR | NETWORK_KW_EXPR) {
+            let keyword = match first_child_kind {
+                SELF_EXPR => "self",
+                BLOCK_KW_EXPR => "block",
+                NETWORK_KW_EXPR => "network",
+                _ => unreachable!(),
+            };
+            self.handler.emit_err(crate::errors::obsolete_context_keyword(keyword, span));
+            return Ok(self.error_expression(span));
         }
 
-        // Field token may be an identifier or keyword (e.g. `self.address`).
-        let name = leo_ast::Identifier {
-            name: Symbol::intern(field_token.text()),
-            span: self.token_span(&field_token),
-            id: self.builder.next_id(),
-        };
+        // Field token may be an identifier or keyword (e.g. `obj.aleo`).
+        let field_span = self.token_span(&field_token);
+        let name = leo_ast::Identifier { name: field_name, span: field_span, id: self.builder.next_id() };
         Ok(leo_ast::MemberAccess { inner, name, span, id }.into())
     }
 
@@ -1231,7 +1279,7 @@ impl<'a> ConversionContext<'a> {
             self.emit_unexpected_str("type in cast expression", node.text(), span);
             return Ok(self.error_expression(span));
         };
-        let type_ = self.to_type(&type_node)?;
+        let type_ = self.to_type_repr(&type_node)?;
 
         Ok(leo_ast::CastExpression { expression, type_, span, id }.into())
     }
@@ -1351,8 +1399,13 @@ impl<'a> ConversionContext<'a> {
             .filter(|n| matches!(n.kind(), STRUCT_FIELD_INIT | STRUCT_FIELD_SHORTHAND))
             .map(|n| self.struct_field_init_to_member(&n))
             .collect::<Result<Vec<_>>>()?;
+        let base = children(node)
+            .find(|n| n.kind() == STRUCT_BASE_UPDATE)
+            .and_then(|n| children(&n).find(|c| c.kind().is_expression()))
+            .map(|n| self.to_expression(&n).map(Box::new))
+            .transpose()?;
         let (_type_parameters, const_arguments) = self.extract_const_arg_list(node)?;
-        Ok(leo_ast::CompositeExpression { path, const_arguments, members, span, id }.into())
+        Ok(leo_ast::CompositeExpression { path, const_arguments, members, base, span, id }.into())
     }
 
     /// Convert a STRUCT_EXPR node to a CompositeExpression.
@@ -1523,12 +1576,19 @@ impl<'a> ConversionContext<'a> {
         Ok(leo_ast::Expression::Path(path))
     }
 
-    /// Convert a keyword expression (SELF_EXPR, BLOCK_KW_EXPR, NETWORK_KW_EXPR) to a Path.
-    fn keyword_expr_to_path(&self, node: &SyntaxNode, name: Symbol) -> Result<leo_ast::Expression> {
+    /// Emit the migration error for a bare reference to one of the removed context keywords
+    /// (`self`, `block`, `network`) and return an error placeholder expression. The sugar that
+    /// turned these into expressions has been replaced by the `std::ctx` module.
+    fn error_removed_context_keyword(&self, node: &SyntaxNode, name: Symbol) -> leo_ast::Expression {
         let span = self.trimmed_span(node);
-        let ident = leo_ast::Identifier { name, span, id: self.builder.next_id() };
-        let path = leo_ast::Path::new(None, Vec::new(), ident, span, self.builder.next_id());
-        Ok(leo_ast::Expression::Path(path))
+        let keyword = match name {
+            sym::SelfLower => "self",
+            sym::block => "block",
+            sym::network => "network",
+            _ => unreachable!("error_removed_context_keyword called with non-context keyword"),
+        };
+        self.handler.emit_err(crate::errors::obsolete_context_keyword(keyword, span));
+        self.error_expression(span)
     }
 
     /// Convert a FINAL_EXPR node to an Expression.
@@ -1713,7 +1773,7 @@ impl<'a> ConversionContext<'a> {
         };
 
         // Find type annotation if present
-        let type_ = children(node).find(|n| n.kind().is_type()).map(|n| self.to_type(&n)).transpose()?;
+        let type_ = children(node).find(|n| n.kind().is_type()).map(|n| self.to_type_repr(&n)).transpose()?;
 
         let value = self.require_expression(node, "value in let statement")?;
 
@@ -1766,11 +1826,12 @@ impl<'a> ConversionContext<'a> {
 
         let place = self.require_ident(node, "name in const declaration");
 
-        let type_ = self.require_type(node, "type in const declaration")?;
+        let type_ = self.require_type_repr(node, "type in const declaration")?;
 
         let value = self.require_expression(node, "value in const declaration")?;
 
-        Ok(leo_ast::ConstDeclaration { place, type_, value, span, id }.into())
+        // Visibility doesn't apply to statement-level `const`s.
+        Ok(leo_ast::ConstDeclaration { is_exported: None, place, type_, value, span, id }.into())
     }
 
     /// Convert a RETURN_STMT node to a ReturnStatement.
@@ -1914,7 +1975,7 @@ impl<'a> ConversionContext<'a> {
         let variable = self.require_ident(node, "variable in for statement");
 
         // Get optional type annotation
-        let type_ = children(node).find(|n| n.kind().is_type()).map(|n| self.to_type(&n)).transpose()?;
+        let type_ = children(node).find(|n| n.kind().is_type()).map(|n| self.to_type_repr(&n)).transpose()?;
 
         // Get range expressions (before and after ..)
         let mut exprs = children(node).filter(|n| n.kind().is_expression());
@@ -1977,15 +2038,45 @@ impl<'a> ConversionContext<'a> {
                 functions.push((func.identifier.name, func));
             }
             STRUCT_DEF | RECORD_DEF => {
-                let composite = self.to_composite(item)?;
+                if item.kind() == STRUCT_DEF && is_in_program_block {
+                    let span = self.non_trivia_span(item);
+                    self.handler.emit_err(
+                        crate::errors::custom(
+                            "`struct` definitions are not allowed inside a `program { ... }` block.",
+                            span,
+                        )
+                        .with_help("Move the declaration outside the `program` block, to the top level of the file."),
+                    );
+                }
+                let composite = self.to_composite(item, is_in_program_block)?;
                 composites.push((composite.identifier.name, composite));
             }
             GLOBAL_CONST => {
-                let global_const = self.to_global_const(item)?;
+                if is_in_program_block {
+                    let span = self.non_trivia_span(item);
+                    self.handler.emit_err(
+                        crate::errors::custom(
+                            "`const` declarations are not allowed inside a `program { ... }` block.",
+                            span,
+                        )
+                        .with_help("Move the declaration outside the `program` block, to the top level of the file."),
+                    );
+                }
+                let global_const = self.to_global_const(item, is_in_program_block)?;
                 consts.push((global_const.place.name, global_const));
             }
             INTERFACE_DEF => {
-                let interface = self.to_interface(item)?;
+                if is_in_program_block {
+                    let span = self.non_trivia_span(item);
+                    self.handler.emit_err(
+                        crate::errors::custom(
+                            "`interface` definitions are not allowed inside a `program { ... }` block.",
+                            span,
+                        )
+                        .with_help("Move the declaration outside the `program` block, to the top level of the file."),
+                    );
+                }
+                let interface = self.to_interface(item, is_in_program_block)?;
                 interfaces.push((interface.identifier.name, interface));
             }
             _ => {}
@@ -2005,11 +2096,11 @@ impl<'a> ConversionContext<'a> {
         if is_library_item(item.kind()) {
             match item.kind() {
                 GLOBAL_CONST => {
-                    let global_const = self.to_global_const(item)?;
+                    let global_const = self.to_global_const(item, false)?;
                     consts.push((global_const.place.name, global_const));
                 }
                 STRUCT_DEF => {
-                    let composite = self.to_composite(item)?;
+                    let composite = self.to_composite(item, false)?;
                     structs.push((composite.identifier.name, composite));
                 }
                 FUNCTION_DEF => {
@@ -2018,7 +2109,7 @@ impl<'a> ConversionContext<'a> {
                     functions.push((func.identifier.name, func));
                 }
                 INTERFACE_DEF => {
-                    let interface = self.to_interface(item)?;
+                    let interface = self.to_interface(item, false)?;
                     interfaces.push((interface.identifier.name, interface));
                 }
                 _ => {}
@@ -2370,16 +2461,23 @@ impl<'a> ConversionContext<'a> {
                 Some(start) => Span::new(start, type_span.hi),
                 None => type_span,
             };
-            let output =
-                vec![leo_ast::Output { mode, type_: type_.clone(), span: output_span, id: self.builder.next_id() }];
+            let output = vec![leo_ast::Output {
+                mode,
+                type_: leo_ast::TypeNode::new(self.interner, type_.clone(), type_span),
+                span: output_span,
+                id: self.builder.next_id(),
+            }];
             (output, type_)
         } else {
-            (Vec::new(), leo_ast::Type::Unit)
+            (Vec::new(), leo_ast::TypeKind::Unit)
         };
 
         let block = self.require_block(node, span)?;
 
+        let is_exported = if is_in_program_block { None } else { Some(has_export(node)) };
+
         Ok(leo_ast::Function {
+            is_exported,
             annotations,
             variant,
             identifier,
@@ -2415,8 +2513,8 @@ impl<'a> ConversionContext<'a> {
         (mode, mode_start)
     }
 
-    /// Convert a RETURN_TYPE node (tuple return) to (Vec<Output>, Type).
-    fn return_type_to_outputs(&self, node: &SyntaxNode) -> Result<(Vec<leo_ast::Output>, leo_ast::Type)> {
+    /// Convert a RETURN_TYPE node (tuple return) to `(Vec<Output>, TypeKind)`.
+    fn return_type_to_outputs(&self, node: &SyntaxNode) -> Result<(Vec<leo_ast::Output>, leo_ast::TypeKind)> {
         debug_assert_eq!(node.kind(), RETURN_TYPE);
 
         // RETURN_TYPE contains: L_PAREN [vis? TYPE_*]+ R_PAREN
@@ -2442,7 +2540,7 @@ impl<'a> ConversionContext<'a> {
                     };
                     outputs.push(leo_ast::Output {
                         mode: current_mode,
-                        type_,
+                        type_: leo_ast::TypeNode::new(self.interner, type_, type_span),
                         span: output_span,
                         id: self.builder.next_id(),
                     });
@@ -2453,9 +2551,9 @@ impl<'a> ConversionContext<'a> {
         }
 
         let output_type = match outputs.len() {
-            0 => leo_ast::Type::Unit,
-            1 => outputs[0].type_.clone(),
-            _ => leo_ast::TupleType::new(outputs.iter().map(|o| o.type_.clone()).collect()).into(),
+            0 => leo_ast::TypeKind::Unit,
+            1 => outputs[0].type_.kind().clone(),
+            _ => leo_ast::TupleType::new(outputs.iter().map(|o| o.type_.kind().clone()).collect()).into(),
         };
 
         Ok((outputs, output_type))
@@ -2517,7 +2615,7 @@ impl<'a> ConversionContext<'a> {
         let identifier = self.require_ident(node, "parameter name");
         self.validate_identifier(&identifier);
 
-        let type_ = self.require_type(node, "parameter type")?;
+        let type_ = self.require_type_repr(node, "parameter type")?;
 
         Ok(leo_ast::Input { identifier, mode, type_, span, id })
     }
@@ -2534,7 +2632,7 @@ impl<'a> ConversionContext<'a> {
 
                 let identifier = self.require_ident(&n, "const parameter name");
 
-                let type_ = self.require_type(&n, "const parameter type")?;
+                let type_ = self.require_type_repr(&n, "const parameter type")?;
 
                 Ok(leo_ast::ConstParameter { identifier, type_, span, id })
             })
@@ -2551,7 +2649,7 @@ impl<'a> ConversionContext<'a> {
     }
 
     /// Convert a STRUCT_DEF or RECORD_DEF node to a Composite.
-    fn to_composite(&self, node: &SyntaxNode) -> Result<leo_ast::Composite> {
+    fn to_composite(&self, node: &SyntaxNode, is_in_program_block: bool) -> Result<leo_ast::Composite> {
         debug_assert!(matches!(node.kind(), STRUCT_DEF | RECORD_DEF));
         let span = self.non_trivia_span(node);
         let id = self.builder.next_id();
@@ -2574,7 +2672,9 @@ impl<'a> ConversionContext<'a> {
             .map(|n| self.struct_member_to_member(&n))
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(leo_ast::Composite { identifier, const_parameters, members, is_record, span, id })
+        let is_exported = if is_record || is_in_program_block { None } else { Some(has_export(node)) };
+
+        Ok(leo_ast::Composite { is_exported, identifier, const_parameters, members, is_record, span, id })
     }
 
     /// Convert a STRUCT_MEMBER node to a Member.
@@ -2591,13 +2691,13 @@ impl<'a> ConversionContext<'a> {
         let identifier = self.require_ident(node, "member name");
         self.validate_identifier(&identifier);
 
-        let type_ = self.require_type(node, "member type")?;
+        let type_ = self.require_type_repr(node, "member type")?;
 
         Ok(leo_ast::Member { mode, identifier, type_, span, id })
     }
 
     /// Convert a GLOBAL_CONST node to a ConstDeclaration.
-    fn to_global_const(&self, node: &SyntaxNode) -> Result<leo_ast::ConstDeclaration> {
+    fn to_global_const(&self, node: &SyntaxNode, is_in_program_block: bool) -> Result<leo_ast::ConstDeclaration> {
         debug_assert_eq!(node.kind(), GLOBAL_CONST);
         let span = self.non_trivia_span(node);
         let id = self.builder.next_id();
@@ -2605,18 +2705,20 @@ impl<'a> ConversionContext<'a> {
         let place = self.require_ident(node, "const name");
         self.validate_definition_identifier(&place);
 
-        let type_ = self.require_type(node, "const type")?;
+        let type_ = self.require_type_repr(node, "const type")?;
 
         let value = self.require_expression(node, "const value")?;
 
-        Ok(leo_ast::ConstDeclaration { place, type_, value, span, id })
+        let is_exported = if is_in_program_block { None } else { Some(has_export(node)) };
+
+        Ok(leo_ast::ConstDeclaration { is_exported, place, type_, value, span, id })
     }
 
     /// Parse a MAPPING_DEF node, returning its constituent parts.
     fn parse_mapping_def(
         &self,
         node: &SyntaxNode,
-    ) -> Result<(leo_ast::Identifier, leo_ast::Type, leo_ast::Type, Span, NodeID)> {
+    ) -> Result<(leo_ast::Identifier, leo_ast::TypeKind, leo_ast::TypeKind, Span, NodeID)> {
         debug_assert_eq!(node.kind(), MAPPING_DEF);
         let span = self.non_trivia_span(node);
         let id = self.builder.next_id();
@@ -2626,14 +2728,14 @@ impl<'a> ConversionContext<'a> {
             Some(key_node) => self.to_type(&key_node)?,
             None => {
                 self.emit_unexpected_str("key type in mapping", node.text(), span);
-                leo_ast::Type::Err
+                leo_ast::TypeKind::Err
             }
         };
         let value_type = match type_nodes.next() {
             Some(value_node) => self.to_type(&value_node)?,
             None => {
                 self.emit_unexpected_str("value type in mapping", node.text(), span);
-                leo_ast::Type::Err
+                leo_ast::TypeKind::Err
             }
         };
         Ok((identifier, key_type, value_type, span, id))
@@ -2652,12 +2754,12 @@ impl<'a> ConversionContext<'a> {
     }
 
     /// Parse a STORAGE_DEF node, returning its constituent parts.
-    fn parse_storage_def(&self, node: &SyntaxNode) -> Result<(leo_ast::Identifier, leo_ast::Type, Span, NodeID)> {
+    fn parse_storage_def(&self, node: &SyntaxNode) -> Result<(leo_ast::Identifier, leo_ast::TypeNode, Span, NodeID)> {
         debug_assert_eq!(node.kind(), STORAGE_DEF);
         let span = self.non_trivia_span(node);
         let id = self.builder.next_id();
         let identifier = self.require_ident(node, "name in storage");
-        let type_ = self.require_type(node, "type in storage")?;
+        let type_ = self.require_type_repr(node, "type in storage")?;
         Ok((identifier, type_, span, id))
     }
 
@@ -2690,7 +2792,7 @@ impl<'a> ConversionContext<'a> {
     // =========================================================================
 
     /// Convert an INTERFACE_DEF node to an Interface.
-    fn to_interface(&self, node: &SyntaxNode) -> Result<leo_ast::Interface> {
+    fn to_interface(&self, node: &SyntaxNode, is_in_program_block: bool) -> Result<leo_ast::Interface> {
         debug_assert_eq!(node.kind(), INTERFACE_DEF);
         let span = self.to_span(node);
 
@@ -2732,7 +2834,10 @@ impl<'a> ConversionContext<'a> {
             }
         }
 
+        let is_exported = if is_in_program_block { None } else { Some(has_export(node)) };
+
         Ok(leo_ast::Interface {
+            is_exported,
             identifier,
             parents,
             span,
@@ -2778,7 +2883,12 @@ impl<'a> ConversionContext<'a> {
                 Some(start) => Span::new(start, type_span.hi),
                 None => type_span,
             };
-            vec![leo_ast::Output { mode, type_, span: output_span, id: self.builder.next_id() }]
+            vec![leo_ast::Output {
+                mode,
+                type_: leo_ast::TypeNode::new(self.interner, type_, type_span),
+                span: output_span,
+                id: self.builder.next_id(),
+            }]
         } else {
             Vec::new()
         };
@@ -2814,7 +2924,9 @@ impl<'a> ConversionContext<'a> {
         // Check for redundant prototypes: `{ .. }` or `{ owner: address, .. }`.
         let is_redundant = members.is_empty()
             || members.iter().all(|m| {
-                m.identifier.name == sym::owner && m.type_ == leo_ast::Type::Address && m.mode == leo_ast::Mode::None
+                m.identifier.name == sym::owner
+                    && *m.type_.kind() == leo_ast::TypeKind::Address
+                    && m.mode == leo_ast::Mode::None
             });
         if is_redundant && !members.is_empty() {
             // Strip the owner-only members since they are implicit.
@@ -2957,6 +3069,7 @@ fn emit_parse_errors(
 fn conversion_context<'a>(
     handler: &'a Handler,
     node_builder: &'a NodeBuilder,
+    interner: &'a TypeInterner,
     lex_errors: &[leo_parser_rowan::LexError],
     parse_errors: &[leo_parser_rowan::ParseError],
     start_pos: u32,
@@ -2965,20 +3078,28 @@ fn conversion_context<'a>(
     emit_lex_errors(handler, lex_errors, start_pos, source_len);
     emit_parse_errors(handler, parse_errors, start_pos, source_len, lex_errors);
     let has_errors = !parse_errors.is_empty() || !lex_errors.is_empty();
-    ConversionContext::new(handler, node_builder, start_pos, has_errors)
+    ConversionContext::new(handler, node_builder, interner, start_pos, has_errors)
 }
 
 /// Parses a single expression from source code.
 pub fn parse_expression(
     handler: Handler,
     node_builder: &NodeBuilder,
+    interner: &TypeInterner,
     source: &str,
     start_pos: u32,
     _network: NetworkName,
 ) -> Result<leo_ast::Expression> {
     let parse = leo_parser_rowan::parse_expression_entry(source);
-    let ctx =
-        conversion_context(&handler, node_builder, parse.lex_errors(), parse.errors(), start_pos, source.len() as u32);
+    let ctx = conversion_context(
+        &handler,
+        node_builder,
+        interner,
+        parse.lex_errors(),
+        parse.errors(),
+        start_pos,
+        source.len() as u32,
+    );
     ctx.to_expression(&parse.syntax())
 }
 
@@ -2986,20 +3107,30 @@ pub fn parse_expression(
 pub fn parse_statement(
     handler: Handler,
     node_builder: &NodeBuilder,
+    interner: &TypeInterner,
     source: &str,
     start_pos: u32,
     _network: NetworkName,
 ) -> Result<leo_ast::Statement> {
     let parse = leo_parser_rowan::parse_statement_entry(source);
-    let ctx =
-        conversion_context(&handler, node_builder, parse.lex_errors(), parse.errors(), start_pos, source.len() as u32);
+    let ctx = conversion_context(
+        &handler,
+        node_builder,
+        interner,
+        parse.lex_errors(),
+        parse.errors(),
+        start_pos,
+        source.len() as u32,
+    );
     ctx.to_statement(&parse.syntax())
 }
 
 /// Parses a module (non-main source file) into a Module AST.
+#[allow(clippy::too_many_arguments)]
 pub fn parse_module(
     handler: Handler,
     node_builder: &NodeBuilder,
+    interner: &TypeInterner,
     source: &str,
     start_pos: u32,
     program_name: Symbol,
@@ -3007,8 +3138,15 @@ pub fn parse_module(
     _network: NetworkName,
 ) -> Result<leo_ast::Module> {
     let parse = leo_parser_rowan::parse_module_entry(source);
-    let ctx =
-        conversion_context(&handler, node_builder, parse.lex_errors(), parse.errors(), start_pos, source.len() as u32);
+    let ctx = conversion_context(
+        &handler,
+        node_builder,
+        interner,
+        parse.lex_errors(),
+        parse.errors(),
+        start_pos,
+        source.len() as u32,
+    );
     ctx.to_module(&parse.syntax(), program_name, path)
 }
 
@@ -3016,6 +3154,7 @@ pub fn parse_module(
 pub fn parse_program(
     handler: Handler,
     node_builder: &NodeBuilder,
+    interner: &TypeInterner,
     source: &SourceFile,
     modules: &[std::rc::Rc<SourceFile>],
     _network: NetworkName,
@@ -3025,6 +3164,7 @@ pub fn parse_program(
     let main_context = conversion_context(
         &handler,
         node_builder,
+        interner,
         parse.lex_errors(),
         parse.errors(),
         source.absolute_start,
@@ -3044,6 +3184,7 @@ pub fn parse_program(
         let module_context = conversion_context(
             &handler,
             node_builder,
+            interner,
             module_parse.lex_errors(),
             module_parse.errors(),
             module.absolute_start,
@@ -3052,7 +3193,7 @@ pub fn parse_program(
 
         if let Some(key) = compute_module_key(&module.name, root_dir.as_deref()) {
             for segment in &key {
-                if symbol_is_keyword(*segment) {
+                if leo_parser_rowan::is_keyword(&segment.to_string()) {
                     return Err(crate::errors::keyword_used_as_module_name(key.iter().format("::"), segment).into());
                 }
             }
@@ -3068,6 +3209,7 @@ pub fn parse_program(
 pub fn parse_library(
     handler: Handler,
     node_builder: &NodeBuilder,
+    interner: &TypeInterner,
     library_name: Symbol,
     source: &SourceFile,
     modules: &[std::rc::Rc<SourceFile>],
@@ -3078,6 +3220,7 @@ pub fn parse_library(
     let main_context = conversion_context(
         &handler,
         node_builder,
+        interner,
         parse.lex_errors(),
         parse.errors(),
         source.absolute_start,
@@ -3098,6 +3241,7 @@ pub fn parse_library(
         let module_context = conversion_context(
             &handler,
             node_builder,
+            interner,
             module_parse.lex_errors(),
             module_parse.errors(),
             module_sf.absolute_start,
@@ -3106,7 +3250,7 @@ pub fn parse_library(
 
         if let Some(key) = compute_module_key(&module_sf.name, root_dir.as_deref()) {
             for segment in &key {
-                if symbol_is_keyword(*segment) {
+                if leo_parser_rowan::is_keyword(&segment.to_string()) {
                     return Err(crate::errors::keyword_used_as_module_name(key.iter().format("::"), segment).into());
                 }
             }
@@ -3132,6 +3276,11 @@ fn children(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> + '_ {
 /// Get non-trivia tokens from a node.
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> + '_ {
     node.children_with_tokens().filter_map(|elem| elem.into_token()).filter(|t| !t.kind().is_trivia())
+}
+
+/// True when `node` carries a direct `export` keyword child.
+fn has_export(node: &SyntaxNode) -> bool {
+    tokens(node).any(|t| t.kind() == KW_EXPORT)
 }
 
 /// Find the first IDENT or keyword token after the DOT in a node.
@@ -3212,29 +3361,28 @@ fn is_assign_op(kind: SyntaxKind) -> bool {
             | PIPE2_EQ
     )
 }
-
-/// Convert a type keyword to a primitive Type, if applicable.
-fn keyword_to_primitive_type(kind: SyntaxKind) -> Option<leo_ast::Type> {
+/// Convert a type keyword to a primitive `TypeKind`, if applicable.
+fn keyword_to_primitive_type(kind: SyntaxKind) -> Option<leo_ast::TypeKind> {
     let ty = match kind {
-        KW_ADDRESS => leo_ast::Type::Address,
-        KW_BOOL => leo_ast::Type::Boolean,
-        KW_FIELD => leo_ast::Type::Field,
-        KW_GROUP => leo_ast::Type::Group,
-        KW_SCALAR => leo_ast::Type::Scalar,
-        KW_SIGNATURE => leo_ast::Type::Signature,
-        KW_STRING => leo_ast::Type::String,
-        KW_DYN => leo_ast::Type::DynRecord,
-        KW_IDENTIFIER => leo_ast::Type::Identifier,
-        KW_U8 => leo_ast::Type::Integer(leo_ast::IntegerType::U8),
-        KW_U16 => leo_ast::Type::Integer(leo_ast::IntegerType::U16),
-        KW_U32 => leo_ast::Type::Integer(leo_ast::IntegerType::U32),
-        KW_U64 => leo_ast::Type::Integer(leo_ast::IntegerType::U64),
-        KW_U128 => leo_ast::Type::Integer(leo_ast::IntegerType::U128),
-        KW_I8 => leo_ast::Type::Integer(leo_ast::IntegerType::I8),
-        KW_I16 => leo_ast::Type::Integer(leo_ast::IntegerType::I16),
-        KW_I32 => leo_ast::Type::Integer(leo_ast::IntegerType::I32),
-        KW_I64 => leo_ast::Type::Integer(leo_ast::IntegerType::I64),
-        KW_I128 => leo_ast::Type::Integer(leo_ast::IntegerType::I128),
+        KW_ADDRESS => leo_ast::TypeKind::Address,
+        KW_BOOL => leo_ast::TypeKind::Boolean,
+        KW_FIELD => leo_ast::TypeKind::Field,
+        KW_GROUP => leo_ast::TypeKind::Group,
+        KW_SCALAR => leo_ast::TypeKind::Scalar,
+        KW_SIGNATURE => leo_ast::TypeKind::Signature,
+        KW_STRING => leo_ast::TypeKind::String,
+        KW_DYN => leo_ast::TypeKind::DynRecord,
+        KW_IDENTIFIER => leo_ast::TypeKind::Identifier,
+        KW_U8 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::U8),
+        KW_U16 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::U16),
+        KW_U32 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::U32),
+        KW_U64 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::U64),
+        KW_U128 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::U128),
+        KW_I8 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::I8),
+        KW_I16 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::I16),
+        KW_I32 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::I32),
+        KW_I64 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::I64),
+        KW_I128 => leo_ast::TypeKind::Integer(leo_ast::IntegerType::I128),
         _ => return None,
     };
     Some(ty)
@@ -3264,62 +3412,6 @@ fn token_to_binary_op(kind: SyntaxKind) -> leo_ast::BinaryOperation {
         CARET => leo_ast::BinaryOperation::Xor,
         _ => panic!("unexpected binary operator: {:?}", kind),
     }
-}
-
-fn symbol_is_keyword(symbol: Symbol) -> bool {
-    matches!(
-        symbol,
-        sym::address
-            | sym::aleo
-            | sym::As
-            | sym::assert
-            | sym::assert_eq
-            | sym::assert_neq
-            | sym::block
-            | sym::bool
-            | sym::Const
-            | sym::constant
-            | sym::constructor
-            | sym::Else
-            | sym::False
-            | sym::field
-            | sym::FnUpper
-            | sym::Fn
-            | sym::For
-            | sym::Final
-            | sym::group
-            | sym::i8
-            | sym::i16
-            | sym::i32
-            | sym::i64
-            | sym::i128
-            | sym::If
-            | sym::import
-            | sym::In
-            | sym::inline
-            | sym::Let
-            | sym::leo
-            | sym::mapping
-            | sym::storage
-            | sym::network
-            | sym::private
-            | sym::program
-            | sym::public
-            | sym::record
-            | sym::Return
-            | sym::scalar
-            | sym::script
-            | sym::SelfLower
-            | sym::signature
-            | sym::string
-            | sym::Struct
-            | sym::True
-            | sym::u8
-            | sym::u16
-            | sym::u32
-            | sym::u64
-            | sym::u128
-    )
 }
 
 /// Computes a module key from a `FileName`, optionally relative to a root directory.

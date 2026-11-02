@@ -1,12 +1,15 @@
-program test.aleo {}
-
-struct Bar {
+program test.aleo {
+    @noupgrade
+    constructor() {}
 }
 
-struct Foo {
+export struct Bar {
+}
+
+export struct Foo {
     a: [u8; 0],
 }
 
-fn main(zz: bool) -> bool {
+export fn main(zz: bool) -> bool {
     return true;
 }

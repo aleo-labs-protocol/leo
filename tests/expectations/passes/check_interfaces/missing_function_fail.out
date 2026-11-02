@@ -3,9 +3,9 @@
     │
   8 │ ╭─▶ program test.aleo: Calculator {
     ┆ ┆   
- 17 │ ├─▶ }
+ 20 │ ├─▶ }
     │ │       
-    │ ╰─────── 
+    │ ╰─────── here
     │     
     │     Help: Add the missing function `subtract` with the exact signature specified in `test.aleo/Calculator`.
 ────╯

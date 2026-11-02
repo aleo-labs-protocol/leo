@@ -16,3 +16,6 @@ function main:
     ternary r0 r5 r7 into r9;
     output r8 as foo.private;
     output r9 as foo.private;
+
+constructor:
+    assert.eq edition 0u16;

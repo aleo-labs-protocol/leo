@@ -15,11 +15,14 @@ program test.aleo: interfaces::HasToken {
     }
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Module: interfaces.leo --- //
 
-interface HasToken {
+export interface HasToken {
     record Token {
         owner: address,
         ..

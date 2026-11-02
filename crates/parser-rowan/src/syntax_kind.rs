@@ -219,10 +219,14 @@ define_syntax_kinds! {
     KW_PUBLIC,
     /// `private`
     KW_PRIVATE,
+    /// `export`
+    KW_EXPORT,
     /// `as`
     KW_AS,
     /// `self`
     KW_SELF,
+    /// `Self`
+    KW_SELF_UPPER,
     /// `assert`
     KW_ASSERT,
     /// `assert_eq`
@@ -393,11 +397,11 @@ define_syntax_kinds! {
     RECORD_DEF,
     /// Struct member declaration.
     STRUCT_MEMBER,
-    /// Public struct member: `public name: Type`
+    /// Public struct member: `public name: TypeKind`
     STRUCT_MEMBER_PUBLIC,
-    /// Private struct member: `private name: Type`
+    /// Private struct member: `private name: TypeKind`
     STRUCT_MEMBER_PRIVATE,
-    /// Constant struct member: `constant name: Type`
+    /// Constant struct member: `constant name: TypeKind`
     STRUCT_MEMBER_CONSTANT,
     /// Mapping definition.
     MAPPING_DEF,
@@ -421,11 +425,11 @@ define_syntax_kinds! {
     ANNOTATION_PAIR,
     /// Parameter in a function signature.
     PARAM,
-    /// Public parameter: `public name: Type`
+    /// Public parameter: `public name: TypeKind`
     PARAM_PUBLIC,
-    /// Private parameter: `private name: Type`
+    /// Private parameter: `private name: TypeKind`
     PARAM_PRIVATE,
-    /// Constant parameter: `constant name: Type`
+    /// Constant parameter: `constant name: TypeKind`
     PARAM_CONSTANT,
     /// Parameter list: `(a: u32, b: u32)`
     PARAM_LIST,
@@ -507,20 +511,24 @@ define_syntax_kinds! {
     TUPLE_EXPR,
     /// Struct literal: `Foo { a: 1, b: 2 }`
     STRUCT_EXPR,
-    /// Struct locator literal: `program.aleo::Type { a: 1, b: 2 }`
+    /// Struct locator literal: `program.aleo::TypeKind { a: 1, b: 2 }`
     STRUCT_LOCATOR_EXPR,
     /// Struct field initializer: `a: 1`
     STRUCT_FIELD_INIT,
     /// Struct field shorthand: `{ x }` (equivalent to `{ x: x }`)
     STRUCT_FIELD_SHORTHAND,
+    /// Struct update base: `..other` in `Foo { a: 1, ..other }`
+    STRUCT_BASE_UPDATE,
     /// Path expression: `foo::bar`
     PATH_EXPR,
     /// Path locator expression: `program.aleo::function`
     PATH_LOCATOR_EXPR,
-    /// Program reference expression: `name.aleo` (without `::Type` suffix).
+    /// Program reference expression: `name.aleo` (without `::TypeKind` suffix).
     PROGRAM_REF_EXPR,
     /// Self expression: `self`
     SELF_EXPR,
+    /// `Self` expression.
+    SELF_UPPER_EXPR,
     /// Block keyword expression: `block`
     BLOCK_KW_EXPR,
     /// Network keyword expression: `network`
@@ -564,7 +572,7 @@ define_syntax_kinds! {
     TYPE_PATH,
     /// Primitive type: `u32`, `bool`, `field`, etc.
     TYPE_PRIMITIVE,
-    /// Locator type: `program.aleo::Type`
+    /// Locator type: `program.aleo::TypeKind`
     TYPE_LOCATOR,
     /// Array type: `[u32; 10]`
     TYPE_ARRAY,
@@ -647,8 +655,10 @@ impl SyntaxKind {
                 | KW_BLOCK
                 | KW_PUBLIC
                 | KW_PRIVATE
+                | KW_EXPORT
                 | KW_AS
                 | KW_SELF
+                | KW_SELF_UPPER
                 | KW_ASSERT
                 | KW_ASSERT_EQ
                 | KW_ASSERT_NEQ
@@ -743,6 +753,7 @@ impl SyntaxKind {
                     | PATH_LOCATOR_EXPR
                     | PROGRAM_REF_EXPR
                     | SELF_EXPR
+                    | SELF_UPPER_EXPR
                     | BLOCK_KW_EXPR
                     | NETWORK_KW_EXPR
                     | PAREN_EXPR
@@ -916,8 +927,10 @@ impl SyntaxKind {
             // Visibility and assertion keywords
             KW_PUBLIC => "'public'",
             KW_PRIVATE => "'private'",
+            KW_EXPORT => "'export'",
             KW_AS => "'as'",
             KW_SELF => "'self'",
+            KW_SELF_UPPER => "'Self'",
             KW_ASSERT => "'assert'",
             KW_ASSERT_EQ => "'assert_eq'",
             KW_ASSERT_NEQ => "'assert_neq'",

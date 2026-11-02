@@ -3,7 +3,7 @@
 // (`scale::[5u32]`) is hashed via `legalize_path` into a legal Aleo identifier
 // at the declaration and at every call site, so both sides agree.
 
-fn scale::[N: u32](x: u32) -> u32 {
+export fn scale::[N: u32](x: u32) -> u32 {
     return x * N;
 }
 
@@ -14,4 +14,7 @@ program test.aleo {
         let b: u32 = scale::[5u32](y);
         return (a, b);
     }
+
+    @noupgrade
+    constructor() {}
 }

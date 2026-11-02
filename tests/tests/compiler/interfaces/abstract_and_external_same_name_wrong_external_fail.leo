@@ -10,12 +10,15 @@ program other.aleo {
     record Token {
         owner: address,
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
 import other.aleo;
 
-interface HasMixed {
+export interface HasMixed {
     record Token {
         owner: address,
         ..
@@ -26,6 +29,9 @@ interface HasMixed {
 
 program lib.aleo {
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -47,4 +53,7 @@ program test.aleo: lib.aleo::HasMixed {
     }
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }

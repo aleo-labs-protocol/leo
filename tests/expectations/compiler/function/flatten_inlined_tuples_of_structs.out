@@ -41,3 +41,6 @@ function bar:
     output r19 as u8.private;
     output r20 as u8.private;
     output r21 as Data.private;
+
+constructor:
+    assert.eq edition 0u16;

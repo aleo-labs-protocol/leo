@@ -1,9 +1,12 @@
-struct Bar {
+export struct Bar {
     baz: Baz,
 }
 
-struct Baz {
+export struct Baz {
     bar: Bar,
 }
 
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}

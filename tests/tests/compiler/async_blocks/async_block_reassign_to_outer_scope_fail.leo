@@ -1,4 +1,4 @@
-struct TokenInfo {
+export struct TokenInfo {
     id: u64,
 }
 
@@ -17,4 +17,7 @@ program test.aleo {
             }
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

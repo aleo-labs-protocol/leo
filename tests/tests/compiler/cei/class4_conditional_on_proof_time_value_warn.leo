@@ -7,9 +7,12 @@ program oracle.aleo {
         // Proof-time snapshot of price
         return (500u64, f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_get_price(id: u32) {
+export final fn finalize_get_price(id: u32) {
     let p: u64 = Mapping::get_or_use(prices, id, 0u64);
     Mapping::set(prices, id, p);
 }
@@ -25,9 +28,12 @@ program trader.aleo {
         let (price, f): (u64, Final) = oracle.aleo::get_price(id);
         return final { finalize_trade(f, price, id); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_trade(f: Final, price: u64, id: u32) {
+export final fn finalize_trade(f: Final, price: u64, id: u32) {
     // [E] Branch on stale proof-time price
     if price > 400u64 {
         Mapping::set(positions, id, price);

@@ -1,14 +1,17 @@
 // Test: Missing function from second interface
 
-interface Counter {
+export interface Counter {
     fn increment() -> u64;
 }
 
-interface Calculator {
+export interface Calculator {
     fn add(a: u64, b: u64) -> u64;
 }
 
 program test.aleo: Counter + Calculator {
+    @noupgrade
+    constructor() {}
+
     fn increment() -> u64 {
         return 1u64;
     }

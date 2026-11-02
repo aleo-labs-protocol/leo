@@ -5,12 +5,15 @@ program test.aleo {
         // The token amount.
         amount: u64,
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-struct Token { // This struct cannot have the same name as the record defined above it.
+export struct Token { // This struct cannot have the same name as the record defined above it.
     x: u32,
 }
 
-fn main(zz: bool) -> bool {
+export fn main(zz: bool) -> bool {
     return true;
 }

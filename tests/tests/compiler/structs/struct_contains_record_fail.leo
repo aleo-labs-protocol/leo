@@ -1,4 +1,4 @@
-struct Foo {
+export struct Foo {
     // The token amount.
     token: Token,
 }
@@ -10,4 +10,7 @@ program test.aleo {
         // The token amount.
         foo: Foo,
     }
+
+    @noupgrade
+    constructor() {}
 }

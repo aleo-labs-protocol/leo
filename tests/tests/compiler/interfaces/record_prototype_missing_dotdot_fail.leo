@@ -1,4 +1,4 @@
-interface TokenInterface {
+export interface TokenInterface {
     record Token {
         owner: address,
     }
@@ -11,4 +11,7 @@ program test.aleo: TokenInterface {
     }
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }

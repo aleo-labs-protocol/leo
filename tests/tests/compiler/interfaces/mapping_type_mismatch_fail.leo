@@ -1,4 +1,4 @@
-interface CounterInterface {
+export interface CounterInterface {
     mapping counter: address => u64;
 }
 
@@ -6,4 +6,7 @@ program test.aleo: CounterInterface {
     mapping counter: u32 => u64;
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }

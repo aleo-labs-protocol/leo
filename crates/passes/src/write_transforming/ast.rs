@@ -44,7 +44,7 @@ impl WriteTransformingVisitor<'_> {
         if let Some(array_members) = self.array_members.get(&input.name) {
             // Build the array expression from the members.
             let id = self.state.node_builder.next_id();
-            self.state.type_table.insert(id, ty.clone());
+            self.state.type_table.insert(id, ty);
             let expr = ArrayExpression {
                 elements: array_members
                     // This clone is unfortunate, but both `array_members` and the closure below borrow self.
@@ -70,8 +70,8 @@ impl WriteTransformingVisitor<'_> {
         } else if let Some(composite_members) = self.composite_members.get(&input.name) {
             // Build the composite expression from the members.
             let id = self.state.node_builder.next_id();
-            self.state.type_table.insert(id, ty.clone());
-            let Type::Composite(comp_type) = ty else {
+            self.state.type_table.insert(id, ty);
+            let TypeKind::Composite(comp_type) = self.state.types.resolve(ty) else {
                 panic!("The type of a composite init should be a composite.");
             };
             let expr = CompositeExpression {
@@ -91,6 +91,7 @@ impl WriteTransformingVisitor<'_> {
                         }
                     })
                     .collect(),
+                base: None,
                 path: comp_type.path,
                 span: Default::default(),
                 id,
@@ -113,6 +114,10 @@ impl WriteTransformingVisitor<'_> {
 impl AstReconstructor for WriteTransformingVisitor<'_> {
     type AdditionalInput = ();
     type AdditionalOutput = Vec<Statement>;
+
+    fn interner(&self) -> &TypeInterner {
+        &self.state.types
+    }
 
     /* Expressions */
     fn reconstruct_path(&mut self, input: Path, _additional: &()) -> (Expression, Self::AdditionalOutput) {
@@ -226,6 +231,56 @@ impl AstReconstructor for WriteTransformingVisitor<'_> {
     fn reconstruct_cast(&mut self, input: CastExpression, _additional: &()) -> (Expression, Self::AdditionalOutput) {
         let (expression, statements) = self.reconstruct_expression(input.expression, &());
         (CastExpression { expression, ..input }.into(), statements)
+    }
+
+    fn reconstruct_repeat(
+        &mut self,
+        input: RepeatExpression,
+        _additional: &(),
+    ) -> (Expression, Self::AdditionalOutput) {
+        let (expr, mut statements) = self.reconstruct_expression(input.expr, &());
+        let (count, statements2) = self.reconstruct_expression(input.count, &());
+        statements.extend(statements2);
+        (RepeatExpression { expr, count, ..input }.into(), statements)
+    }
+
+    fn reconstruct_dynamic_op(
+        &mut self,
+        input: DynamicOpExpression,
+        _additional: &(),
+    ) -> (Expression, Self::AdditionalOutput) {
+        let (target_program, mut statements) = self.reconstruct_expression(input.target_program, &());
+        let network = input.network.map(|n| {
+            let (expr, statements2) = self.reconstruct_expression(n, &());
+            statements.extend(statements2);
+            expr
+        });
+        let kind = match input.kind {
+            DynamicOpKind::Call { function, arguments } => {
+                let arguments = arguments
+                    .into_iter()
+                    .map(|arg| {
+                        let (expr, statements2) = self.reconstruct_expression(arg, &());
+                        statements.extend(statements2);
+                        expr
+                    })
+                    .collect();
+                DynamicOpKind::Call { function, arguments }
+            }
+            DynamicOpKind::Read { storage } => DynamicOpKind::Read { storage },
+            DynamicOpKind::Op { member, op, arguments } => {
+                let arguments = arguments
+                    .into_iter()
+                    .map(|arg| {
+                        let (expr, statements2) = self.reconstruct_expression(arg, &());
+                        statements.extend(statements2);
+                        expr
+                    })
+                    .collect();
+                DynamicOpKind::Op { member, op, arguments }
+            }
+        };
+        (DynamicOpExpression { target_program, network, kind, ..input }.into(), statements)
     }
 
     fn reconstruct_composite_init(
@@ -346,7 +401,7 @@ impl AstReconstructor for WriteTransformingVisitor<'_> {
             ..input
         }
         .into();
-        (stmt, Default::default())
+        (stmt, statements)
     }
 
     fn reconstruct_block(&mut self, block: Block) -> (Block, Self::AdditionalOutput) {
@@ -356,7 +411,7 @@ impl AstReconstructor for WriteTransformingVisitor<'_> {
         for statement in block.statements {
             let (reconstructed_statement, additional_statements) = self.reconstruct_statement(statement);
             statements.extend(additional_statements);
-            if !reconstructed_statement.is_empty() {
+            if !reconstructed_statement.is_removable() {
                 statements.push(reconstructed_statement);
             }
         }

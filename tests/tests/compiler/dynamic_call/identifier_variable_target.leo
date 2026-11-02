@@ -1,4 +1,4 @@
-interface Adder {
+export interface Adder {
     fn sum(a: u32, b: u32) -> u32;
 }
 
@@ -11,4 +11,7 @@ program test.aleo: Adder {
         let target: identifier = 'foo';
         return Adder@(target)::sum(x, y);
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -16,6 +16,7 @@ finalize bar:
     assert.neq checksum child.aleo/checksum;
     assert.eq edition child.aleo/edition;
     assert.eq program_owner child.aleo/program_owner;
+    assert.neq bar/checksum child.aleo/dummy/checksum;
 
 constructor:
     assert.eq edition 0u16;
@@ -24,20 +25,20 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au19ys7wqskp6rvlfmc7gwz4tecckgkymr86cg2h7u7rxd7fuvvh5qsn955lf",
+      "id": "au128pd3qt8wmpf0tfttf8hn2z4qmcqhtx5dvy9h04j34qt4yegdqgqh282qq",
       "program": "test.aleo",
       "function": "bar",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "109084072588046870880309859562417289896156897587092208097736672923043320916field",
+          "id": "935161915594283383186605228902687209460799553309809703927362721742624782158field",
           "value": "{\n  program_id: test.aleo,\n  function_name: bar,\n  arguments: []\n}"
         }
       ],
-      "tpk": "932902105444239517980596565691908870668917795454138192289088332646102103453group",
-      "tcm": "4534045528378062984919568849257618109414740950022974037600860386185923697801field",
-      "scm": "919245366506739687912770902847963156737622134026017456623407014687413152843field"
+      "tpk": "7746047146545543446742057904550202472611886872316036833009917201705905996431group",
+      "tcm": "4320592220324322526216308097494051446030852113282086804219760798619699368553field",
+      "scm": "3609000689911673644292249378334827587729796752984632500404758660628038874950field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"

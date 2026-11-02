@@ -22,3 +22,6 @@ finalize update:
     input r2 as [Point; 3u32].public;
     ternary r0 r1 r2 into r3;
     set r3 into arr[0u32];
+
+constructor:
+    assert.eq edition 0u16;

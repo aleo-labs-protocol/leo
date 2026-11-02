@@ -1,10 +1,13 @@
 // Test: Program correctly implements an interface
 
-interface Counter {
+export interface Counter {
     fn increment(amount: u64) -> u64;
 }
 
 program test.aleo: Counter {
+    @noupgrade
+    constructor() {}
+
     fn increment(amount: u64) -> u64 {
         return amount + 1u64;
     }

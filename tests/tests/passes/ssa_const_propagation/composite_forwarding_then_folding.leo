@@ -1,8 +1,11 @@
+export struct Flag {
+    active: bool,
+    payload: u32,
+}
+
 program test.aleo {
-    struct Flag {
-        active: bool,
-        payload: u32,
-    }
+    @noupgrade
+    constructor() {}
 
     // End-to-end demonstration of the passes that #29343 adds together:
     // composite forwarding replaces `f.active` with the stored literal `true`,

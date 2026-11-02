@@ -1,5 +1,8 @@
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}
 
-fn main(x: bool) {
+export fn main(x: bool) {
     let a: i64 = 9223372036854775808i64;
 }

@@ -10,23 +10,26 @@ program test_dep.aleo {
 
     fn main_dep(a: u32) -> (yeets, Final<Fn(u32)>) {
         let f: Final<Fn(u32)> = final { finalize_main_dep(a, 1u32); };
-        let l: yeets = yeets { owner: self.signer, val: 1u32 };
+        let l: yeets = yeets { owner: std::ctx::signer(), val: 1u32 };
         return (l, f);
     }
 
     fn main_dep_2(a: u32) -> (yeets, Final<Fn()>) {
         let f: Final<Fn()> = final { finalize_main_dep_2(); };
-        let l: yeets = yeets { owner: self.signer, val: 1u32 };
+        let l: yeets = yeets { owner: std::ctx::signer(), val: 1u32 };
         return (l, f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_main_dep(a: u32, b: u32) {
+export final fn finalize_main_dep(a: u32, b: u32) {
     Mapping::set(Yo, a, b);
     let c: u32 = a + b;
 }
 
-final fn finalize_main_dep_2() {
+export final fn finalize_main_dep_2() {
     Mapping::set(Yo, 1u32, 1u32);
 }
 
@@ -44,9 +47,12 @@ program test.aleo {
         let f3: Final = final { finalize_main(f, f2, 1u32); };
         return (a, f3);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_main(f: Final, f2: Final, a: u32) {
+export final fn finalize_main(f: Final, f2: Final, a: u32) {
     // f.run();
     if a == 1u32 {
         Final::run(f);
@@ -72,9 +78,12 @@ program wrapper.aleo {
         let f4: Final = final { finalize_main(f, f2, f3); };
         return (val, f4);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_main(f: Final, f2: Final, f3: Final) {
+export final fn finalize_main(f: Final, f2: Final, f3: Final) {
     f.run();
     f2.run();
     f3.run();
@@ -106,4 +115,7 @@ program big_wrapper.aleo {
             },
         );
     }
+
+    @noupgrade
+    constructor() {}
 }

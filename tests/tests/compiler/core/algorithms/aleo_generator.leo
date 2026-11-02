@@ -17,9 +17,12 @@ program test.aleo {
     fn test_in_finalize() -> Final {
         return final { finalize_test(); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_test() {
+export final fn finalize_test() {
     let g: group = Aleo::generator();
     let g0: group = Aleo::generator_powers()[0u32];
     assert_eq(g, g0);

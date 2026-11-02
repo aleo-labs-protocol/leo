@@ -1,10 +1,11 @@
         // File-level comment about this program
-program test.aleo{
     // A struct
         struct  Point{
         x  :  u64,
             y  :  u64,
     }
+program test.aleo{
+    @noupgrade constructor() {}
 
 
             // A fn that uses the struct

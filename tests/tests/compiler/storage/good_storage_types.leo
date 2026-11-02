@@ -1,5 +1,5 @@
 // --- Structs ---
-struct MyStruct {
+export struct MyStruct {
     a: u32,
     b: bool,
     c: address,
@@ -36,4 +36,7 @@ program good_storage_tests.aleo {
     storage vec_struct: [MyStruct];
 
     fn foo() {}
+
+    @noupgrade
+    constructor() {}
 }

@@ -9,7 +9,7 @@
 // too. The mismatch is semantic: `concrete_type_matches_proto` requires the argument to
 // belong to the implementing program (`bad_records.aleo`), not to `lib.aleo`.
 
-interface HasToken {
+export interface HasToken {
     record Token {
         owner: address,
         ..
@@ -19,6 +19,9 @@ interface HasToken {
 
 program lib.aleo {
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -28,6 +31,9 @@ program other.aleo {
     record Token {
         owner: address,
     }
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -44,4 +50,7 @@ program bad_records.aleo: lib.aleo::HasToken {
     }
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }

@@ -1,6 +1,6 @@
-const x: u32 = 42;
+export const x: u32 = 42;
 
-struct Foo {
+export struct Foo {
     x: u32,
 }
 
@@ -10,4 +10,7 @@ program b28788.aleo {
         let f = Foo { x };
         return f.x;
     }
+
+    @noupgrade
+    constructor() {}
 }

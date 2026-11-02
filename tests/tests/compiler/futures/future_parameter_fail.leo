@@ -6,12 +6,15 @@ program test.aleo {
     fn second(x: Final) -> u8 {
         return 1u8;
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-fn third(x: Final) -> u8 {
+export fn third(x: Final) -> u8 {
     return 1u8;
 }
 
-final fn finish() {
+export final fn finish() {
     assert_eq(1u8, 1u8);
 }

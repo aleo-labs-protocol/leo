@@ -6,11 +6,14 @@ program child.aleo {
     fn bar() -> Final {
         return final { bar_(); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn foo_() {}
+export final fn foo_() {}
 
-final fn bar_() {}
+export final fn bar_() {}
 
 // --- Next Program --- //
 import child.aleo;
@@ -27,8 +30,11 @@ program type_inference.aleo {
         let r: bool = final { foo(f); };
         return (99u64, r);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn foo(fut: Final) {
+export final fn foo(fut: Final) {
     fut.run();
 }

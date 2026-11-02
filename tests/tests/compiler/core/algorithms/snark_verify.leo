@@ -26,9 +26,12 @@ program test.aleo {
     ) -> Final {
         return final { finalize_boundary(vks32, batch_inputs32, proof, v); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(
+export final fn finalize(
     vk: [u8; 128],
     varuna_version: u8,
     inputs: [field; 4],
@@ -47,7 +50,7 @@ final fn finalize(
     assert_eq(v2, v2);
 }
 
-final fn finalize_boundary(
+export final fn finalize_boundary(
     vks32: [[u8; 128]; 32],
     batch_inputs32: [[[field; 4]; 4]; 32],
     proof: [u8; 256],

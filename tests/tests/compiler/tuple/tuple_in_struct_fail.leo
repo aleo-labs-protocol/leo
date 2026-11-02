@@ -1,9 +1,12 @@
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}
 
-struct A {
+export struct A {
     mem: (u8, u16),
 }
 
-struct B {
+export struct B {
     mems: (A, A),
 }

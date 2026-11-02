@@ -1,4 +1,4 @@
-interface StorageInterface {
+export interface StorageInterface {
     storage counter: u32;
 }
 
@@ -6,4 +6,7 @@ program test.aleo: StorageInterface {
     storage counter: u64;
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }

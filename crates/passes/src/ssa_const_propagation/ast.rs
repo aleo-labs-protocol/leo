@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the Leo library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::expression_can_be_discarded;
+
 use super::{
     SsaConstPropagationVisitor,
     visitor::{is_atom, is_one_literal, is_zero_literal, same_ssa_atom},
@@ -32,6 +34,10 @@ const VALUE_ERROR: &str = "A non-future value should always be able to be conver
 impl AstReconstructor for SsaConstPropagationVisitor<'_> {
     type AdditionalInput = ();
     type AdditionalOutput = Option<Value>;
+
+    fn interner(&self) -> &TypeInterner {
+        &self.state.types
+    }
 
     /// Reconstruct a path expression. If the path refers to a variable that has
     /// a constant value, replace it with that constant.
@@ -76,7 +82,7 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
             // constant (literals evaluate directly; paths look up tracked constants).
             let opt_value = match atom {
                 Expression::Literal(lit) => {
-                    let ty = self.state.type_table.get(&lit.id());
+                    let ty = self.state.type_table.get(&lit.id()).map(|t| self.state.types.resolve(t));
                     const_eval::literal_to_value(lit, &ty).ok()
                 }
                 Expression::Path(p) => p.try_local_symbol().and_then(|s| self.constants.get(&s).cloned()),
@@ -93,11 +99,11 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
 
     /// Reconstruct a literal expression and convert it to a Value.
     fn reconstruct_literal(&mut self, mut input: Literal, _additional: &()) -> (Expression, Self::AdditionalOutput) {
-        let type_info = self.state.type_table.get(&input.id());
+        let type_info = self.state.type_table.get(&input.id()).map(|t| self.state.types.resolve(t));
 
         // If this is an optional, then unwrap it first.
         let type_info = type_info.as_ref().map(|ty| match ty {
-            Type::Optional(opt) => *opt.inner.clone(),
+            TypeKind::Optional(opt) => *opt.inner.clone(),
             _ => ty.clone(),
         });
 
@@ -111,10 +117,10 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
                 // If we know the type of an unsuffixed literal, might as well change it to a suffixed literal.
                 LiteralVariant::Unsuffixed(s) => {
                     match type_info.expect("Expected type information to be available") {
-                        Type::Integer(ty) => input.variant = LiteralVariant::Integer(ty, s),
-                        Type::Field => input.variant = LiteralVariant::Field(s),
-                        Type::Group => input.variant = LiteralVariant::Group(s),
-                        Type::Scalar => input.variant = LiteralVariant::Scalar(s),
+                        TypeKind::Integer(ty) => input.variant = LiteralVariant::Integer(ty, s),
+                        TypeKind::Field => input.variant = LiteralVariant::Field(s),
+                        TypeKind::Group => input.variant = LiteralVariant::Group(s),
+                        TypeKind::Scalar => input.variant = LiteralVariant::Scalar(s),
                         _ => panic!("Type checking should have prevented this."),
                     }
                     (input.into(), Some(value))
@@ -147,7 +153,7 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
                 input.op,
                 lhs_value,
                 rhs_value,
-                &self.state.type_table.get(&input_id),
+                &self.state.type_table.get(&input_id).map(|t| self.state.types.resolve(t)),
             ) {
                 Ok(new_value) => {
                     let (new_expr, _) = self.value_to_expression(&new_value, span, input_id).expect(VALUE_ERROR);
@@ -200,8 +206,8 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
                     return (right, rhs_opt_value);
                 }
                 // Absorbing element: x * 0 = 0 (only for integers and field, not group or scalar)
-                let result_ty = self.state.type_table.get(&input_id);
-                if matches!(&result_ty, Some(Type::Integer(_) | Type::Field)) {
+                let result_ty = self.state.type_table.get(&input_id).map(|t| self.state.types.resolve(t));
+                if matches!(&result_ty, Some(TypeKind::Integer(_) | TypeKind::Field)) {
                     if right_is_zero {
                         self.changed = true;
                         return (right, rhs_opt_value);
@@ -315,14 +321,14 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
             BinaryOperation::Eq if same_ssa_atom(&left, &right) => {
                 self.changed = true;
                 let id = self.state.node_builder.next_id();
-                self.state.type_table.insert(id, Type::Boolean);
+                self.state.type_table.insert(id, Type::BOOLEAN);
                 let lit = Literal::boolean(true, span, id);
                 return (lit.into(), Some(Value::from(true)));
             }
             BinaryOperation::Neq if same_ssa_atom(&left, &right) => {
                 self.changed = true;
                 let id = self.state.node_builder.next_id();
-                self.state.type_table.insert(id, Type::Boolean);
+                self.state.type_table.insert(id, Type::BOOLEAN);
                 let lit = Literal::boolean(false, span, id);
                 return (lit.into(), Some(Value::from(false)));
             }
@@ -342,7 +348,12 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
 
         if let Some(value) = opt_value {
             // We were able to evaluate the operand, so we can evaluate the expression.
-            match const_eval::evaluate_unary(span, input.op, &value, &self.state.type_table.get(&input_id)) {
+            match const_eval::evaluate_unary(
+                span,
+                input.op,
+                &value,
+                &self.state.type_table.get(&input_id).map(|t| self.state.types.resolve(t)),
+            ) {
                 Ok(new_value) => {
                     let (new_expr, _) = self.value_to_expression(&new_value, span, input_id).expect(VALUE_ERROR);
                     self.changed = true;
@@ -373,7 +384,7 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
         (UnaryExpression { receiver, ..input }.into(), None)
     }
 
-    /// Reconstruct a ternary expression and fold it if the condition is a constant.
+    /// Reconstruct a ternary expression and fold a constant condition only after both arms are reconstructed.
     fn reconstruct_ternary(
         &mut self,
         input: TernaryExpression,
@@ -381,20 +392,19 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
     ) -> (Expression, Self::AdditionalOutput) {
         let ternary_span = input.span();
         let (cond, cond_value) = self.reconstruct_expression(input.condition, &());
+        let (if_true, if_true_value) = self.reconstruct_expression(input.if_true, &());
+        let (if_false, if_false_value) = self.reconstruct_expression(input.if_false, &());
 
         match cond_value.and_then(|v| v.try_into().ok()) {
-            Some(true) => {
+            Some(true) if expression_can_be_discarded(&if_false, self.state) => {
                 self.changed = true;
-                self.reconstruct_expression(input.if_true, &())
+                (if_true, if_true_value)
             }
-            Some(false) => {
+            Some(false) if expression_can_be_discarded(&if_true, self.state) => {
                 self.changed = true;
-                self.reconstruct_expression(input.if_false, &())
+                (if_false, if_false_value)
             }
             _ => {
-                let (if_true, if_true_value) = self.reconstruct_expression(input.if_true, &());
-                let (if_false, if_false_value) = self.reconstruct_expression(input.if_false, &());
-
                 // Boolean branch folding: collapse a bool-literal-branched ternary.
                 // Commonly arises after composite forwarding erases an `is_some`-style
                 // flag that was selected across a ternary.
@@ -410,7 +420,7 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
                     (Some(false), Some(true)) => {
                         self.changed = true;
                         let id = self.state.node_builder.next_id();
-                        self.state.type_table.insert(id, Type::Boolean);
+                        self.state.type_table.insert(id, Type::BOOLEAN);
                         let not_cond =
                             UnaryExpression { op: UnaryOperation::Not, receiver: cond, span: ternary_span, id };
                         return (not_cond.into(), None);
@@ -579,5 +589,35 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
 
     fn reconstruct_assign(&mut self, _input: AssignStatement) -> (Statement, Self::AdditionalOutput) {
         panic!("there should be no assignments at this stage");
+    }
+
+    /// Reconstruct a conditional statement and fold it if the condition is a constant.
+    ///
+    /// Constant conditions reach this pass when inlining substitutes literal arguments into a
+    /// finalize-context body, or when the iterative-inline weave const-specializes a duplicated
+    /// continuation. Both after the pre-flattening const propagation has already run. The
+    /// condition is an SSA atom at this point, so dropping it is side-effect-free, and the
+    /// untaken branch is statically dead.
+    fn reconstruct_conditional(&mut self, conditional: ConditionalStatement) -> (Statement, Self::AdditionalOutput) {
+        let (condition, condition_value) = self.reconstruct_expression(conditional.condition, &());
+
+        match condition_value.and_then(|v| v.try_into().ok()) {
+            Some(true) => {
+                self.changed = true;
+                (Statement::Block(self.reconstruct_block(conditional.then).0), None)
+            }
+            Some(false) => {
+                self.changed = true;
+                match conditional.otherwise {
+                    Some(otherwise) => self.reconstruct_statement(*otherwise),
+                    None => (Statement::dummy(), None),
+                }
+            }
+            _ => {
+                let then = self.reconstruct_block(conditional.then).0;
+                let otherwise = conditional.otherwise.map(|s| Box::new(self.reconstruct_statement(*s).0));
+                (ConditionalStatement { condition, then, otherwise, ..conditional }.into(), None)
+            }
+        }
     }
 }

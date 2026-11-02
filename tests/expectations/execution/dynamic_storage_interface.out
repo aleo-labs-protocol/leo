@@ -111,51 +111,21 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1lt0knc464pvsj8vz8mv6hrrx0g2w0vvfq2dwmkd302cxeh6hlv8smhuzvx",
+      "id": "au1akd20w0pw7qft53ll7runatkh44aglv0dnv5vnlqurv0vp9qnvrq56sy9y",
       "program": "logger.aleo",
       "function": "bump",
       "inputs": [
         {
           "type": "private",
-          "id": "632265720186924243409081052197704521705997972115762558046493572425308789884field",
-          "value": "ciphertext1qyqdxy64havm7vrrv88wf4ppwrxv2v5a6zdxv8ntzmnp7dcjfvkk2zqwsrtsm"
+          "id": "2781775294397041354404858583458622201806451583331128912372339047981436564193field",
+          "value": "ciphertext1qyqx9saj9rmxpr4585ma89u3hpvsnanwx2xw5r0l7yj7x0celmjd6yg8fd5a0"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "6663972477147784006518514005073752167673013001913020683128580106706584176812field",
+          "id": "7529282395167142142086964328615080029317244491965528736200460177877833490130field",
           "value": "{\n  program_id: logger.aleo,\n  function_name: bump,\n  arguments: [\n    10u64\n  ]\n}"
-        }
-      ],
-      "tpk": "932902105444239517980596565691908870668917795454138192289088332646102103453group",
-      "tcm": "4534045528378062984919568849257618109414740950022974037600860386185923697801field",
-      "scm": "919245366506739687912770902847963156737622134026017456623407014687413152843field"
-    }
-  ],
-  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
-}
-
-verified: true
-status: accepted
-{
-  "transitions": [
-    {
-      "id": "au1kl287q70yrk0kzppkcdulgwuk644su6fvukn2956yg6z3780dvgs78pkyn",
-      "program": "logger.aleo",
-      "function": "bump",
-      "inputs": [
-        {
-          "type": "private",
-          "id": "7393046868593245479101777094855106221123672146854395544540120982275975779206field",
-          "value": "ciphertext1qyqx9saj2rmxpr4585ma89u3hpvsnanwx2xw5r0l7yj7x0celmjd6ygpu95u0"
-        }
-      ],
-      "outputs": [
-        {
-          "type": "future",
-          "id": "5797740370651708277028581063712647627745736864402804412388999148300715497778field",
-          "value": "{\n  program_id: logger.aleo,\n  function_name: bump,\n  arguments: [\n    20u64\n  ]\n}"
         }
       ],
       "tpk": "4435182414136183130262225239916202916754973933386625330210643288715243337617group",
@@ -171,26 +141,21 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1sjnu2fdf4wtkmhmlthhr5xvh99fns2t3vw7fkk9fvrnfdcmzvggqxrkj5v",
+      "id": "au1g3q8t37xn0mvxu94cgs2cadu0c6l3khmuz64q9efznhweph0vgrsh3lpj0",
       "program": "logger.aleo",
-      "function": "check_counter",
+      "function": "bump",
       "inputs": [
         {
           "type": "private",
-          "id": "4079006191393675311251112369541775905637776192028127257618297927723899232123field",
-          "value": "ciphertext1qgqwmngfan27r4c053gjdcja73fmu448tvhlluuepgrqavfnc8wdvy0vpzgx05pu08gqpapsmlm6m30w0yrn734up85xt2jsfvlqz6a3q5r6eur4"
-        },
-        {
-          "type": "private",
-          "id": "1095616806518118663889144716809788490826472567871294618279449652786075560967field",
-          "value": "ciphertext1qyqzhjexvydz3l27ey9qk0v4gmywtlj2g89tjkrwa3ymr5j50mx62zcqtx3k5"
+          "id": "1320829822713267499515145776164340627031175509448346215485796019323737051771field",
+          "value": "ciphertext1qyqd5mqvqpvrlgc8ewhe70h2rh5sg5hxgdwseyn60p5m8wm66t5d5pqmkezee"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "7711906405327390079534530731760235974325835444480203507456125554543965930815field",
-          "value": "{\n  program_id: logger.aleo,\n  function_name: check_counter,\n  arguments: [\n    125779852095340field,\n    2u64\n  ]\n}"
+          "id": "2358033033279019305224069073997087247027085683518339195309073705147229083607field",
+          "value": "{\n  program_id: logger.aleo,\n  function_name: bump,\n  arguments: [\n    20u64\n  ]\n}"
         }
       ],
       "tpk": "2522887999940374826698654126645535027810075514268095352773581615775304946572group",
@@ -206,31 +171,26 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1mchhet4sv6x9fe4t765957s833dydp66tjv6k4df7jq3rut285rsf4ct2k",
+      "id": "au1jcnyjus4slcv3v6n0cg0y85ncy3kn6uuyg06cat2eqrtxxnklu8qw4p6l8",
       "program": "logger.aleo",
-      "function": "check_entry",
+      "function": "check_counter",
       "inputs": [
         {
           "type": "private",
-          "id": "7899081735691939273112118264538143068394175580085949537028836429672439913120field",
-          "value": "ciphertext1qgqgxzzf2zuyq36cag6ul8evcftm8pu89dze38vdrcvqzyxzj5zzkqwzyggrznsztvsa29a58yamaf9pejyp06ghxyrq6tq0fg5udzgeqcxas266"
+          "id": "839766191785579271286454773576418908293163045243236914488748325918478289612field",
+          "value": "ciphertext1qgqg4g4ahsaq3dqs3jklqvq9x3tmuk2c72hntrwun24qeexv80pnjq2wqutnaqm5ngrn96ycfl0ra9hvfl4v0k3lm9uaqxljacjh5u2pq5vag0sf"
         },
         {
           "type": "private",
-          "id": "6294886298537983888012186860415797430739497989894324097008523920756470759263field",
-          "value": "ciphertext1qyq9kj6jh9g2dzcn2tr4v2exl0u3cxtf2q43pyzc7mfduzfzm22uzzgdvnww7"
-        },
-        {
-          "type": "private",
-          "id": "5385442430269755358121974762568891278985131470539761763402649308326982004262field",
-          "value": "ciphertext1qyqdl0ghdgayvpwvp0kuplk0x0tfn93kt5jjjx5ydgujs3hp87z45qsuctscn"
+          "id": "1650368367352334747686618357302618240238487593589325694936559218614326943383field",
+          "value": "ciphertext1qyq8tc3l8e5vq30az9au4eg5sl7krdyyvzfwafx4z6el6yxgpzlf2yqpdg0jx"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "5571970684750583597056541736733690016532845940375254097268268157246156197567field",
-          "value": "{\n  program_id: logger.aleo,\n  function_name: check_entry,\n  arguments: [\n    125779852095340field,\n    0u32,\n    10u64\n  ]\n}"
+          "id": "4550940018124037246301899762112377532397582277629710276375899044420543053241field",
+          "value": "{\n  program_id: logger.aleo,\n  function_name: check_counter,\n  arguments: [\n    125779852095340field,\n    2u64\n  ]\n}"
         }
       ],
       "tpk": "6060197335674172363144850410502281312781694387277365216513387164100734934168group",
@@ -246,7 +206,7 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1jwzl6v67kcsjlaj4we6e3g2hesr48g4805ess4427jgqzs9695pqz66hfa",
+      "id": "au1z3y9x7mfy6pkeevd07ll2zaeuzh8lupz4l9fknld97dq925qmqrqppcp70",
       "program": "logger.aleo",
       "function": "check_entry",
       "inputs": [
@@ -257,20 +217,20 @@ status: accepted
         },
         {
           "type": "private",
-          "id": "1941126981181291249979694752623560235109076567130842912566062305929000347505field",
-          "value": "ciphertext1qyq2pjp3355p7jdf68znjwe2l8rkkdutsaacm7ch52xpqs3gd2zpyrc8tzcwj"
+          "id": "3133009359895268836347203419282406221694901146021562569772728471607147041726field",
+          "value": "ciphertext1qyq2pjp33y5p7jdf68znjwe2l8rkkdutsaacm7ch52xpqs3gd2zpyrc83swww"
         },
         {
           "type": "private",
-          "id": "4868052151066283779318798651758977700184318112576786176659806703784078398515field",
-          "value": "ciphertext1qyqqt9qa5jx6esje2avyr48tfvrfuzjyqdcfq7fmpkkvr9k3dvtv6qs8gccwe"
+          "id": "1721803095956079334704114856862654051830271565563789235993225610792159466030field",
+          "value": "ciphertext1qyqqt9qa0jx6esje2avyr48tfvrfuzjyqdcfq7fmpkkvr9k3dvtv6qsflhc5e"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "2648544519727096251975426586636004605256340736451309733062467181662408118719field",
-          "value": "{\n  program_id: logger.aleo,\n  function_name: check_entry,\n  arguments: [\n    125779852095340field,\n    1u32,\n    20u64\n  ]\n}"
+          "id": "4301358658316811627247148053597795413585600532699847673330775202306332101282field",
+          "value": "{\n  program_id: logger.aleo,\n  function_name: check_entry,\n  arguments: [\n    125779852095340field,\n    0u32,\n    10u64\n  ]\n}"
         }
       ],
       "tpk": "5501575527267754697309838948653136094413849704757357265871953615905434807714group",
@@ -286,26 +246,31 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1p2zu02rkcje96sfa90c7llwwaj6xh4gql4smh3tgxv89t5g6tcpq0hrqxk",
+      "id": "au1ltezr6v0xzjk6ackvqmewr5vuzfvndusuyg32pa4d5ktkmlyjvysqesd2m",
       "program": "logger.aleo",
-      "function": "check_entry_oob",
+      "function": "check_entry",
       "inputs": [
         {
           "type": "private",
-          "id": "5578084566320648781762966958943407175808950085215281358681421429517859578539field",
-          "value": "ciphertext1qgqx3h9nrxhqj6jxfwrt8sqyeukyw5ggcw9c9gnj4vnze38dpmsggys002j522rp9qrax8pna3w2hafsg6jzlwhn0f6vgzxvtj9lg8ccpv64aw89"
+          "id": "5085827234616316349969960038741260740223114800594352675314319134778599478107field",
+          "value": "ciphertext1qgqqc7hdcytg9pq3gd0cghfautcyh3nran3yy5f7s54uv7yt70ttcrh2vc9mqqw6na9pdw2ptg50qgd9a5wj72mv07z2vrsyzh4pmduhpuy5qmmr"
         },
         {
           "type": "private",
-          "id": "6896267116820308745051384428760697940796302350844847606850314488035513111257field",
-          "value": "ciphertext1qyqt6ft86rtkaxvzpp9m0n7j5an56fucrzr3qa9985lhgtqyvecckys8y4pka"
+          "id": "6247321377586480291935088028019617548148141587269768717722987080222400077609field",
+          "value": "ciphertext1qyq9a62xxtyfn94ptur3ju7fpepfj99qxux7vfltnk0vhyg36ry4xrsg8dfv3"
+        },
+        {
+          "type": "private",
+          "id": "3039971926920848342189392419201792015838440178643729685450845510749103591480field",
+          "value": "ciphertext1qyqfgvytj60k3x8a5tyj9suxr452jtwrtywznlvvzq7pu8vr3zex2rgvpftx7"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "4418557498532713257731021057516480485008510223773787816380963204443190768744field",
-          "value": "{\n  program_id: logger.aleo,\n  function_name: check_entry_oob,\n  arguments: [\n    125779852095340field,\n    99u32\n  ]\n}"
+          "id": "6046324153554525384519206242314013475778331490688098372079877544701125246483field",
+          "value": "{\n  program_id: logger.aleo,\n  function_name: check_entry,\n  arguments: [\n    125779852095340field,\n    1u32,\n    20u64\n  ]\n}"
         }
       ],
       "tpk": "3532762458625321599141060623467596614319941243060133069432406976651174585051group",
@@ -321,31 +286,66 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1jjr2zw6akkysnr08fnryu5hshuzfpelnwp30rw27eydpxz6s5gfqtk3xvu",
+      "id": "au169mxsqfcm7332txjqpevn8ktq27ee6jhr0dhw0j9k40s2npl3vgqkeqcgn",
       "program": "logger.aleo",
-      "function": "check_len",
+      "function": "check_entry_oob",
       "inputs": [
         {
           "type": "private",
-          "id": "6060438818422619004468553451014789151677436021718844757266064183606800115597field",
-          "value": "ciphertext1qgqdgq7ysr68wcpmlvsqggtkh7wxve30d257kk3lr20qgcxvcssl7ytwyt9uk37lvgjyq9e2j0zcftjfuxmzln6xzh6a60awvrsf3803puf22q0t"
+          "id": "4341598559200805854054129561918502432875603325021818143540193189233841946323field",
+          "value": "ciphertext1qgqg5gm42qvvc5wxzatry36rq6h7rzm6kr2ru5cunw5nqq9ytuv6spw63ygkt6p0ffygz42ykahqxwpg4sgjg0lw4cgj6t892epxagnyzqgpgx3u"
         },
         {
           "type": "private",
-          "id": "7582735262707929177039352632611615040872691291000116752854942658871698806029field",
-          "value": "ciphertext1qyqglxs7f6ws6cp6d4uswlldfmceg57gk5092eqyc2s8mk679tfqqzc6k6tzl"
+          "id": "4720567605394635702220788351714777548950971004390039188810070704071507466287field",
+          "value": "ciphertext1qyq8z6d8t7d5xyqe72vhp02mt42zyjahvan87w90ag3nmq7ky6x4cqq6upzkv"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "8173103443050342229406016359381087875030875079378861155154243498701360280876field",
-          "value": "{\n  program_id: logger.aleo,\n  function_name: check_len,\n  arguments: [\n    125779852095340field,\n    2u32\n  ]\n}"
+          "id": "1227258582363586575168018606948300073390737500611446643918093179660568837215field",
+          "value": "{\n  program_id: logger.aleo,\n  function_name: check_entry_oob,\n  arguments: [\n    125779852095340field,\n    99u32\n  ]\n}"
         }
       ],
       "tpk": "2957572463448044047572302283090774174789875296427157043680251670334182136991group",
       "tcm": "5310187864470640489792802185373139747670761851167134875372720775567455039533field",
       "scm": "2731867544474854882155293186906946790245760852362359709206582236422383834612field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1efymrdg8fazcrwzcf7vgrhh3tm239f0fakep93d3hprkrfw82spq27c6le",
+      "program": "logger.aleo",
+      "function": "check_len",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "4110423763212304798511453723839912848053715578013861302744518999290381934068field",
+          "value": "ciphertext1qgq2xa5jlwqj6kjlm0f2sc60el8nq9jydd3yksxfs3066tqlshecjq04e8dhg96acynmxfgpzmv4yq7xm660e0t2q5fplpqwte22gpfyqgexmgpz"
+        },
+        {
+          "type": "private",
+          "id": "3127800278736912340192285614846463677818235421227594509624712444159415056478field",
+          "value": "ciphertext1qyqyfzpfrnkwj4xh3q4rshxn22jafn9ullgwhtghst9gr874xqs9wqg3clkk4"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "1464448391127086860352328528787962471643986904486122840843274375455248800565field",
+          "value": "{\n  program_id: logger.aleo,\n  function_name: check_len,\n  arguments: [\n    125779852095340field,\n    2u32\n  ]\n}"
+        }
+      ],
+      "tpk": "618463892478179654488510729354955405387729702799953179470949795558026296286group",
+      "tcm": "3222863864947299824058145457944808101658067063756378963401609457144523851515field",
+      "scm": "2751074422296527527690782501411707498196040280129501517996949701994551145022field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"

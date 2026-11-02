@@ -6,4 +6,7 @@ program test.aleo {
     fn select_literal(s: bool) -> identifier {
         return s ? 'foo' : 'bar';
     }
+
+    @noupgrade
+    constructor() {}
 }

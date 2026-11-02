@@ -1,5 +1,5 @@
 // Inlines can have any number of inputs/outputs.
-fn baz(
+export fn baz(
     a: u8,
     b: u8,
     c: u8,
@@ -29,4 +29,7 @@ program test.aleo {
         let (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) = inputs;
         return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q;
     }
+
+    @noupgrade
+    constructor() {}
 }

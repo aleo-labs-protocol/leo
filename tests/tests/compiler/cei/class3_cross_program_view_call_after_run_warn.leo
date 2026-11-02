@@ -11,9 +11,12 @@ program dep.aleo {
     fn modify(a: u32) -> Final {
         return final { finalize_modify(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_modify(a: u32) {
+export final fn finalize_modify(a: u32) {
     Mapping::set(shared, 0u32, a);
 }
 
@@ -27,9 +30,12 @@ program caller.aleo {
         let f: Final = dep.aleo::modify(a);
         return final { finalize_do_work(f); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_do_work(f: Final) {
+export final fn finalize_do_work(f: Final) {
     // [I] Interaction: run external future.
     f.run();
     // [C] Cross-program view call after the interaction.

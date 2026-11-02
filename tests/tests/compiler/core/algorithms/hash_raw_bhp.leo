@@ -3,7 +3,7 @@ namespace: Compile
 expectation: Pass
 */
 
-struct Data {
+export struct Data {
     x: u32,
     y: u32,
 }
@@ -54,4 +54,7 @@ program test.aleo {
             bhp768_field_raw != bhp768_field_normal,
         );
     }
+
+    @noupgrade
+    constructor() {}
 }

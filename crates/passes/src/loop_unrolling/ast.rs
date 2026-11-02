@@ -22,6 +22,10 @@ impl AstReconstructor for UnrollingVisitor<'_> {
     type AdditionalInput = ();
     type AdditionalOutput = ();
 
+    fn interner(&self) -> &TypeInterner {
+        &self.state.types
+    }
+
     /* Expressions */
     fn reconstruct_repeat(
         &mut self,
@@ -32,8 +36,10 @@ impl AstReconstructor for UnrollingVisitor<'_> {
         // reconstructed `RepeatExpression` and update the type table accordingly.
         let new_id = self.state.node_builder.next_id();
         let new_count = self.reconstruct_expression(input.count, &()).0;
-        let el_ty = self.state.type_table.get(&input.expr.id()).expect("guaranteed by type checking");
-        self.state.type_table.insert(new_id, Type::Array(ArrayType::new(el_ty, new_count.clone())));
+        let el_ty =
+            self.state.types.resolve(self.state.type_table.get(&input.expr.id()).expect("guaranteed by type checking"));
+        let array_ty = self.state.types.intern(&TypeKind::Array(ArrayType::new(el_ty, new_count.clone())));
+        self.state.type_table.insert(new_id, array_ty);
         (
             RepeatExpression {
                 expr: self.reconstruct_expression(input.expr, &()).0,
@@ -61,7 +67,7 @@ impl AstReconstructor for UnrollingVisitor<'_> {
     fn reconstruct_definition(&mut self, input: DefinitionStatement) -> (Statement, Self::AdditionalOutput) {
         (
             DefinitionStatement {
-                type_: input.type_.map(|ty| self.reconstruct_type(ty).0),
+                type_: input.type_.map(|ty| self.reconstruct_type_node(ty).0),
                 value: self.reconstruct_expression(input.value, &()).0,
                 ..input
             }
@@ -88,7 +94,8 @@ impl AstReconstructor for UnrollingVisitor<'_> {
         let resolve_unsuffixed = |lit: &leo_ast::Literal, expr_id| {
             let mut resolved = lit.clone();
             if let LiteralVariant::Unsuffixed(s) = &resolved.variant
-                && let Some(Type::Integer(integer_type)) = self.state.type_table.get(&expr_id)
+                && let Some(TypeKind::Integer(integer_type)) =
+                    self.state.type_table.get(&expr_id).map(|t| self.state.types.resolve(t))
             {
                 resolved.variant = LiteralVariant::Integer(integer_type, s.clone());
             }
@@ -107,9 +114,15 @@ impl AstReconstructor for UnrollingVisitor<'_> {
 
         self.loop_unrolled = true;
 
+        let empty_range = if input.inclusive {
+            start_value.gt(&stop_value).expect("Type checking guarantees these are the same type")
+        } else {
+            start_value.gte(&stop_value).expect("Type checking guarantees these are the same type")
+        };
+
         // Actually unroll.
         (
-            if start_value.gte(&stop_value).expect("Type checking guarantees these are the same type") {
+            if empty_range {
                 let new_block_id = self.state.node_builder.next_id();
                 self.in_scope(new_block_id, |_| {
                     Statement::from(Block { span: input.span, statements: vec![], id: new_block_id })

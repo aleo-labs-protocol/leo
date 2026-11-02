@@ -3,12 +3,15 @@ program test.aleo {
         let c: u32 = a + b;
         return c;
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-struct Board {
+export struct Board {
     foo: u8,
 }
 
-fn win(b: Board, p: u8) -> bool {
+export fn win(b: Board, p: u8) -> bool {
     return false & true;
 }

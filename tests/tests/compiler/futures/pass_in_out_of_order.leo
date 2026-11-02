@@ -4,9 +4,12 @@ program test.aleo {
     fn main_inner(public a: u32, public b: u32) -> Final {
         return final { finalize(a, b); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(a: u32, b: u32) {
+export final fn finalize(a: u32, b: u32) {
     Mapping::set(foo, a, b);
 }
 
@@ -20,9 +23,12 @@ program basic.aleo {
         let f: Final = final { finalize(f2, f1); };
         return f;
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(f1: Final, f2: Final) {
+export final fn finalize(f1: Final, f2: Final) {
     f1.run();
     f2.run();
 }

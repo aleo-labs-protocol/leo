@@ -11,3 +11,6 @@ function select:
     input r2 as Point.private;
     ternary r0 r1 r2 into r3;
     output r3 as Point.private;
+
+constructor:
+    assert.eq edition 0u16;

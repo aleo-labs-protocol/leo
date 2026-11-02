@@ -35,9 +35,12 @@ program test.aleo {
         return move {
             owner: player_2,
             incoming_fire_coordinate: 0u64,
-            player_1: self.caller,
+            player_1: std::ctx::caller(),
             player_2: player_2,
             prev_hit_or_miss: 0u64,
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

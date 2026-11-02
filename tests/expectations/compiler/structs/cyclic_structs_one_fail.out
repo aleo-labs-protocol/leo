@@ -1,14 +1,14 @@
 [ETYC0372058] Error: cyclic dependency between composites: `test.aleo/Foo` --> `test.aleo/Foo`
-   ╭─[ compiler-test:1:8 ]
+   ╭─[ compiler-test:1:15 ]
    │
- 1 │ struct Foo {
+ 1 │ export struct Foo {
    │ 
    │ Help: Break the cycle by removing one of the references. Composite types cannot contain themselves transitively.
 ───╯
 [ETYC0372083] Error: a program must have at least one entry point fn
    ╭─[ compiler-test:5:9 ]
    │
- 5 │ program test.aleo {}
+ 5 │ program test.aleo {
    │ 
    │ Help: Define at least one function inside the `program` block.
 ───╯

@@ -6,14 +6,17 @@ program test.aleo {
     fn bar(a: [bool; 8]) -> [bool; 8] {
         return a;
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-fn baz(a: [bool; 8]) -> bool {
+export fn baz(a: [bool; 8]) -> bool {
     assert(a[0u8]);
     return true;
 }
 
-fn qux(a: [bool; 8]) -> [bool; 8] {
+export fn qux(a: [bool; 8]) -> [bool; 8] {
     assert(a[0u8]);
     return a;
 }

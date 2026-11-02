@@ -3,7 +3,7 @@
 // in both cases) but the record-presence check correctly fires a missing_interface_record
 // error because lookup_record finds no record with that name.
 
-interface IToken {
+export interface IToken {
     record Token {
         owner: address,
         ..
@@ -11,11 +11,14 @@ interface IToken {
     fn mint(owner: address) -> Token;
 }
 
+export struct Token {
+    owner: address,
+    amount: u64,
+}
+
 program test.aleo: IToken {
-    struct Token {
-        owner: address,
-        amount: u64,
-    }
+    @noupgrade
+    constructor() {}
 
     fn mint(owner: address) -> Token {
         return Token { owner: owner, amount: 0u64 };

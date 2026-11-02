@@ -7,4 +7,7 @@ program test.aleo {
             arr.set(0u32, chosen);
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

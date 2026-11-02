@@ -3,7 +3,7 @@ namespace: Compile
 expectation: Pass
 */
 
-struct Point {
+export struct Point {
     x: u64,
     y: u64,
 }
@@ -52,4 +52,7 @@ program test.aleo {
             psd8_u64_raw,
         );
     }
+
+    @noupgrade
+    constructor() {}
 }

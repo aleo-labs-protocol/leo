@@ -1,4 +1,4 @@
-fn foo(x: u32) -> field {
+export fn foo(x: u32) -> field {
     return myGlobal;
 }
 
@@ -9,4 +9,7 @@ program test.aleo {
 
         return err;
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -1,6 +1,9 @@
-fn main(zz: bool) -> u8 {
+export fn main(zz: bool) -> u8 {
     my_function();
     return 0u8;
 }
 
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}

@@ -30,16 +30,17 @@ pub struct CLI {
     #[clap(short, global = true, help = "Suppress CLI output")]
     quiet: bool,
 
-    #[clap(long, global = true, help = "Write results as JSON to a file. Defaults to build/json-outputs/<command>.json if no path specified.", num_args = 0..=1, require_equals = true, default_missing_value = "")]
+    #[clap(long, global = true, help = "Write command results as JSON. Pass `--json-output=<FILE>` for a custom path; with no value it defaults to build/json-outputs/<command>.json.", num_args = 0..=1, require_equals = true, default_missing_value = "")]
     json_output: Option<String>,
-
-    #[clap(long, global = true, help = "Disable Leo's daily check for version updates")]
-    disable_update_check: bool,
 
     #[clap(subcommand)]
     command: Commands,
 
-    #[clap(long, global = true, help = "Path to Leo program root folder")]
+    #[clap(
+        long,
+        global = true,
+        help = "Path to a Leo project, or an Aleo bytecode file for run, execute, deploy, or upgrade"
+    )]
     path: Option<PathBuf>,
 
     #[clap(long, global = true, help = "Path to aleo program registry")]
@@ -129,7 +130,7 @@ enum Commands {
     },
     #[clap(about = "List installed leo plugins")]
     Plugins,
-    #[clap(about = "Update the Leo CLI")]
+    #[clap(about = "Update dependencies in leo.lock within the manifest constraints")]
     Update {
         #[clap(flatten)]
         command: LeoUpdate,
@@ -184,7 +185,8 @@ pub fn handle_error<T>(res: Result<T>) -> T {
 #[derive(Serialize)]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
-enum JsonOutput {
+enum Output {
+    Build(BuildOutput),
     Deploy(DeployOutput),
     Run(RunOutput),
     Execute(ExecuteOutput),
@@ -221,39 +223,38 @@ pub fn run_with_args(cli: CLI) -> Result<()> {
         })?;
     }
 
-    // Check for updates. If not forced, it checks once per day.
-    if !quiet
-        && !cli.disable_update_check
-        && let Ok(true) = updater::Updater::check_for_updates(false)
-    {
-        let _ = updater::Updater::print_cli();
-    }
-
     // Get custom root folder and create context for it.
     // If not specified, default context will be created in cwd.
     let context = handle_error(Context::new(cli.path.clone(), cli.home, false, cli.package.clone()));
 
     let command_name = cli.command.name();
-    let mut command_output: Option<JsonOutput> = None;
+    let mut command_output: Option<Output> = None;
 
     match cli.command {
         Commands::Add { command } => command.try_execute(context)?,
         Commands::Account { command } => command.try_execute(context)?,
         Commands::New { command } => command.try_execute(context)?,
-        Commands::Build { command } => command.try_execute(context)?,
+        Commands::Build { command } => {
+            // `NetworkName` is `Copy`, so read it out before `command` is consumed by `execute`.
+            let network = command.env_override.network;
+            let package = command.execute(context)?;
+            if cli.json_output.is_some() {
+                command_output = Some(Output::Build(build_output(&package, network)?));
+            }
+        }
         Commands::Abi { command } => command.try_execute(context)?,
         Commands::Query { command } => {
             let result = command.execute(context)?;
             let data = serde_json::from_str(&result).unwrap_or_else(|_| serde_json::Value::String(result));
-            command_output = Some(JsonOutput::Query(data));
+            command_output = Some(Output::Query(data));
         }
         Commands::Clean { command } => command.try_execute(context)?,
-        Commands::Deploy { command } => command_output = Some(JsonOutput::Deploy(command.execute(context)?)),
+        Commands::Deploy { command } => command_output = Some(Output::Deploy(command.execute(context)?)),
         Commands::Devnet { command } => command.try_execute(context)?,
         Commands::Devnode { command } => command.try_execute(context)?,
-        Commands::Run { command } => command_output = Some(JsonOutput::Run(command.execute(context)?)),
-        Commands::Test { command } => command_output = Some(JsonOutput::Test(command.execute(context)?)),
-        Commands::Execute { command } => command_output = Some(JsonOutput::Execute(command.execute(context)?)),
+        Commands::Run { command } => command_output = Some(Output::Run(command.execute(context)?)),
+        Commands::Test { command } => command_output = Some(Output::Test(command.execute(context)?)),
+        Commands::Execute { command } => command_output = Some(Output::Execute(command.execute(context)?)),
         Commands::Plugins => crate::cli::plugin::print_all(),
         Commands::External(args) => {
             let (name, plugin_args) = args.split_first().expect("external subcommand requires a name");
@@ -261,9 +262,9 @@ pub fn run_with_args(cli: CLI) -> Result<()> {
             crate::cli::plugin::exec(&name, plugin_args, Some(&context.dir()?))?;
         }
         Commands::Remove { command } => command.try_execute(context)?,
-        Commands::Synthesize { command } => command_output = Some(JsonOutput::Synthesize(command.execute(context)?)),
+        Commands::Synthesize { command } => command_output = Some(Output::Synthesize(command.execute(context)?)),
         Commands::Update { command } => command.try_execute(context)?,
-        Commands::Upgrade { command } => command_output = Some(JsonOutput::Deploy(command.execute(context)?)),
+        Commands::Upgrade { command } => command_output = Some(Output::Deploy(command.execute(context)?)),
     }
 
     if let Some(json_output_arg) = cli.json_output
@@ -271,9 +272,16 @@ pub fn run_with_args(cli: CLI) -> Result<()> {
     {
         let json = serde_json::to_string_pretty(output).expect("JSON serialization failed");
 
-        // Use provided path or default to build/json-outputs/<command>.json
         let path = if json_output_arg.is_empty() {
             cli.path
+                .as_deref()
+                .map(|path| {
+                    if path.extension().and_then(|extension| extension.to_str()) == Some("aleo") {
+                        path.parent().unwrap_or(path).to_path_buf()
+                    } else {
+                        path.to_path_buf()
+                    }
+                })
                 .unwrap_or_else(|| PathBuf::from("."))
                 .join("build")
                 .join("json-outputs")
@@ -290,7 +298,7 @@ pub fn run_with_args(cli: CLI) -> Result<()> {
             .map_err(|e| crate::errors::custom(format!("Failed to write JSON output to {}: {e}", path.display())))?;
     }
 
-    if let Some(JsonOutput::Test(output)) = &command_output
+    if let Some(Output::Test(output)) = &command_output
         && output.failed > 0
     {
         return Err(crate::errors::tests_failed(output.failed, output.tests.len()).into());
@@ -303,14 +311,412 @@ pub fn run_with_args(cli: CLI) -> Result<()> {
 mod tests {
     use crate::cli::{
         CLI,
+        DependencySource,
+        GitRef,
+        LeoAdd,
         cli::{Commands, test_helpers},
+        commands::LeoNew,
         run_with_args,
     };
     use clap::Parser;
     use leo_ast::NetworkName;
     use leo_span::create_session_if_not_set_then;
     use serial_test::serial;
-    use std::env::temp_dir;
+    use std::{env::temp_dir, path::PathBuf};
+
+    #[test]
+    fn update_accepts_dependency_options_and_rejects_self_update_flags() {
+        for arguments in [vec!["leo", "update"], vec![
+            "leo",
+            "update",
+            "token.aleo",
+            "--dry-run",
+            "--network",
+            "testnet",
+            "--endpoint",
+            "http://localhost:3030",
+        ]] {
+            CLI::try_parse_from(arguments).expect("Dependency update arguments must parse");
+        }
+        for arguments in [
+            vec!["leo", "update", "--list"],
+            vec!["leo", "update", "--name", "v4.4.4"],
+            vec!["leo", "--disable-update-check", "build"],
+            vec!["leo", "update", "--disable-update-check"],
+        ] {
+            assert!(CLI::try_parse_from(arguments).is_err(), "Self-update flags must be removed");
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn build_initializes_missing_registry_directory() {
+        let root = tempfile::tempdir().expect("Create the fixture directory");
+        test_helpers::scaffold_minimal_member(root.path(), "fresh_registry");
+        let project = root.path().join("fresh_registry");
+        std::fs::write(
+            project.join("src/main.leo"),
+            "program fresh_registry.aleo { fn main(public a: u32) -> u32 { return a; } @noupgrade constructor() {} }",
+        )
+        .expect("Write a program with an entry point");
+        let home = root.path().join("missing/home");
+        assert!(!home.exists());
+        let command = CLI::try_parse_from([
+            "leo",
+            "-q",
+            "--path",
+            project.to_str().expect("The project path must be UTF-8"),
+            "--home",
+            home.to_str().expect("The registry path must be UTF-8"),
+            "build",
+            "--network",
+            "testnet",
+        ])
+        .expect("The build arguments must parse");
+        create_session_if_not_set_then(|_| {
+            run_with_args(command).expect("The first build must create its registry directory");
+        });
+        assert!(home.is_dir());
+        assert!(project.join("build/fresh_registry/fresh_registry.aleo").is_file());
+
+        let file = root.path().join("not_a_directory");
+        std::fs::write(&file, "file").expect("Create the invalid registry path");
+        let context = crate::cli::context::Context::new(None, Some(file), false, None).expect("Create context");
+        assert!(context.home().is_err(), "A registry path must be a directory");
+    }
+
+    #[test]
+    fn network_pins_use_the_workspace_root() {
+        use crate::cli::context::Context;
+
+        let root = temp_dir().join(format!("leo_workspace_pins_{}", std::process::id()));
+        std::fs::create_dir_all(root.join("member")).expect("The member directory must be created");
+        std::fs::write(root.join("workspace.json"), r#"{"members":["member"]}"#)
+            .expect("The workspace file must be written");
+        let lock = serde_json::json!({"version":2,"network":[{
+            "name":"trusted.aleo","network":"testnet","edition":7,"checksum":vec![0;32]
+        }]});
+        std::fs::write(root.join("leo.lock"), lock.to_string()).expect("The root lock must be written");
+        std::fs::write(root.join("member/leo.lock"), "invalid member lock").expect("The member lock must be written");
+        let context = Context::new(Some(root.join("member")), None, false, None).expect("The context must be valid");
+        let pins = context.network_pins().expect("The workspace lock must load");
+        assert_eq!(
+            pins.network_pin("trusted.aleo", NetworkName::TestnetV0, None).expect("The pin must exist").edition,
+            7
+        );
+        std::fs::remove_dir_all(root).expect("The temporary directory must be removed");
+    }
+
+    #[test]
+    fn network_pins_find_nested_project_files_and_ignore_unrelated_locks() {
+        use crate::cli::context::Context;
+
+        let root = temp_dir().join(format!("leo_nested_pins_{}", std::process::id()));
+        let file = root.join("build/program/main.aleo");
+        std::fs::create_dir_all(file.parent().expect("The file has a parent")).expect("Create the build directory");
+        std::fs::write(&file, "program main.aleo;").expect("Write the standalone program");
+        let lock = serde_json::json!({"version":2,"network":[{
+            "name":"trusted.aleo","network":"testnet","edition":7,"checksum":vec![0;32]
+        }]});
+        std::fs::write(root.join("leo.lock"), lock.to_string()).expect("Write the project lock");
+        let context = Context::new(Some(file), None, false, None).expect("The context must be valid");
+        assert!(context.network_pins().expect("Ignore locks outside projects").is_empty());
+        std::fs::write(root.join("program.json"), "{}").expect("Write the project manifest");
+        let pins = context.network_pins().expect("Read the enclosing project lock");
+        assert_eq!(
+            pins.network_pin("trusted.aleo", NetworkName::TestnetV0, None).expect("The pin must exist").edition,
+            7
+        );
+        std::fs::remove_dir_all(root).expect("Remove the temporary directory");
+    }
+
+    #[test]
+    fn remote_loader_resolves_without_manual_pins_and_checks_existing_pins() {
+        use crate::cli::{context::Context, load_programs_from_network};
+        use snarkvm::prelude::{Program, ProgramID, TestnetV0};
+        use std::{
+            io::{Read, Write},
+            net::TcpListener,
+            time::{Duration, Instant},
+        };
+
+        let root_source = "import imported.aleo;\nprogram target.aleo;\nfunction main:\n    input r0 as u32.public;\n    output r0 as u32.public;\n";
+        let import_source =
+            "program imported.aleo;\nfunction main:\n    input r0 as u32.public;\n    output r0 as u32.public;\n";
+        for case in ["unlocked", "locked", "upgrade", "root_mismatch", "import_mismatch"] {
+            let root = temp_dir().join(format!("leo_auto_remote_{}_{case}", std::process::id()));
+            std::fs::create_dir_all(&root).expect("The fixture directory must exist");
+            let home = root.join("cache");
+            let cache = home.join("registry/testnet/target/7/target.aleo");
+            std::fs::create_dir_all(cache.parent().expect("The cache file has a parent")).expect("Create cache");
+            std::fs::write(&cache, if case == "unlocked" { "unverified cache" } else { root_source })
+                .expect("Seed cache");
+            let mut pins = Vec::new();
+            if case != "unlocked" {
+                test_helpers::scaffold_minimal_member(&root, "consumer");
+                for (source, edition) in [(root_source, if case == "upgrade" { 2 } else { 7 }), (import_source, 3)] {
+                    let program: Program<TestnetV0> = source.parse().expect("The fixture must parse");
+                    pins.push(
+                        serde_json::json!({"name":program.id().to_string(),"network":"testnet","edition":edition,
+                        "checksum":program.to_checksum().map(|byte| *byte)}),
+                    );
+                }
+            }
+            let project = if case == "unlocked" { root.clone() } else { root.join("consumer") };
+            let lock_path = project.join("leo.lock");
+            let original_lock = serde_json::json!({"version":2,"network":pins}).to_string();
+            if case != "unlocked" {
+                std::fs::write(&lock_path, &original_lock).expect("Write project lock");
+            }
+            let mut responses = Vec::new();
+            if case == "unlocked" {
+                responses.push(("/testnet/program/target.aleo/latest_edition", "7".to_string()));
+            }
+            responses.push((
+                "/testnet/program/target.aleo/7",
+                serde_json::to_string(&if case == "root_mismatch" {
+                    root_source.replace("public", "private")
+                } else {
+                    root_source.to_string()
+                })
+                .expect("Serialize root"),
+            ));
+            if case != "root_mismatch" {
+                if case == "unlocked" {
+                    responses.push(("/testnet/program/imported.aleo/latest_edition", "3".to_string()));
+                }
+                responses.push((
+                    "/testnet/program/imported.aleo/3",
+                    serde_json::to_string(&if case == "import_mismatch" {
+                        import_source.replace("public", "private")
+                    } else {
+                        import_source.to_string()
+                    })
+                    .expect("Serialize import"),
+                ));
+            }
+            let listener = TcpListener::bind("127.0.0.1:0").expect("Bind fixture");
+            listener.set_nonblocking(true).expect("Set accept mode");
+            let endpoint = format!("http://{}", listener.local_addr().expect("Read fixture address"));
+            let server = std::thread::spawn(move || {
+                for (path, body) in responses {
+                    let start = Instant::now();
+                    let mut stream = loop {
+                        match listener.accept() {
+                            Ok((stream, _)) => break stream,
+                            Err(error)
+                                if error.kind() == std::io::ErrorKind::WouldBlock
+                                    && start.elapsed() < Duration::from_secs(10) =>
+                            {
+                                std::thread::sleep(Duration::from_millis(5))
+                            }
+                            Err(error) => panic!("Expected a program request: {error}"),
+                        }
+                    };
+                    stream.set_nonblocking(false).expect("Set stream mode");
+                    stream.set_read_timeout(Some(Duration::from_secs(10))).expect("Set read timeout");
+                    let mut request = [0; 4096];
+                    let count = stream.read(&mut request).expect("Read request");
+                    assert!(String::from_utf8_lossy(&request[..count]).starts_with(&format!("GET {path} HTTP/1.1")));
+                    write!(
+                        stream,
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .expect("Write response");
+                }
+            });
+            let context = Context::new(Some(project), Some(home), false, None).expect("Create context");
+            create_session_if_not_set_then(|_| {
+                let id = "target.aleo".parse::<ProgramID<TestnetV0>>().expect("Parse ID");
+                let result = load_programs_from_network(
+                    &context,
+                    id,
+                    NetworkName::TestnetV0,
+                    &endpoint,
+                    0,
+                    (case == "upgrade").then_some(7),
+                );
+                if case.ends_with("mismatch") {
+                    assert!(result.expect_err("Changed bytes must fail").to_string().contains("checksum"));
+                } else {
+                    let programs = result.expect("No manual pins must be required");
+                    assert_eq!(programs.len(), 2);
+                    assert_eq!(programs[0].0.id().to_string(), "imported.aleo");
+                    assert_eq!(programs[0].1, Some(3));
+                    assert_eq!(programs[1].1, Some(7));
+                }
+            });
+            server.join().expect("The server must finish");
+            if case == "unlocked" {
+                assert!(!lock_path.exists(), "An ad-hoc command must not create a project lock");
+            } else {
+                assert_eq!(std::fs::read_to_string(lock_path).expect("Read unchanged lock"), original_lock);
+            }
+            assert_eq!(std::fs::read_to_string(cache).expect("Read root cache"), root_source);
+            std::fs::remove_dir_all(root).expect("Remove fixture");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[serial]
+    fn add_network_dependency_restores_lock_when_manifest_write_fails() {
+        use leo_package::{Dependency, Location, Lock, Manifest};
+        use snarkvm::prelude::{Program, TestnetV0};
+        use std::{
+            io::{Read, Write},
+            net::TcpListener,
+            os::unix::fs::PermissionsExt,
+            time::{Duration, Instant},
+        };
+
+        let source =
+            "program target.aleo;\nfunction main:\n    input r0 as u32.public;\n    output r0 as u32.public;\n";
+        let program: Program<TestnetV0> = source.parse().expect("The fixture must parse");
+        dotenvy::dotenv().ok();
+        let network = crate::cli::get_network(&None).unwrap_or(NetworkName::TestnetV0);
+        for existing_lock in [false, true] {
+            let root = tempfile::tempdir().expect("Create the fixture directory");
+            test_helpers::scaffold_minimal_member(root.path(), "consumer");
+            let project = root.path().join("consumer");
+            let manifest_path = project.join("program.json");
+            let mut manifest = Manifest::read_from_file(&manifest_path).expect("Read the fixture manifest");
+            manifest.dependencies = Some(vec![Dependency {
+                name: "target.aleo".to_owned(),
+                location: Location::Network,
+                ..Default::default()
+            }]);
+            manifest.write_to_file(&manifest_path).expect("Write the existing dependency");
+            let original_manifest = std::fs::read(&manifest_path).expect("Read the original manifest");
+            if existing_lock {
+                let lock = serde_json::json!({"version":2,"network":[{
+                    "name":"target.aleo","network":network.to_string(),"edition":0,
+                    "checksum":program.to_checksum().map(|byte| *byte)
+                }]});
+                std::fs::write(project.join("leo.lock"), lock.to_string()).expect("Write the original lock");
+            }
+            std::fs::set_permissions(&manifest_path, std::fs::Permissions::from_mode(0o444))
+                .expect("Make the manifest read-only");
+
+            let listener = TcpListener::bind("127.0.0.1:0").expect("Bind the fixture");
+            listener.set_nonblocking(true).expect("Set accept mode");
+            let endpoint = format!("http://{}", listener.local_addr().expect("Read the fixture address"));
+            let server = std::thread::spawn(move || {
+                let start = Instant::now();
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(error)
+                            if error.kind() == std::io::ErrorKind::WouldBlock
+                                && start.elapsed() < Duration::from_secs(10) =>
+                        {
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(error) => panic!("Expected a program request: {error}"),
+                    }
+                };
+                stream.set_nonblocking(false).expect("Set stream mode");
+                stream.set_read_timeout(Some(Duration::from_secs(10))).expect("Set read timeout");
+                let mut request = [0; 4096];
+                let count = stream.read(&mut request).expect("Read the request");
+                assert!(
+                    String::from_utf8_lossy(&request[..count])
+                        .starts_with(&format!("GET /{network}/program/target.aleo/1 HTTP/1.1"))
+                );
+                let body = serde_json::to_string(source).expect("Serialize the program");
+                write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len())
+                    .expect("Write the response");
+            });
+            let cli = CLI::try_parse_from([
+                "leo",
+                "-q",
+                "--path",
+                project.to_str().expect("The project path must be UTF-8"),
+                "--home",
+                root.path().to_str().expect("The home path must be UTF-8"),
+                "add",
+                "target.aleo",
+                "--edition",
+                "1",
+                "--endpoint",
+                &endpoint,
+                "--network-retries",
+                "0",
+            ])
+            .expect("The add arguments must parse");
+            create_session_if_not_set_then(|_| {
+                let error = run_with_args(cli).expect_err("The read-only manifest must reject the update");
+                assert!(error.to_string().contains("failed to write manifest file"), "{error}");
+            });
+            server.join().expect("The fixture must finish");
+            assert_eq!(std::fs::read(&manifest_path).expect("Read the unchanged manifest"), original_manifest);
+            let lock = Lock::read(&project).expect("Read the restored lock");
+            if existing_lock {
+                let pin = lock.network_pin("target.aleo", network, None).expect("The original pin must remain");
+                assert_eq!(pin.edition, 0);
+                assert_eq!(pin.checksum, program.to_checksum().map(|byte| *byte));
+            } else {
+                assert!(lock.is_empty());
+                assert!(!project.join("leo.lock").exists());
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn add_network_dependency_rejects_unreachable_endpoint() {
+        let temp_dir = temp_dir();
+        let project_directory = temp_dir.join("add_missing_network_dep");
+        if project_directory.exists() {
+            std::fs::remove_dir_all(&project_directory).unwrap();
+        }
+
+        let new = CLI {
+            debug: false,
+            quiet: false,
+            json_output: None,
+            command: Commands::New {
+                command: LeoNew { name: "add_missing_network_dep".to_string(), library: false, workspace: false },
+            },
+            path: Some(project_directory.clone()),
+            home: None,
+            package: None,
+        };
+
+        let add = CLI {
+            debug: false,
+            quiet: false,
+            json_output: None,
+            command: Commands::Add {
+                command: LeoAdd {
+                    name: "nonexistent_program".to_string(),
+                    source: DependencySource { local: None, network: true, edition: None, workspace: false, git: None },
+                    git_ref: GitRef { branch: None, tag: None, rev: None },
+                    endpoint: Some("http://localhost:1".to_string()),
+                    network_retries: 0,
+                    dev: false,
+                },
+            },
+            path: Some(project_directory.clone()),
+            home: Some(temp_dir.join(".aleo_add_missing")),
+            package: None,
+        };
+
+        create_session_if_not_set_then(|_| {
+            run_with_args(new).expect("Failed to execute `leo new`");
+
+            let error = run_with_args(add).expect_err("An unreachable dependency must fail");
+            assert!(error.to_string().contains("failed to retrieve"), "{error}");
+
+            let manifest_path = project_directory.join(leo_package::MANIFEST_FILENAME);
+            let manifest = leo_package::Manifest::read_from_file(&manifest_path).unwrap();
+            assert!(
+                manifest.dependencies.is_none(),
+                "manifest should not record a dependency that failed verification"
+            );
+        });
+    }
 
     #[test]
     #[serial]
@@ -334,13 +740,14 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Run {
                 command: crate::cli::commands::LeoRun {
                     name: "example".to_string(),
                     inputs: vec!["1u32".to_string(), "2u32".to_string()],
                     env_override,
                     build_options: Default::default(),
+                    imports_dir: None,
+                    key_override: Default::default(),
                     with: vec![],
                 },
             },
@@ -380,7 +787,6 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Run {
                 command: crate::cli::commands::LeoRun {
                     name: "double_wrapper_mint".to_string(),
@@ -390,6 +796,8 @@ mod tests {
                     ],
                     env_override: Default::default(),
                     build_options: Default::default(),
+                    imports_dir: None,
+                    key_override: Default::default(),
                     with: vec![],
                 },
             },
@@ -427,13 +835,14 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Run {
                 command: crate::cli::commands::LeoRun {
                     name: "inner_1_main".to_string(),
                     inputs: vec!["1u32".to_string(), "2u32".to_string()],
                     build_options: Default::default(),
+                    imports_dir: None,
                     env_override: Default::default(),
+                    key_override: Default::default(),
                     with: vec![],
                 },
             },
@@ -468,13 +877,14 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Run {
                 command: crate::cli::commands::LeoRun {
                     name: "main".to_string(),
                     inputs: vec!["1u32".to_string(), "2u32".to_string()],
                     env_override: Default::default(),
                     build_options: Default::default(),
+                    imports_dir: None,
+                    key_override: Default::default(),
                     with: vec![],
                 },
             },
@@ -505,7 +915,6 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: crate::cli::commands::LeoNew { name: lib_name.to_string(), library: true, workspace: false },
             },
@@ -551,7 +960,6 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: crate::cli::commands::LeoNew { name: ws_name.to_string(), library: false, workspace: true },
             },
@@ -589,6 +997,108 @@ mod tests {
 
     #[test]
     #[serial]
+    fn deploy_rename_flag_parses() {
+        // `leo deploy --rename <name>` should populate the deploy command's `rename` field.
+        let cli = CLI::try_parse_from(["leo", "deploy", "--rename", "renamed"])
+            .expect("`leo deploy --rename renamed` should parse");
+        match cli.command {
+            Commands::Deploy { command } => assert_eq!(command.rename.as_deref(), Some("renamed")),
+            _ => panic!("expected a deploy command"),
+        }
+        // The flag is optional: deploying without it leaves `rename` unset.
+        let cli = CLI::try_parse_from(["leo", "deploy"]).expect("`leo deploy` should parse");
+        match cli.command {
+            Commands::Deploy { command } => assert_eq!(command.rename, None),
+            _ => panic!("expected a deploy command"),
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn aleo_imports_directory_flag_parses_for_supported_commands() {
+        let expected = PathBuf::from("imports");
+
+        let cli = CLI::try_parse_from(["leo", "run", "--imports-dir", "imports"])
+            .expect("run should accept an Aleo imports directory");
+        match cli.command {
+            Commands::Run { command } => assert_eq!(command.imports_dir.as_ref(), Some(&expected)),
+            _ => panic!("expected a run command"),
+        }
+
+        let cli = CLI::try_parse_from(["leo", "execute", "--imports-dir", "imports"])
+            .expect("execute should accept an Aleo imports directory");
+        match cli.command {
+            Commands::Execute { command } => assert_eq!(command.imports_dir.as_ref(), Some(&expected)),
+            _ => panic!("expected an execute command"),
+        }
+
+        let cli = CLI::try_parse_from(["leo", "deploy", "--imports-dir", "imports"])
+            .expect("deploy should accept an Aleo imports directory");
+        match cli.command {
+            Commands::Deploy { command } => assert_eq!(command.imports_dir.as_ref(), Some(&expected)),
+            _ => panic!("expected a deploy command"),
+        }
+
+        let cli = CLI::try_parse_from(["leo", "upgrade", "--imports-dir", "imports"])
+            .expect("upgrade should accept an Aleo imports directory");
+        match cli.command {
+            Commands::Upgrade { command } => assert_eq!(command.imports_dir.as_ref(), Some(&expected)),
+            _ => panic!("expected an upgrade command"),
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn aleo_file_path_is_rejected_by_build_test_and_clean() {
+        let test_directory = tempfile::tempdir().expect("test directory should be creatable");
+        let aleo_file = test_directory.path().join("standalone.aleo");
+        std::fs::write(&aleo_file, "program standalone.aleo;\n").expect("Aleo fixture should be writable");
+        let aleo_path = aleo_file.to_str().expect("Aleo fixture path should be UTF-8");
+
+        for (command, expected_error) in [
+            ("build", "failed to load Leo project"),
+            ("test", "failed to load Leo project"),
+            ("clean", "doesn't appear to be a Leo package"),
+        ] {
+            let cli = CLI::try_parse_from(["leo", "-q", "--path", aleo_path, command])
+                .unwrap_or_else(|error| panic!("`leo {command}` arguments should parse: {error}"));
+
+            create_session_if_not_set_then(|_| {
+                let error = run_with_args(cli).expect_err("project-only command should reject an Aleo bytecode path");
+                assert!(error.to_string().contains(expected_error), "unexpected `leo {command}` error: {error}");
+            });
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn aleo_upgrade_rejects_invalid_path_option_combinations() {
+        let test_directory = tempfile::tempdir().expect("test directory should be creatable");
+        let aleo_file = test_directory.path().join("standalone.aleo");
+        std::fs::write(&aleo_file, "program standalone.aleo;\n").expect("Aleo fixture should be writable");
+        let project_path = test_directory.path().to_str().expect("test directory path should be UTF-8");
+        let aleo_path = aleo_file.to_str().expect("Aleo fixture path should be UTF-8");
+
+        for (arguments, expected_error) in [
+            (
+                ["leo", "-q", "--path", aleo_path, "--package", "member", "upgrade"],
+                "`--package` cannot be used with an Aleo bytecode file",
+            ),
+            (
+                ["leo", "-q", "--path", project_path, "upgrade", "--imports-dir", "imports"],
+                "`--imports-dir` requires `--path` to point to an Aleo bytecode file",
+            ),
+        ] {
+            let cli = CLI::try_parse_from(arguments).expect("upgrade arguments should parse");
+            create_session_if_not_set_then(|_| {
+                let error = run_with_args(cli).expect_err("invalid upgrade option combination should fail");
+                assert!(error.to_string().contains(expected_error), "unexpected upgrade error: {error}");
+            });
+        }
+    }
+
+    #[test]
+    #[serial]
     fn new_inside_workspace_auto_registers() {
         let temp_dir = temp_dir();
         let ws_root = temp_dir.join("ws_new_inside_test");
@@ -608,7 +1118,6 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: crate::cli::commands::LeoNew { name: new_pkg.to_string(), library: false, workspace: false },
             },
@@ -650,7 +1159,6 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: crate::cli::commands::LeoNew { name: new_pkg.to_string(), library: false, workspace: false },
             },
@@ -682,10 +1190,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
                         ..Default::default()
@@ -701,8 +1209,8 @@ mod tests {
             run_with_args(build).expect("workspace build should succeed");
         });
 
-        assert!(ws_root.join("token/build/token/token.aleo").exists(), "token should be built");
-        assert!(ws_root.join("swap/build/swap/swap.aleo").exists(), "swap should be built");
+        assert!(ws_root.join("build/token/token.aleo").exists(), "token should be built");
+        assert!(ws_root.join("build/swap/swap.aleo").exists(), "swap should be built");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -717,10 +1225,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
                         ..Default::default()
@@ -736,8 +1244,8 @@ mod tests {
             run_with_args(build).expect("single member build should succeed");
         });
 
-        assert!(ws_root.join("token/build/token/token.aleo").exists(), "token should be built");
-        assert!(!ws_root.join("swap/build/swap/swap.aleo").exists(), "swap should NOT be built");
+        assert!(ws_root.join("build/token/token.aleo").exists(), "token should be built");
+        assert!(!ws_root.join("build/swap/swap.aleo").exists(), "swap should NOT be built");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -752,10 +1260,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
                         ..Default::default()
@@ -771,8 +1279,8 @@ mod tests {
             run_with_args(build).expect("--package build should succeed");
         });
 
-        assert!(ws_root.join("token/build/token/token.aleo").exists(), "token should be built");
-        assert!(!ws_root.join("swap/build/swap/swap.aleo").exists(), "swap should NOT be built");
+        assert!(ws_root.join("build/token/token.aleo").exists(), "token should be built");
+        assert!(!ws_root.join("build/swap/swap.aleo").exists(), "swap should NOT be built");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -787,10 +1295,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: Default::default(),
                 },
             },
@@ -818,10 +1326,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
                         ..Default::default()
@@ -837,15 +1345,14 @@ mod tests {
             run_with_args(build).expect("build should succeed");
         });
 
-        assert!(ws_root.join("token/build").exists(), "token build dir should exist");
-        assert!(ws_root.join("swap/build").exists(), "swap build dir should exist");
+        assert!(ws_root.join("build/token").exists(), "token build dir should exist under shared build/");
+        assert!(ws_root.join("build/swap").exists(), "swap build dir should exist under shared build/");
 
         // Clean.
         let clean = CLI {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Clean { command: crate::cli::commands::LeoClean {} },
             path: Some(ws_root.clone()),
             home: None,
@@ -856,8 +1363,7 @@ mod tests {
             run_with_args(clean).expect("workspace clean should succeed");
         });
 
-        assert!(!ws_root.join("token/build").exists(), "token build dir should be cleaned");
-        assert!(!ws_root.join("swap/build").exists(), "swap build dir should be cleaned");
+        assert!(!ws_root.join("build").exists(), "shared workspace build dir should be cleaned");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -872,10 +1378,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
                         ..Default::default()
@@ -891,8 +1397,8 @@ mod tests {
             run_with_args(build).expect("workspace build with workspace deps should succeed");
         });
 
-        assert!(ws_root.join("token/build/token/token.aleo").exists(), "token should be built");
-        assert!(ws_root.join("swap/build/swap/swap.aleo").exists(), "swap should be built");
+        assert!(ws_root.join("build/token/token.aleo").exists(), "token should be built");
+        assert!(ws_root.join("build/swap/swap.aleo").exists(), "swap should be built");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -908,10 +1414,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
                         ..Default::default()
@@ -927,7 +1433,7 @@ mod tests {
             run_with_args(build).expect("single member build with workspace dep should succeed");
         });
 
-        assert!(ws_root.join("swap/build/swap/swap.aleo").exists(), "swap should be built");
+        assert!(ws_root.join("build/swap/swap.aleo").exists(), "swap should be built");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -943,10 +1449,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
                         ..Default::default()
@@ -962,7 +1468,7 @@ mod tests {
             run_with_args(build).expect("build with workspace dev dep should succeed");
         });
 
-        assert!(ws_root.join("swap/build/swap/swap.aleo").exists(), "swap should be built");
+        assert!(ws_root.join("build/swap/swap.aleo").exists(), "swap should be built");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -980,21 +1486,27 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Deploy {
                 command: crate::cli::commands::LeoDeploy {
                     fee_options: Default::default(),
                     action: crate::cli::commands::TransactionAction { print: false, broadcast: false, save: None },
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
-                        private_key: Some("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()),
                         endpoint: Some("http://localhost:1".to_string()),
+                        ..Default::default()
+                    },
+                    key_override: crate::cli::commands::PrivateKeyOptions {
+                        private_key: Some("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()),
+                    },
+                    consensus_override: crate::cli::commands::ConsensusOptions {
                         consensus_heights: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
                         ..Default::default()
                     },
                     extra: crate::cli::commands::ExtraOptions { yes: true, ..Default::default() },
                     skip: vec![],
+                    rename: None,
                     build_options: Default::default(),
+                    imports_dir: None,
                     skip_deploy_certificate: true,
                 },
             },
@@ -1010,9 +1522,34 @@ mod tests {
         });
 
         // Verify both members were built.
-        assert!(ws_root.join("token/build/token/token.aleo").exists(), "token should be built");
-        assert!(ws_root.join("swap/build/swap/swap.aleo").exists(), "swap should be built");
+        assert!(ws_root.join("build/token/token.aleo").exists(), "token should be built");
+        assert!(ws_root.join("build/swap/swap.aleo").exists(), "swap should be built");
 
+        let _ = std::fs::remove_dir_all(&ws_root);
+    }
+
+    #[test]
+    #[serial]
+    fn workspace_deploy_rejects_aleo_imports_directory() {
+        let temp_dir = temp_dir();
+        let ws_root = test_helpers::sample_workspace_with_workspace_deps(&temp_dir, "deploy_imports_directory");
+        let imports = ws_root.join("imports");
+        let deploy = CLI::try_parse_from([
+            "leo",
+            "--path",
+            ws_root.to_str().expect("workspace path should be UTF-8"),
+            "deploy",
+            "--imports-dir",
+            imports.to_str().expect("imports path should be UTF-8"),
+        ])
+        .expect("deploy arguments should parse");
+
+        create_session_if_not_set_then(|_| {
+            let error = run_with_args(deploy).expect_err("workspace deploy should reject an Aleo imports directory");
+            assert!(error.to_string().contains("`--imports-dir` requires `--path` to point to an Aleo bytecode file"));
+        });
+
+        assert!(!ws_root.join("build").exists(), "validation should happen before workspace members are built");
         let _ = std::fs::remove_dir_all(&ws_root);
     }
 
@@ -1027,21 +1564,27 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Deploy {
                 command: crate::cli::commands::LeoDeploy {
                     fee_options: Default::default(),
                     action: crate::cli::commands::TransactionAction { print: false, broadcast: false, save: None },
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
-                        private_key: Some("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()),
                         endpoint: Some("http://localhost:1".to_string()),
+                        ..Default::default()
+                    },
+                    key_override: crate::cli::commands::PrivateKeyOptions {
+                        private_key: Some("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()),
+                    },
+                    consensus_override: crate::cli::commands::ConsensusOptions {
                         consensus_heights: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
                         ..Default::default()
                     },
                     extra: crate::cli::commands::ExtraOptions { yes: true, ..Default::default() },
                     skip: vec![],
+                    rename: None,
                     build_options: Default::default(),
+                    imports_dir: None,
                     skip_deploy_certificate: true,
                 },
             },
@@ -1057,8 +1600,8 @@ mod tests {
 
         // --package=token targets a single member, so resolve_targets returns 1 target.
         // This falls through to the single-package deploy path, building only token.
-        assert!(ws_root.join("token/build/token/token.aleo").exists(), "token should be built");
-        assert!(!ws_root.join("swap/build/swap/swap.aleo").exists(), "swap should NOT be built");
+        assert!(ws_root.join("build/token/token.aleo").exists(), "token should be built");
+        assert!(!ws_root.join("build/swap/swap.aleo").exists(), "swap should NOT be built");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -1074,21 +1617,27 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Deploy {
                 command: crate::cli::commands::LeoDeploy {
                     fee_options: Default::default(),
                     action: crate::cli::commands::TransactionAction { print: false, broadcast: false, save: None },
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
-                        private_key: Some("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()),
                         endpoint: Some("http://localhost:1".to_string()),
+                        ..Default::default()
+                    },
+                    key_override: crate::cli::commands::PrivateKeyOptions {
+                        private_key: Some("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()),
+                    },
+                    consensus_override: crate::cli::commands::ConsensusOptions {
                         consensus_heights: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
                         ..Default::default()
                     },
                     extra: crate::cli::commands::ExtraOptions { yes: true, ..Default::default() },
                     skip: vec![],
+                    rename: None,
                     build_options: Default::default(),
+                    imports_dir: None,
                     skip_deploy_certificate: true,
                 },
             },
@@ -1122,21 +1671,27 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Deploy {
                 command: crate::cli::commands::LeoDeploy {
                     fee_options: Default::default(),
                     action: crate::cli::commands::TransactionAction { print: false, broadcast: false, save: None },
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
-                        private_key: Some("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()),
                         endpoint: Some("http://localhost:1".to_string()),
+                        ..Default::default()
+                    },
+                    key_override: crate::cli::commands::PrivateKeyOptions {
+                        private_key: Some("APrivateKey1zkp8CZNn3yeCseEtxuVPbDCwSyhGW6yZKUYKfgXmcpoGPWH".to_string()),
+                    },
+                    consensus_override: crate::cli::commands::ConsensusOptions {
                         consensus_heights: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
                         ..Default::default()
                     },
                     extra: crate::cli::commands::ExtraOptions { yes: true, ..Default::default() },
                     skip: vec![],
+                    rename: None,
                     build_options: Default::default(),
+                    imports_dir: None,
                     skip_deploy_certificate: true,
                 },
             },
@@ -1151,9 +1706,9 @@ mod tests {
         });
 
         // The app program should be built.
-        assert!(ws_root.join("app/build/app/app.aleo").exists(), "app should be built");
+        assert!(ws_root.join("build/app/app.aleo").exists(), "app should be built");
         // utils is a library - no bytecode output.
-        assert!(!ws_root.join("utils/build/utils/utils.aleo").exists(), "utils library should not produce bytecode");
+        assert!(!ws_root.join("build/utils/utils.aleo").exists(), "utils library should not produce bytecode");
 
         let _ = std::fs::remove_dir_all(&ws_root);
     }
@@ -1173,7 +1728,6 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: crate::cli::commands::LeoNew { name: pkg_name.to_string(), library: false, workspace: false },
             },
@@ -1190,10 +1744,10 @@ mod tests {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Build {
                 command: crate::cli::commands::LeoBuild {
                     options: Default::default(),
+                    rename: None,
                     env_override: crate::cli::commands::EnvOptions {
                         network: Some(NetworkName::TestnetV0),
                         ..Default::default()
@@ -1217,7 +1771,7 @@ mod tests {
 
 #[cfg(test)]
 mod test_helpers {
-    use crate::cli::{CLI, DependencySource, LeoAdd, LeoNew, cli::Commands, run_with_args};
+    use crate::cli::{CLI, DependencySource, GitRef, LeoAdd, LeoNew, cli::Commands, run_with_args};
     use leo_span::create_session_if_not_set_then;
     use std::path::{Path, PathBuf};
 
@@ -1608,7 +2162,7 @@ program swap.aleo {
         std::fs::write(
             utils_dir.join("src/lib.leo"),
             "\
-const FACTOR: u32 = 2u32;
+export const FACTOR: u32 = 2u32;
 ",
         )
         .unwrap();
@@ -1688,7 +2242,6 @@ program app.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New { command: LeoNew { name: name.to_string(), library: false, workspace: false } },
             path: Some(project_directory.clone()),
             home: None,
@@ -1753,30 +2306,7 @@ function external_nested_function:
         // Overwrite `src/main.leo` file
         std::fs::write(project_directory.join("src").join("main.leo"), program_str).unwrap();
 
-        // Add dependencies
-        let add = CLI {
-            debug: false,
-            quiet: false,
-            json_output: None,
-            disable_update_check: false,
-            command: Commands::Add {
-                command: LeoAdd {
-                    name: "nested_example_layer_0".to_string(),
-                    source: DependencySource { local: None, network: true, edition: Some(0), workspace: false },
-                    clear: false,
-                    dev: false,
-                },
-            },
-            path: Some(project_directory.clone()),
-            home: None,
-            package: None,
-        };
-
-        create_session_if_not_set_then(|_| {
-            run_with_args(add).expect("Failed to execute `leo add`");
-        });
-
-        // Add custom `.aleo` directory with the appropriate cache entries.
+        // Seed the locked dependency graph for the cached execution test.
         let registry = temp_dir.join(".aleo").join("registry").join("testnet");
         std::fs::create_dir_all(&registry).unwrap();
 
@@ -1791,6 +2321,34 @@ function external_nested_function:
         let dir = registry.join("nested_example_layer_2").join("0");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("nested_example_layer_2.aleo"), nested_example_layer_2).unwrap();
+
+        // Trust the fixture programs independently of the cache.
+        let pins = [nested_example_layer_0, nested_example_layer_1, nested_example_layer_2].map(|source| {
+            let program: snarkvm::prelude::Program<snarkvm::prelude::TestnetV0> =
+                source.parse().expect("The fixture program must parse");
+            serde_json::json!({
+                "name": program.id().to_string(),
+                "network": "testnet",
+                "edition": 0,
+                "checksum": program.to_checksum().map(|byte| *byte),
+            })
+        });
+        std::fs::write(
+            project_directory.join("leo.lock"),
+            serde_json::json!({"version": 2, "network": pins}).to_string(),
+        )
+        .expect("The fixture pins must be written");
+
+        let manifest_path = project_directory.join(leo_package::MANIFEST_FILENAME);
+        let mut manifest =
+            leo_package::Manifest::read_from_file(&manifest_path).expect("The fixture manifest must load");
+        manifest.dependencies = Some(vec![leo_package::Dependency {
+            name: "nested_example_layer_0.aleo".to_string(),
+            location: leo_package::Location::Network,
+            edition: Some(0),
+            ..Default::default()
+        }]);
+        manifest.write_to_file(manifest_path).expect("The fixture dependency must be written");
     }
 
     pub(crate) fn sample_grandparent_package(temp_dir: &Path) {
@@ -1807,7 +2365,6 @@ function external_nested_function:
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: LeoNew { name: "grandparent".to_string(), library: false, workspace: false },
             },
@@ -1820,7 +2377,6 @@ function external_nested_function:
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New { command: LeoNew { name: "parent".to_string(), library: false, workspace: false } },
             path: Some(parent_directory.clone()),
             home: None,
@@ -1831,7 +2387,6 @@ function external_nested_function:
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New { command: LeoNew { name: "child".to_string(), library: false, workspace: false } },
             path: Some(child_directory.clone()),
             home: None,
@@ -1884,7 +2439,6 @@ program child.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Add {
                 command: LeoAdd {
                     name: "parent".to_string(),
@@ -1893,8 +2447,11 @@ program child.aleo {
                         network: false,
                         edition: None,
                         workspace: false,
+                        git: None,
                     },
-                    clear: false,
+                    git_ref: GitRef { branch: None, tag: None, rev: None },
+                    endpoint: None,
+                    network_retries: 2,
                     dev: false,
                 },
             },
@@ -1907,7 +2464,6 @@ program child.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Add {
                 command: LeoAdd {
                     name: "child".to_string(),
@@ -1916,8 +2472,11 @@ program child.aleo {
                         network: false,
                         edition: None,
                         workspace: false,
+                        git: None,
                     },
-                    clear: false,
+                    git_ref: GitRef { branch: None, tag: None, rev: None },
+                    endpoint: None,
+                    network_retries: 2,
                     dev: false,
                 },
             },
@@ -1930,7 +2489,6 @@ program child.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Add {
                 command: LeoAdd {
                     name: "child".to_string(),
@@ -1939,8 +2497,11 @@ program child.aleo {
                         network: false,
                         edition: None,
                         workspace: false,
+                        git: None,
                     },
-                    clear: false,
+                    git_ref: GitRef { branch: None, tag: None, rev: None },
+                    endpoint: None,
+                    network_retries: 2,
                     dev: false,
                 },
             },
@@ -1982,7 +2543,6 @@ program child.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New { command: LeoNew { name: "outer".to_string(), library: false, workspace: false } },
             path: Some(outer_directory.clone()),
             home: None,
@@ -1993,7 +2553,6 @@ program child.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: LeoNew { name: "inner_1".to_string(), library: false, workspace: false },
             },
@@ -2006,7 +2565,6 @@ program child.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: LeoNew { name: "inner_2".to_string(), library: false, workspace: false },
             },
@@ -2039,7 +2597,7 @@ program outer.aleo {
 }
             ";
         let inner_1_program = "
-struct ex_struct {
+export struct ex_struct {
     arg1: u32,
     arg2: u32,
 }
@@ -2051,7 +2609,7 @@ program inner_1.aleo {
     }
     fn inner_1_main(public a: u32, b: u32, c: ex_struct) -> inner_1_record {
         return inner_1_record {
-            owner: self.caller,
+            owner: std::ctx::caller(),
             val: c.arg1,
         };
     }
@@ -2070,7 +2628,7 @@ program inner_2.aleo {
     fn inner_2_main(public a: u32, b: u32) -> inner_2_record {
         let c: u32 = a + b;
         return inner_2_record {
-            owner: self.caller,
+            owner: std::ctx::caller(),
             val: a,
         };
     }
@@ -2084,7 +2642,6 @@ program inner_2.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Add {
                 command: LeoAdd {
                     name: "inner_1".to_string(),
@@ -2093,8 +2650,11 @@ program inner_2.aleo {
                         network: false,
                         edition: None,
                         workspace: false,
+                        git: None,
                     },
-                    clear: false,
+                    git_ref: GitRef { branch: None, tag: None, rev: None },
+                    endpoint: None,
+                    network_retries: 2,
                     dev: false,
                 },
             },
@@ -2107,7 +2667,6 @@ program inner_2.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Add {
                 command: LeoAdd {
                     name: "inner_2".to_string(),
@@ -2116,8 +2675,11 @@ program inner_2.aleo {
                         network: false,
                         edition: None,
                         workspace: false,
+                        git: None,
                     },
-                    clear: false,
+                    git_ref: GitRef { branch: None, tag: None, rev: None },
+                    endpoint: None,
+                    network_retries: 2,
                     dev: false,
                 },
             },
@@ -2158,7 +2720,6 @@ program inner_2.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: LeoNew { name: "outer_2".to_string(), library: false, workspace: false },
             },
@@ -2171,7 +2732,6 @@ program inner_2.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: LeoNew { name: "inner_1".to_string(), library: false, workspace: false },
             },
@@ -2184,7 +2744,6 @@ program inner_2.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::New {
                 command: LeoNew { name: "inner_2".to_string(), library: false, workspace: false },
             },
@@ -2225,7 +2784,7 @@ program outer_2.aleo {
         inner_2.aleo::Yo_Consumer(inner_2.aleo::Yo());
         let h: inner_2.aleo::Yoo = inner_2.aleo::Yo();
         let i: inner_2.aleo::Goo = inner_2.aleo::Goo_creator();
-        let j: Hello = Hello {owner: self.signer, a:1u32};
+        let j: Hello = Hello {owner: std::ctx::signer(), a:1u32};
 
         return (h, j);
     }
@@ -2235,12 +2794,12 @@ program outer_2.aleo {
 }
 ";
         let inner_1_program = "
-struct Foo {
+export struct Foo {
     a: u32,
     b: u32,
     c: Boo,
 }
-struct Boo {
+export struct Boo {
     a: u32,
     b: u32,
 }
@@ -2256,16 +2815,16 @@ program inner_1.aleo {
     constructor() {}
 }";
         let inner_2_program = "
-struct Foo {
+export struct Foo {
     a: u32,
     b: u32,
     c: Boo,
 }
-struct Boo {
+export struct Boo {
     a: u32,
     b: u32,
 }
-struct Goo {
+export struct Goo {
     a: u32,
     b: u32,
     c: u32,
@@ -2279,7 +2838,7 @@ program inner_2.aleo {
         return Foo {a: a, b: b, c: Boo {a:1u32, b:1u32}};
     }
     fn Yo()-> Yoo {
-        return Yoo {owner: self.signer, a:1u32};
+        return Yoo {owner: std::ctx::signer(), a:1u32};
     }
     fn Yo_Consumer(a: Yoo)->u32 {
         return a.a;
@@ -2296,7 +2855,6 @@ program inner_2.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Add {
                 command: LeoAdd {
                     name: "inner_1".to_string(),
@@ -2305,8 +2863,11 @@ program inner_2.aleo {
                         network: false,
                         edition: None,
                         workspace: false,
+                        git: None,
                     },
-                    clear: false,
+                    git_ref: GitRef { branch: None, tag: None, rev: None },
+                    endpoint: None,
+                    network_retries: 2,
                     dev: false,
                 },
             },
@@ -2319,7 +2880,6 @@ program inner_2.aleo {
             debug: false,
             quiet: false,
             json_output: None,
-            disable_update_check: false,
             command: Commands::Add {
                 command: LeoAdd {
                     name: "inner_2".to_string(),
@@ -2328,8 +2888,11 @@ program inner_2.aleo {
                         network: false,
                         edition: None,
                         workspace: false,
+                        git: None,
                     },
-                    clear: false,
+                    git_ref: GitRef { branch: None, tag: None, rev: None },
+                    endpoint: None,
+                    network_retries: 2,
                     dev: false,
                 },
             },

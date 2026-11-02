@@ -5,9 +5,12 @@ program test.aleo {
     fn check(key: address) -> Final {
         return final { finalize_check(key); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_check(key: address) {
+export final fn finalize_check(key: address) {
     let val: u64 = _dynamic_get::[u64]('some_program', 'aleo', 'balances', key);
     Mapping::set(result, key, val);
 }

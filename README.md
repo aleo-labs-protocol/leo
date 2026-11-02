@@ -8,8 +8,8 @@
     <a href="https://crates.io/crates/leo-lang">
         <img src="https://img.shields.io/crates/v/leo-lang?style=flat-square"/>
     </a>
-    <a href="https://circleci.com/gh/ProvableHQ/leo">
-        <img src="https://circleci.com/gh/ProvableHQ/leo.svg?style=svg&circle-token=00960191919c40be0774e00ce8f7fa1fcaa20c00">
+    <a href="https://github.com/aleo-labs-protocol/leo/actions/workflows/ci.yml">
+        <img alt="CI" src="https://github.com/aleo-labs-protocol/leo/actions/workflows/ci.yml/badge.svg?branch=master">
     </a>
     <a href="https://discord.gg/aleo">
         <img src="https://img.shields.io/discord/700454073459015690?logo=discord"/>
@@ -28,7 +28,7 @@ Leo is an imperative, statically-typed programming language built for writing pr
     * [🦀 Install Rust](#-install-rust)
     * [📦 Download using Cargo](#-download-using-cargo)
     * [🐙 Build from Source Code](#-build-from-source-code)
-    * [🦁 Update from Leo](#-update-from-leo)
+    * [🦁 Update Leo](#-update-leo)
 * [🚀 Quick Start](#-quick-start)
 * [🧰 Troubleshooting](#-troubleshooting)
 * [📖 Documentation](#-documentation)
@@ -73,7 +73,7 @@ We recommend installing Rust using [rustup](https://www.rustup.rs/). You can ins
 If you don't intend to work on the Leo compiler itself, you can install the latest Leo release with:
 
 ```bash
-cargo install leo-lang leo-fmt
+cargo install leo-lang leo-fmt leo-lsp
 ```
 
 Now to use leo, in your terminal, run:
@@ -96,22 +96,21 @@ cargo install --path crates/leo
 cargo install --path crates/fmt
 ```
 
-### 🦁 Update from Leo
+### 🦁 Update Leo
 
-You can update Leo and its plugins to the latest released version using the
-following command:
+To install the latest released version of Leo and its plugins, run:
 
 ```bash
-leo update
+cargo install leo-lang leo-fmt leo-lsp
 ```
 
-Note that if you were using a prerelease version of Leo, this will overwrite
-that with the latest released version.
+To check the installed version, run:
 
-Now to check the version of leo, in your terminal, run:
 ```bash
 leo --version
 ```
+
+Use `leo update` to update project dependency locks. This command does not install Leo or its plugins.
 
 ## 🚀 Quick Start
 

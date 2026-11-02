@@ -79,9 +79,19 @@ pub struct LeoExecute {
     #[clap(flatten)]
     pub(crate) env_override: EnvOptions,
     #[clap(flatten)]
+    pub(crate) key_override: PrivateKeyOptions,
+    #[clap(flatten)]
+    pub(crate) consensus_override: ConsensusOptions,
+    #[clap(flatten)]
     pub(crate) extra: ExtraOptions,
     #[clap(flatten)]
     build_options: BuildOptions,
+    #[clap(
+        long,
+        value_name = "DIR",
+        help = "Directory containing local .aleo imports when --path points to an Aleo bytecode file; other imports are fetched from the network"
+    )]
+    pub(crate) imports_dir: Option<PathBuf>,
     #[clap(
         long = "with",
         help = "Additional programs to load into the VM (comma-separated). \
@@ -109,6 +119,27 @@ impl Command for LeoExecute {
         let network = get_network(&self.env_override.network)?;
         // Get the endpoint, accounting for overrides.
         let endpoint = get_endpoint(&self.env_override.endpoint)?;
+        if path.extension().and_then(|extension| extension.to_str()) == Some("aleo") {
+            if context.package_filter.is_some() {
+                return Err(crate::errors::custom("`--package` cannot be used with an Aleo bytecode file.").into());
+            }
+            return Package::from_aleo_file(
+                path,
+                home_path,
+                self.imports_dir.as_deref(),
+                true,
+                self.build_options.no_local,
+                Some(network),
+                Some(&endpoint),
+                self.env_override.network_retries,
+            )
+            .map(Some);
+        }
+        if self.imports_dir.is_some() {
+            return Err(
+                crate::errors::custom("`--imports-dir` requires `--path` to point to an Aleo bytecode file.").into()
+            );
+        }
         // If the current directory is a valid Leo package, then build it.
         if Package::from_directory_no_graph(
             path,
@@ -126,6 +157,7 @@ impl Command for LeoExecute {
                     options.no_cache = true;
                     options
                 },
+                rename: None,
             }
             .execute(context)?;
             // Return the package.
@@ -174,7 +206,7 @@ fn handle_execute<A: Aleo>(
     package: Option<Package>,
 ) -> Result<<LeoExecute as Command>::Output> {
     // Get the private key and associated address, accounting for overrides.
-    let private_key = get_private_key(&command.env_override.private_key)?;
+    let private_key = get_private_key(&command.key_override.private_key)?;
     let address = Address::<A::Network>::try_from(&private_key)
         .map_err(|e| crate::errors::custom(format!("Failed to parse address: {e}")))?;
 
@@ -182,11 +214,14 @@ fn handle_execute<A: Aleo>(
     let endpoint = get_endpoint(&command.env_override.endpoint)?;
 
     // Get whether the network is a devnet, accounting for overrides.
-    let is_devnet = get_is_devnet(command.env_override.devnet);
+    let is_devnet = get_is_devnet(command.consensus_override.devnet);
 
     // If the consensus heights are provided, use them; otherwise, use the default heights for the network.
-    let consensus_heights =
-        command.env_override.consensus_heights.clone().unwrap_or_else(|| get_consensus_heights(network, is_devnet));
+    let consensus_heights = command
+        .consensus_override
+        .consensus_heights
+        .clone()
+        .unwrap_or_else(|| get_consensus_heights(network, is_devnet));
     // Validate the provided consensus heights.
     validate_consensus_heights(&consensus_heights)
         .map_err(|e| crate::errors::custom(format!("Invalid consensus heights: {e}")))?;
@@ -315,8 +350,8 @@ fn handle_execute<A: Aleo>(
         command.inputs.into_iter().map(|string| parse_input(&string, &private_key)).collect::<Result<Vec<_>>>()?;
 
     // Get the first fee option.
-    let (base_fee, priority_fee, record) =
-        parse_fee_options(&private_key, &command.fee_options, 1)?.into_iter().next().unwrap_or((None, None, None));
+    let (priority_fee, record) =
+        parse_fee_options(&private_key, &command.fee_options, 1)?.into_iter().next().unwrap_or((None, None));
 
     // Get the consensus version.
     let consensus_version = get_consensus_version(
@@ -336,35 +371,6 @@ fn handle_execute<A: Aleo>(
         consensus_version: Some(consensus_version as u8),
     });
 
-    // Print the execution plan.
-    print_execution_plan::<A::Network>(
-        &private_key,
-        &address,
-        &endpoint,
-        &network,
-        &program_name,
-        &function_name,
-        is_local,
-        priority_fee.unwrap_or(0),
-        record.is_some(),
-        &command.action,
-        consensus_version,
-        &check_task_for_warnings(
-            &endpoint,
-            network,
-            &programs,
-            consensus_version,
-            command.env_override.network_retries,
-        ),
-        command.skip_execute_proof,
-    );
-
-    // Prompt the user to confirm the plan.
-    if !confirm("Do you want to proceed with execution?", command.extra.yes)? {
-        println!("❌ Execution aborted.");
-        return Ok(ExecuteOutput::default());
-    }
-
     // Initialize an RNG.
     let rng = &mut rand::rng();
 
@@ -382,14 +388,18 @@ fn handle_execute<A: Aleo>(
     // Note: The dependencies are downloaded in "post-order" (child before parent).
     if !is_local {
         println!("⬇️ Downloading {program_name} and its dependencies from {endpoint}...");
-        programs = load_latest_programs_from_network(
+        programs = load_programs_from_network(
             &context,
             program_id,
             network,
             &endpoint,
             command.env_override.network_retries,
+            None,
         )?;
     };
+
+    let warnings =
+        check_task_for_warnings(&endpoint, network, &programs, consensus_version, command.env_override.network_retries);
 
     // Add the programs to the VM.
     println!("\n➕Adding programs to the VM in the following order:");
@@ -415,22 +425,43 @@ fn handle_execute<A: Aleo>(
         )?;
     }
 
+    println!("\n⚙️ Preparing calls for review: {program_name}/{function_name}...");
     // Generate the authorization (the method differs based on skip_execute_proof).
     let authorization = if command.skip_execute_proof {
-        println!("\n⚙️ Generating transaction WITHOUT a proof for {program_name}/{function_name}...");
         vm.process()
             .authorize::<A, _>(&private_key, &program_name, &function_name, inputs.iter(), rng)
             .map_err(|e| anyhow::anyhow!("{e}"))?
     } else {
-        println!("\n⚙️ Executing {program_name}/{function_name}...");
         vm.authorize(&private_key, &program_name, &function_name, inputs.iter(), rng)
             .map_err(|e| anyhow::anyhow!("{e}"))?
     };
+
+    print_execution_plan::<A::Network>(
+        &address,
+        &endpoint,
+        &network,
+        &program_name,
+        &function_name,
+        is_local,
+        priority_fee.unwrap_or(0),
+        record.is_some(),
+        &command.action,
+        consensus_version,
+        &warnings,
+        command.skip_execute_proof,
+        &authorization,
+    )?;
 
     // Estimate and display execution cost.
     let (estimated_cost, (est_storage, est_exec)) =
         execution_cost_for_authorization(vm.process(), &authorization, consensus_version)?;
     let stats = print_execution_cost_summary(&program_name, est_storage, est_exec, priority_fee);
+
+    // Keep this authorization local until the user approves its calls and cost.
+    if !confirm("Approve all calls and fees shown above?", command.extra.yes)? {
+        println!("❌ Execution aborted.");
+        return Ok(ExecuteOutput::default());
+    }
 
     // Generate the transaction (the method differs based on skip_execute_proof).
     let (output_name, output, response) = if command.skip_execute_proof {
@@ -445,15 +476,8 @@ fn handle_execute<A: Aleo>(
 
         // Generate the fee authorization.
         let id = authorization.to_execution_id()?;
-        let fee_authorization = authorize_fee::<A, _>(
-            &vm,
-            &private_key,
-            record,
-            base_fee.unwrap_or(cost),
-            priority_fee.unwrap_or(0),
-            id,
-            rng,
-        )?;
+        let fee_authorization =
+            authorize_fee::<A, _>(&vm, &private_key, record, cost, priority_fee.unwrap_or(0), id, rng)?;
 
         // Create a fee transition without a proof.
         let fee = Fee::from(fee_authorization.transitions().into_iter().next().unwrap().1, state_root, None)?;
@@ -477,7 +501,7 @@ fn handle_execute<A: Aleo>(
                 &vm,
                 &private_key,
                 record,
-                base_fee.unwrap_or(estimated_cost),
+                estimated_cost,
                 priority_fee.unwrap_or(0),
                 execution_id,
                 rng,
@@ -667,7 +691,6 @@ fn check_task_for_warnings<N: Network>(
 /// Pretty-print the execution plan in a readable format.
 #[allow(clippy::too_many_arguments)]
 fn print_execution_plan<N: Network>(
-    private_key: &PrivateKey<N>,
     address: &Address<N>,
     endpoint: &str,
     network: &NetworkName,
@@ -680,14 +703,14 @@ fn print_execution_plan<N: Network>(
     consensus_version: ConsensusVersion,
     warnings: &[String],
     skip_execute_proof: bool,
-) {
+    authorization: &Authorization<N>,
+) -> Result<()> {
     println!("\n{}", "🚀 Execution Plan Summary".bold().underline());
     println!("{}", "──────────────────────────────────────────────".dimmed());
 
     println!("{}", "🔧 Configuration:".bold());
-    println!("  {:20}{}", "Private Key:".cyan(), format!("{}...", &private_key.to_string()[..24]).yellow());
-    println!("  {:20}{}", "Address:".cyan(), format!("{}...", &address.to_string()[..24]).yellow());
-    println!("  {:20}{}", "Endpoint:", endpoint.yellow());
+    println!("  {:20}{}", "Address:".cyan(), address.to_string().yellow());
+    println!("  {:20}{}", "Endpoint:", endpoint.escape_debug().to_string().yellow());
     println!("  {:20}{}", "Network:", network.to_string().yellow());
     println!("  {:20}{}", "Consensus Version:", (consensus_version as u8).to_string().yellow());
 
@@ -696,13 +719,55 @@ fn print_execution_plan<N: Network>(
     println!("  {:16}{}", "Function:", function_name.cyan());
     println!("  {:16}{}", "Source:", if is_local { "local" } else { "remote" });
 
+    println!("\n{}", "Calls to approve:".bold());
+    let transitions = authorization.transitions();
+    for (index, request) in authorization.to_vec_deque().iter().enumerate() {
+        println!("  Call {}: {}/{}", index + 1, request.program_id(), request.function_name());
+        println!("    Signer: {}", request.signer());
+        for (index, (input_id, value)) in request.input_ids().iter().zip(request.inputs()).enumerate() {
+            match value {
+                snarkvm::prelude::Value::Record(_) | snarkvm::prelude::Value::DynamicRecord(_) => {
+                    println!("    Input {}: <private record>", index + 1)
+                }
+                _ if matches!(input_id, snarkvm::prelude::InputID::Private(_)) => {
+                    println!("    Input {}: <private input>", index + 1)
+                }
+                _ => println!("    Input {}: {}", index + 1, value.to_string().escape_debug()),
+            }
+        }
+        // Requests and transitions have different traversal orders.
+        let transition = transitions
+            .values()
+            .find(|transition| transition.tcm() == request.tcm())
+            .ok_or_else(|| crate::errors::custom("Cannot review an execution with a missing transition."))?;
+        for future in transition.outputs().iter().filter_map(|output| output.future()) {
+            if future.program_id().to_string() == "credits.aleo"
+                && matches!(
+                    future.function_name().to_string().as_str(),
+                    "transfer_public" | "transfer_public_as_signer"
+                )
+                && let [
+                    snarkvm::prelude::Argument::Plaintext(debit),
+                    snarkvm::prelude::Argument::Plaintext(recipient),
+                    snarkvm::prelude::Argument::Plaintext(amount),
+                ] = future.arguments()
+            {
+                println!("    Debit: {}", debit.to_string().escape_debug());
+                println!("    Recipient: {}", recipient.to_string().escape_debug());
+                println!("    Amount: {} microcredits", amount.to_string().escape_debug());
+            }
+            println!("    Finalize: {}", future.to_string().escape_debug());
+        }
+    }
+    println!("  Final balances depend on on-chain state.");
+
     println!("\n{}", "💸 Fee Info:".bold());
     println!("  {:16}{}", "Priority Fee:", format!("{priority_fee} μcredits").green());
     println!("  {:16}{}", "Fee Record:", if fee_record { "yes" } else { "no (public fee)" });
 
     println!("\n{}", "⚙️ Actions:".bold());
     if !is_local {
-        println!("  - Program and its dependencies will be downloaded from the network.");
+        println!("  - Program and its dependencies were loaded from network bytecode.");
     }
     if skip_execute_proof {
         println!("  - A transaction will be generated, WITHOUT a proof.");
@@ -713,12 +778,12 @@ fn print_execution_plan<N: Network>(
         println!("  - Transaction will NOT be printed to the console.");
     }
     if let Some(path) = &action.save {
-        println!("  - Transaction will be saved to {}", path.bold());
+        println!("  - Transaction will be saved to {}", path.escape_debug().to_string().bold());
     } else {
         println!("  - Transaction will NOT be saved to a file.");
     }
     if action.broadcast {
-        println!("  - Transaction will be broadcast to {}", endpoint.bold());
+        println!("  - Transaction will be broadcast to {}", endpoint.escape_debug().to_string().bold());
     } else {
         println!("  - Transaction will NOT be broadcast to the network.");
     }
@@ -727,11 +792,12 @@ fn print_execution_plan<N: Network>(
     if !warnings.is_empty() {
         println!("\n{}", "⚠️ Warnings:".bold().red());
         for warning in warnings {
-            println!("  • {}", warning.dimmed());
+            println!("  • {}", warning.escape_debug().to_string().dimmed());
         }
     }
 
     println!("{}", "──────────────────────────────────────────────\n".dimmed());
+    Ok(())
 }
 
 /// Print execution cost summary and return stats for JSON output.

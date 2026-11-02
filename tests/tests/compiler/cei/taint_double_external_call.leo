@@ -8,9 +8,12 @@ program dep_a.aleo {
         let f: Final = final { finalize_get_value(id); };
         return (10u64, f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_get_value(id: u32) {
+export final fn finalize_get_value(id: u32) {
     Mapping::set(data_a, id, 10u64);
 }
 
@@ -22,9 +25,12 @@ program dep_b.aleo {
         let f: Final = final { finalize_get_value(id); };
         return (20u64, f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_get_value(id: u32) {
+export final fn finalize_get_value(id: u32) {
     Mapping::set(data_b, id, 20u64);
 }
 
@@ -47,4 +53,7 @@ program caller.aleo {
             fb.run();
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

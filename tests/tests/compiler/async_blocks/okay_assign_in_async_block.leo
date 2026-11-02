@@ -1,4 +1,4 @@
-struct Foo {
+export struct Foo {
     x: u32,
     y: u32,
 }
@@ -42,4 +42,7 @@ program test.aleo {
         };
         return f;
     }
+
+    @noupgrade
+    constructor() {}
 }

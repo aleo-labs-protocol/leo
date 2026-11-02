@@ -5,9 +5,12 @@ program test.aleo {
     fn read(prog: field, net: field, m: field, key: address) -> Final {
         return final { finalize_read(prog, net, m, key); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_read(prog: field, net: field, m: field, key: address) {
+export final fn finalize_read(prog: field, net: field, m: field, key: address) {
     let val: u64 = _dynamic_get_or_use::[u64](prog, net, m, key);
     Mapping::set(result, key, val);
 }

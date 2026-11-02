@@ -21,4 +21,7 @@ program test.aleo {
             addr_map.set(0u32, chosen_addr);
         };
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -1,4 +1,4 @@
-interface TokenA {
+export interface TokenA {
     record Token {
         owner: address,
         amount: u64,
@@ -6,7 +6,7 @@ interface TokenA {
     }
 }
 
-interface TokenB {
+export interface TokenB {
     record Token {
         owner: address,
         amount: u32,
@@ -14,9 +14,12 @@ interface TokenB {
     }
 }
 
-interface Combined: TokenA + TokenB {
+export interface Combined: TokenA + TokenB {
 }
 
 program test.aleo: Combined {
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }

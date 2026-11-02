@@ -1,0 +1,14 @@
+--- leo test with a dependencies-only library named from a test ---
+⚠️ No network specified, defaulting to 'testnet'.
+⚠️ No endpoint specified, defaulting to 'https://api.explorer.provable.com/v1'.
+
+       Leo 🔨 Compiling 'my_app.aleo'
+       Leo     Program size: 0.24 KB / 2000.00 KB
+       Leo ✅ Compiled 'my_app.aleo' into Aleo instructions.
+       Leo ✅ Generated ABI for program 'my_app.aleo'.
+       Leo 🔨 Compiling 'test_my_app.aleo'
+
+     Running 1 test
+        PASS test_my_app.leo::test_combine
+────────────────────────
+     Summary 1 test run: 1 passed, 0 failed

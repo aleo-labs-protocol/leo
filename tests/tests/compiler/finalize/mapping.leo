@@ -1,23 +1,26 @@
 program test.aleo {
     fn matches(addr: address) -> bool {
-        return self.caller == addr;
+        return std::ctx::caller() == addr;
     }
 
     mapping balances: address => u128;
     mapping tokens: address => Token;
 
     mapping foo: Bar => Baz;
+
+    @noupgrade
+    constructor() {}
 }
 
-struct Token {
+export struct Token {
     Owner: address,
     balance: u128,
 }
 
-struct Bar {
+export struct Bar {
     a: u128,
 }
 
-struct Baz {
+export struct Baz {
     a: u128,
 }

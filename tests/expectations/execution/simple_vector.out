@@ -140,6 +140,288 @@ finalize test_vector_ops:
     is.eq r81 0u32 into r82;
     assert.eq r82 true;
 
+function test_else_if_storage:
+    input r0 as boolean.private;
+    async test_else_if_storage r0 into r1;
+    output r1 as test.aleo/test_else_if_storage.future;
+
+finalize test_else_if_storage:
+    input r0 as boolean.public;
+    set 0u32 into vec__len__[false];
+    get.or_use vec__len__[false] 0u32 into r1;
+    add r1 1u32 into r2;
+    set r2 into vec__len__[false];
+    set 10u32 into vec__[r1];
+    get.or_use vec__len__[false] 0u32 into r3;
+    add r3 1u32 into r4;
+    set r4 into vec__len__[false];
+    set 20u32 into vec__[r3];
+    branch.eq r0 false to end_then_0_0;
+    get.or_use vec__len__[false] 0u32 into r5;
+    assert.eq r5 2u32;
+    branch.eq true true to end_otherwise_0_1;
+    position end_then_0_0;
+    get.or_use vec__len__[false] 0u32 into r6;
+    gt r6 0u32 into r7;
+    sub.w r6 1u32 into r8;
+    ternary r7 r8 r6 into r9;
+    set r9 into vec__len__[false];
+    get.or_use vec__[r8] 0u32 into r10;
+    cast true r10 into r11 as Optional__JzunLORyB8U;
+    cast false 0u32 into r12 as Optional__JzunLORyB8U;
+    ternary r7 r11 r12 into r13;
+    assert.eq r13.is_some true;
+    is.eq r13.val 20u32 into r14;
+    branch.eq r14 false to end_then_1_2;
+    get.or_use vec__len__[false] 0u32 into r15;
+    assert.eq r15 1u32;
+    branch.eq true true to end_otherwise_1_3;
+    position end_then_1_2;
+    assert.eq false true;
+    position end_otherwise_1_3;
+    position end_otherwise_0_1;
+    get.or_use vec__len__[false] 0u32 into r16;
+    ternary r0 2u32 1u32 into r17;
+    assert.eq r16 r17;
+    get.or_use vec__len__[false] 0u32 into r18;
+    lt 0u32 r18 into r19;
+    get.or_use vec__[0u32] 0u32 into r20;
+    cast true r20 into r21 as Optional__JzunLORyB8U;
+    cast false 0u32 into r22 as Optional__JzunLORyB8U;
+    ternary r19 r21 r22 into r23;
+    assert.eq r23.is_some true;
+    assert.eq r23.val 10u32;
+    set 0u32 into vec__len__[false];
+    get.or_use vec__len__[false] 0u32 into r24;
+    add r24 1u32 into r25;
+    set r25 into vec__len__[false];
+    set 10u32 into vec__[r24];
+    get.or_use vec__len__[false] 0u32 into r26;
+    add r26 1u32 into r27;
+    set r27 into vec__len__[false];
+    set 20u32 into vec__[r26];
+    get.or_use vec__len__[false] 0u32 into r28;
+    add r28 1u32 into r29;
+    set r29 into vec__len__[false];
+    set 30u32 into vec__[r28];
+    branch.eq r0 false to end_then_0_4;
+    get.or_use vec__len__[false] 0u32 into r30;
+    assert.eq r30 3u32;
+    branch.eq true true to end_otherwise_0_5;
+    position end_then_0_4;
+    get.or_use vec__len__[false] 0u32 into r31;
+    lt 0u32 r31 into r32;
+    assert.eq r32 true;
+    get vec__[0u32] into r33;
+    sub r31 1u32 into r34;
+    get vec__[r34] into r35;
+    set r35 into vec__[0u32];
+    set r34 into vec__len__[false];
+    is.eq r33 10u32 into r36;
+    branch.eq r36 false to end_then_1_6;
+    get.or_use vec__len__[false] 0u32 into r37;
+    assert.eq r37 2u32;
+    get.or_use vec__len__[false] 0u32 into r38;
+    lt 0u32 r38 into r39;
+    get.or_use vec__[0u32] 0u32 into r40;
+    cast true r40 into r41 as Optional__JzunLORyB8U;
+    cast false 0u32 into r42 as Optional__JzunLORyB8U;
+    ternary r39 r41 r42 into r43;
+    assert.eq r43.is_some true;
+    assert.eq r43.val 30u32;
+    branch.eq true true to end_otherwise_1_7;
+    position end_then_1_6;
+    assert.eq false true;
+    position end_otherwise_1_7;
+    position end_otherwise_0_5;
+    get.or_use vec__len__[false] 0u32 into r44;
+    ternary r0 3u32 2u32 into r45;
+    assert.eq r44 r45;
+    get.or_use vec__len__[false] 0u32 into r46;
+    lt 1u32 r46 into r47;
+    get.or_use vec__[1u32] 0u32 into r48;
+    cast true r48 into r49 as Optional__JzunLORyB8U;
+    cast false 0u32 into r50 as Optional__JzunLORyB8U;
+    ternary r47 r49 r50 into r51;
+    assert.eq r51.is_some true;
+    assert.eq r51.val 20u32;
+    set 0u32 into vec__len__[false];
+    get.or_use vec__len__[false] 0u32 into r52;
+    add r52 1u32 into r53;
+    set r53 into vec__len__[false];
+    set 10u32 into vec__[r52];
+    get.or_use vec__len__[false] 0u32 into r54;
+    add r54 1u32 into r55;
+    set r55 into vec__len__[false];
+    set 20u32 into vec__[r54];
+    get.or_use vec__len__[false] 0u32 into r56;
+    add r56 1u32 into r57;
+    set r57 into vec__len__[false];
+    set 30u32 into vec__[r56];
+    branch.eq r0 false to end_then_0_8;
+    get.or_use vec__len__[false] 0u32 into r58;
+    assert.eq r58 3u32;
+    branch.eq true true to end_otherwise_0_9;
+    position end_then_0_8;
+    get.or_use vec__len__[false] 0u32 into r59;
+    gt r59 0u32 into r60;
+    sub.w r59 1u32 into r61;
+    ternary r60 r61 r59 into r62;
+    set r62 into vec__len__[false];
+    get.or_use vec__[r61] 0u32 into r63;
+    cast true r63 into r64 as Optional__JzunLORyB8U;
+    cast false 0u32 into r65 as Optional__JzunLORyB8U;
+    ternary r60 r64 r65 into r66;
+    assert.eq r66.is_some true;
+    is.eq r66.val 30u32 into r67;
+    branch.eq r67 false to end_then_1_10;
+    get.or_use vec__len__[false] 0u32 into r68;
+    assert.eq r68 2u32;
+    branch.eq true true to end_otherwise_1_11;
+    position end_then_1_10;
+    get.or_use vec__len__[false] 0u32 into r69;
+    lt 0u32 r69 into r70;
+    assert.eq r70 true;
+    get vec__[0u32] into r71;
+    sub r69 1u32 into r72;
+    get vec__[r72] into r73;
+    set r73 into vec__[0u32];
+    set r72 into vec__len__[false];
+    is.eq r71 10u32 into r74;
+    branch.eq r74 false to end_then_2_12;
+    assert.eq false true;
+    branch.eq true true to end_otherwise_2_13;
+    position end_then_2_12;
+    assert.eq false true;
+    position end_otherwise_2_13;
+    position end_otherwise_1_11;
+    position end_otherwise_0_9;
+    get.or_use vec__len__[false] 0u32 into r75;
+    assert.eq r75 r45;
+    get.or_use vec__len__[false] 0u32 into r76;
+    lt 0u32 r76 into r77;
+    get.or_use vec__[0u32] 0u32 into r78;
+    cast true r78 into r79 as Optional__JzunLORyB8U;
+    cast false 0u32 into r80 as Optional__JzunLORyB8U;
+    ternary r77 r79 r80 into r81;
+    assert.eq r81.is_some true;
+    assert.eq r81.val 10u32;
+    get.or_use vec__len__[false] 0u32 into r82;
+    lt 1u32 r82 into r83;
+    get.or_use vec__[1u32] 0u32 into r84;
+    cast true r84 into r85 as Optional__JzunLORyB8U;
+    cast false 0u32 into r86 as Optional__JzunLORyB8U;
+    ternary r83 r85 r86 into r87;
+    assert.eq r87.is_some true;
+    assert.eq r87.val 20u32;
+
+function test_false_else_if_storage:
+    async test_false_else_if_storage into r0;
+    output r0 as test.aleo/test_false_else_if_storage.future;
+
+finalize test_false_else_if_storage:
+    set 0u32 into vec__len__[false];
+    get.or_use vec__len__[false] 0u32 into r0;
+    add r0 1u32 into r1;
+    set r1 into vec__len__[false];
+    set 10u32 into vec__[r0];
+    get.or_use vec__len__[false] 0u32 into r2;
+    add r2 1u32 into r3;
+    set r3 into vec__len__[false];
+    set 20u32 into vec__[r2];
+    get.or_use vec__len__[false] 0u32 into r4;
+    add r4 1u32 into r5;
+    set r5 into vec__len__[false];
+    set 30u32 into vec__[r4];
+    get.or_use vec__len__[false] 0u32 into r6;
+    is.neq r6 3u32 into r7;
+    branch.eq r7 false to end_then_0_0;
+    assert.eq false true;
+    branch.eq true true to end_otherwise_0_1;
+    position end_then_0_0;
+    get.or_use vec__len__[false] 0u32 into r8;
+    gt r8 0u32 into r9;
+    sub.w r8 1u32 into r10;
+    ternary r9 r10 r8 into r11;
+    set r11 into vec__len__[false];
+    get.or_use vec__[r10] 0u32 into r12;
+    cast true r12 into r13 as Optional__JzunLORyB8U;
+    cast false 0u32 into r14 as Optional__JzunLORyB8U;
+    ternary r9 r13 r14 into r15;
+    assert.eq r15.is_some true;
+    is.eq r15.val 99u32 into r16;
+    branch.eq r16 false to end_then_1_2;
+    assert.eq false true;
+    branch.eq true true to end_otherwise_1_3;
+    position end_then_1_2;
+    get.or_use vec__len__[false] 0u32 into r17;
+    lt 0u32 r17 into r18;
+    assert.eq r18 true;
+    get vec__[0u32] into r19;
+    sub r17 1u32 into r20;
+    get vec__[r20] into r21;
+    set r21 into vec__[0u32];
+    set r20 into vec__len__[false];
+    is.eq r19 10u32 into r22;
+    branch.eq r22 false to end_then_2_4;
+    get.or_use vec__len__[false] 0u32 into r23;
+    assert.eq r23 1u32;
+    get.or_use vec__len__[false] 0u32 into r24;
+    lt 0u32 r24 into r25;
+    get.or_use vec__[0u32] 0u32 into r26;
+    cast true r26 into r27 as Optional__JzunLORyB8U;
+    cast false 0u32 into r28 as Optional__JzunLORyB8U;
+    ternary r25 r27 r28 into r29;
+    assert.eq r29.is_some true;
+    assert.eq r29.val 20u32;
+    branch.eq true true to end_otherwise_2_5;
+    position end_then_2_4;
+    assert.eq false true;
+    position end_otherwise_2_5;
+    position end_otherwise_1_3;
+    position end_otherwise_0_1;
+    get.or_use vec__len__[false] 0u32 into r30;
+    assert.eq r30 1u32;
+    get.or_use vec__len__[false] 0u32 into r31;
+    lt 0u32 r31 into r32;
+    get.or_use vec__[0u32] 0u32 into r33;
+    cast true r33 into r34 as Optional__JzunLORyB8U;
+    cast false 0u32 into r35 as Optional__JzunLORyB8U;
+    ternary r32 r34 r35 into r36;
+    assert.eq r36.is_some true;
+    assert.eq r36.val 20u32;
+
+function test_skipped_empty_swap_remove:
+    input r0 as boolean.private;
+    async test_skipped_empty_swap_remove r0 into r1;
+    output r1 as test.aleo/test_skipped_empty_swap_remove.future;
+
+finalize test_skipped_empty_swap_remove:
+    input r0 as boolean.public;
+    set 0u32 into vec__len__[false];
+    branch.eq r0 false to end_then_0_0;
+    get.or_use vec__len__[false] 0u32 into r1;
+    assert.eq r1 0u32;
+    branch.eq true true to end_otherwise_0_1;
+    position end_then_0_0;
+    get.or_use vec__len__[false] 0u32 into r2;
+    lt 0u32 r2 into r3;
+    assert.eq r3 true;
+    get vec__[0u32] into r4;
+    sub r2 1u32 into r5;
+    get vec__[r5] into r6;
+    set r6 into vec__[0u32];
+    set r5 into vec__len__[false];
+    is.eq r4 10u32 into r7;
+    branch.eq r7 false to end_then_1_2;
+    assert.eq false true;
+    branch.eq true true to end_otherwise_1_3;
+    position end_then_1_2;
+    position end_otherwise_1_3;
+    position end_otherwise_0_1;
+    get.or_use vec__len__[false] 0u32 into r8;
+    assert.eq r8 0u32;
+
 constructor:
     assert.eq edition 0u16;
 verified: true
@@ -147,20 +429,134 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1jsdtk0gwlztur37mdfp4ganyxlgnw7wcykml5qnfew8dx6y3pg8qzn5a97",
+      "id": "au1nsq4gngkc9a99lkdhcq95ulmdjf5lq5kctaqcpw2w6gyp7yekq9qva9dcj",
       "program": "test.aleo",
       "function": "test_vector_ops",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "8348216107919254059654073478418036731152751632276164124936529655806467137079field",
+          "id": "3710958326975375465457715631283479984162626599561278510591520441293048390157field",
           "value": "{\n  program_id: test.aleo,\n  function_name: test_vector_ops,\n  arguments: []\n}"
         }
       ],
-      "tpk": "4901581211348248743432678155966082569197276464281006566814294795747669711304group",
-      "tcm": "4487557541063798357639594506348499874974637034543806865271946005168540307541field",
-      "scm": "4878737790619634278461021397042898107000409822979236580051357460602383625463field"
+      "tpk": "933855681493918551985687470197036272426346898098942205119692144951957333790group",
+      "tcm": "259659054404697907842985151675384089536870611941430150678929250491220815555field",
+      "scm": "5177025211313217476514050868094597161400778655762139324040146404223391220620field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1f8st8c2g2vqwepexeua5ndjpx0ze7ntdsqdve284amaefktdhqyst3xut2",
+      "program": "test.aleo",
+      "function": "test_else_if_storage",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "2260030435486019579865966830534927545571978966773303245019218002283214870782field",
+          "value": "ciphertext1qyqzgx2xmgnz2kd579x8k26vkcq53s5ak5zuakurkle8094d4k74kqsad7emc"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "7657586109072134938217885804824452628250310081068887933185279137158309179315field",
+          "value": "{\n  program_id: test.aleo,\n  function_name: test_else_if_storage,\n  arguments: [\n    true\n  ]\n}"
+        }
+      ],
+      "tpk": "2372600191360310466730899984372770159985559128975091816341615605713596468995group",
+      "tcm": "5853235491636016644972123751172913318557685922285260959087640681402195176895field",
+      "scm": "6376148113780901017011935352072049648711686986869714373089075707018072104747field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1lt082skycptqlc5g5fwaqzsqx3e4aaywhr23kfm5c94gv7hpjy8safyamd",
+      "program": "test.aleo",
+      "function": "test_else_if_storage",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "5482536955955833917519507242628091512575248216755682322151619572467065289720field",
+          "value": "ciphertext1qyq032xfp5cq7pp78mqpcxgwlchmfjexmw7rzhjdnrhqdawaptqpqysv20zvs"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "5309647801381484487306883689745688272581948279520737961947872478155958546034field",
+          "value": "{\n  program_id: test.aleo,\n  function_name: test_else_if_storage,\n  arguments: [\n    false\n  ]\n}"
+        }
+      ],
+      "tpk": "7519367406712661091265810033560010467750099554570243402063243590776075067862group",
+      "tcm": "7470301684228622630833315644936290798019430522515944686397507995270822590223field",
+      "scm": "3512923019782068683609519208373428502115058467933896558938883041710360245745field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au16meatzehw7fyn4003hs8llfchfafxjkvy87qupc3k60cdge5auqszmg2nk",
+      "program": "test.aleo",
+      "function": "test_skipped_empty_swap_remove",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "2353371731095958022969100421529336870802674188474767558588825578556002757788field",
+          "value": "ciphertext1qyq86ws0l8xad0gx7pk8pxqcp258apwv0ry62u6h6crmxt93a9kpxygjlpqpt"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "8007115405482206874596863131824576767857687689172191250003961982421359033631field",
+          "value": "{\n  program_id: test.aleo,\n  function_name: test_skipped_empty_swap_remove,\n  arguments: [\n    true\n  ]\n}"
+        }
+      ],
+      "tpk": "3867998409334484009727813282319856285398275470243790591832547425793789982623group",
+      "tcm": "1030026032288221794024792418215965556734793958236685729787063657648907245851field",
+      "scm": "3708010339820271063935636638467213475123068213591474614965419485152760596868field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1vyq83agw8nk77445lvdm433spmdmqrgu80kwx433w36nhqvakg8qsmjr70",
+      "program": "test.aleo",
+      "function": "test_false_else_if_storage",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "4807689281926408950169153915316640109942529194165940106705196771310179099685field",
+          "value": "{\n  program_id: test.aleo,\n  function_name: test_false_else_if_storage,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "3744342508569017939952917091266195139506048668333001052431246025018307459023group",
+      "tcm": "3136108140742509310783208835795901869051430650018576573105950074606228979362field",
+      "scm": "6119395913702375448685821293032745650963229918260354295803029009734896234805field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"

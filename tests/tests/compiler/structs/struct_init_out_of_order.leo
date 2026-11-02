@@ -1,11 +1,11 @@
 // TODO: This should be made into an integration test.
 
-struct Foo {
+export struct Foo {
     a: u8,
     b: u16,
 }
 
-struct Bar {
+export struct Bar {
     a: u8,
     b: u8,
 }
@@ -18,4 +18,7 @@ program test.aleo {
         let f: Bar = Bar { b: c, a: a };
         return (e, f);
     }
+
+    @noupgrade
+    constructor() {}
 }

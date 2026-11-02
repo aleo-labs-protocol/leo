@@ -12,4 +12,7 @@ program test.aleo {
     fn select_element(s: bool, a: [Point; 4], b: [Point; 4]) -> Point {
         return s ? a[0u32] : b[1u32];
     }
+
+    @noupgrade
+    constructor() {}
 }

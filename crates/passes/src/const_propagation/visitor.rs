@@ -36,6 +36,8 @@ pub struct ConstPropagationVisitor<'a> {
     pub array_length_not_evaluated: Option<Span>,
     /// A repeat expression count which was not able to be evaluated.
     pub repeat_count_not_evaluated: Option<Span>,
+    /// Whether const initializers may fold a constant-condition ternary before inspecting the unselected arm.
+    pub fold_const_initializer_ternaries: bool,
 }
 
 impl ConstPropagationVisitor<'_> {
@@ -56,13 +58,22 @@ impl ConstPropagationVisitor<'_> {
         result
     }
 
+    /// Reconstruct a const initializer with compile-time ternary selection enabled.
+    pub fn in_const_initializer<T>(&mut self, func: impl FnOnce(&mut Self) -> T) -> T {
+        let previous = self.fold_const_initializer_ternaries;
+        self.fold_const_initializer_ternaries = true;
+        let result = func(self);
+        self.fold_const_initializer_ternaries = previous;
+        result
+    }
+
     /// Emit a `StaticAnalyzerError`.
     pub fn emit_err(&self, err: Formatted) {
         self.state.handler.emit_err(err);
     }
 
     pub fn value_to_expression(&self, value: &Value, span: Span, id: NodeID) -> Option<Expression> {
-        let ty = self.state.type_table.get(&id)?;
+        let ty = self.state.types.resolve(self.state.type_table.get(&id)?);
         let symbol_table = &self.state.symbol_table;
         let struct_lookup = |loc: &Location| {
             symbol_table
@@ -70,7 +81,7 @@ impl ConstPropagationVisitor<'_> {
                 .unwrap()
                 .members
                 .iter()
-                .map(|mem| (mem.identifier.name, mem.type_.clone()))
+                .map(|mem| (mem.identifier.name, mem.type_.kind().clone()))
                 .collect()
         };
         value.to_expression(span, &self.state.node_builder, &ty, &struct_lookup)

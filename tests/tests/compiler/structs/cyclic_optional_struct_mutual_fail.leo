@@ -1,10 +1,13 @@
 // Regression for #29405: mutual recursion through `Option` fields.
-struct A {
+export struct A {
     b: B?,
 }
 
-struct B {
+export struct B {
     a: A?,
 }
 
-program test.aleo {}
+program test.aleo {
+    @noupgrade
+    constructor() {}
+}

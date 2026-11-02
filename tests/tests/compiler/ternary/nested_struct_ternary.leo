@@ -17,4 +17,7 @@ program test.aleo {
     fn select_inner(s: bool, a: Segment, b: Segment) -> Point {
         return s ? a.lo : b.hi;
     }
+
+    @noupgrade
+    constructor() {}
 }

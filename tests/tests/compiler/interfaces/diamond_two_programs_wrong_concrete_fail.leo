@@ -7,7 +7,7 @@
 // concrete type's program must equal self.current_program (test.aleo). Since
 // lib1.aleo != test.aleo, both fn signatures are rejected.
 
-interface ILeft {
+export interface ILeft {
     record Token {
         owner: address,
         ..
@@ -17,11 +17,14 @@ interface ILeft {
 
 program lib1.aleo {
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
 
-interface IRight {
+export interface IRight {
     record Token {
         owner: address,
         ..
@@ -31,6 +34,9 @@ interface IRight {
 
 program lib2.aleo {
     fn dummy() {}
+
+    @noupgrade
+    constructor() {}
 }
 
 // --- Next Program --- //
@@ -52,4 +58,7 @@ program test.aleo: lib1.aleo::ILeft + lib2.aleo::IRight {
     }
 
     fn main() {}
+
+    @noupgrade
+    constructor() {}
 }

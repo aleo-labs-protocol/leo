@@ -1,4 +1,4 @@
-fn f1(a: u8) -> u8 {
+export fn f1(a: u8) -> u8 {
     return a * 100u8;
 }
 
@@ -7,4 +7,7 @@ program test.aleo {
         let f1: u8 = 1u8;
         return f1;
     }
+
+    @noupgrade
+    constructor() {}
 }

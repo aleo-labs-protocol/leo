@@ -1,6 +1,9 @@
 program lib.aleo;
 
 function unused:
+
+constructor:
+    assert.eq edition 0u16;
 // --- Next Program --- //
 import lib.aleo;
 program test.aleo;
@@ -12,6 +15,9 @@ function set:
     input r0 as u64.private;
     output r0 as u64.private;
 
+constructor:
+    assert.eq edition 0u16;
+
 
 ---
 Note: Treating dependencies as Aleo produces different results:
@@ -19,22 +25,22 @@ Note: Treating dependencies as Aleo produces different results:
 [ECHI03712000] Error: interface `lib.aleo/Base` not found
    ╭─[ compiler-test:4:1 ]
    │
- 4 │ ╭─▶ interface Extended: lib.aleo::Base {
+ 4 │ ╭─▶ export interface Extended: lib.aleo::Base {
    ┆ ┆   
  6 │ ├─▶ }
    │ │       
-   │ ╰─────── 
+   │ ╰─────── here
    │     
    │     Help: Make sure the interface is defined in the current program or an imported program.
 ───╯
 [ECHI03712000] Error: interface `lib.aleo/Base` not found
    ╭─[ compiler-test:4:1 ]
    │
- 4 │ ╭─▶ interface Extended: lib.aleo::Base {
+ 4 │ ╭─▶ export interface Extended: lib.aleo::Base {
    ┆ ┆   
  6 │ ├─▶ }
    │ │       
-   │ ╰─────── 
+   │ ╰─────── here
    │     
    │     Help: Make sure the interface is defined in the current program or an imported program.
 ───╯

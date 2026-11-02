@@ -1,0 +1,16 @@
+⚠️ No network specified, defaulting to 'testnet'.
+⚠️ No endpoint specified, defaulting to 'https://api.explorer.provable.com/v1'.
+
+       Leo 🔨 Compiling 'multi_test_prog.aleo'
+       Leo     Program size: 0.19 KB / 2000.00 KB
+       Leo ✅ Compiled 'multi_test_prog.aleo' into Aleo instructions.
+       Leo ✅ Generated ABI for program 'multi_test_prog.aleo'.
+       Leo 🔨 Compiling 'test_addition.aleo'
+       Leo 🔨 Compiling 'test_larger.aleo'
+
+     Running 3 tests
+        PASS test_addition.leo::adds_small_numbers
+        PASS test_larger.leo::adds_larger_numbers
+        PASS test_larger.leo::wrong_expectation
+────────────────────────
+     Summary 3 tests run: 3 passed, 0 failed

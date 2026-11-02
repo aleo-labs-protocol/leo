@@ -7,16 +7,19 @@ program test.aleo {
             return subber(a, b);
         }
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-fn check_not_eq(a: u32, b: u32) {
+export fn check_not_eq(a: u32, b: u32) {
     assert(a != b);
 }
 
-fn adder(a: u32, b: u32) -> u32 {
+export fn adder(a: u32, b: u32) -> u32 {
     return a + b;
 }
 
-fn subber(a: u32, b: u32) -> u32 {
+export fn subber(a: u32, b: u32) -> u32 {
     return a - b;
 }

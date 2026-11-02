@@ -1,5 +1,11 @@
 program multifile.aleo;
 
+struct Baz__IS0I3ciAuv5:
+    x as u32;
+
+struct QQ:
+    y as Baz__IS0I3ciAuv5;
+
 struct Foo__DEaGXd8fTqV:
     a as [u32; 6u32];
 
@@ -55,3 +61,6 @@ function main:
     add r20 r23 into r24;
     add r24 999999u32 into r25;
     output r25 as u32.private;
+
+constructor:
+    assert.eq edition 0u16;

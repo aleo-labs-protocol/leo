@@ -5,8 +5,11 @@ program test.aleo {
     fn check(prog: field, net: field, mapping_name: field) -> Final {
         return final { finalize_check(prog, net, mapping_name); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_check(prog: field, net: field, mapping_name: field) {
+export final fn finalize_check(prog: field, net: field, mapping_name: field) {
     let _: u64 = _dynamic_get_or_use::[u64](prog, net, mapping_name, 1, 0u64);
 }

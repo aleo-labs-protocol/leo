@@ -37,3 +37,6 @@ finalize update:
     set r7 into u32_map[0u32];
     set r8 into field_map[0u32];
     set r9 into addr_map[0u32];
+
+constructor:
+    assert.eq edition 0u16;

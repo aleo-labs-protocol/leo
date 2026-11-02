@@ -31,26 +31,26 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1mkpw4lcfcc7pzt90hugtkc665l6gh2zv5wm745pjhcdd2h5uyuqsqq035u",
+      "id": "au1f6rsrds0g9k605qsf4v4m7xtxymp7knk2udyshv33dncqznkycgq5ep060",
       "program": "test.aleo",
       "function": "cache_total",
       "inputs": [
         {
           "type": "private",
-          "id": "4336839086441028044451527891237737607430791764407588462497204273217899396326field",
-          "value": "ciphertext1qgqgzefu93fgv7y5k88da4lf38f9y57gh0gdrplsug0q86lfhvhejq8uck4t2tnur7s0vqhxt6slzy5yu2xqj6mlf9hm0xck4nwfygwxqu84mq8x"
+          "id": "5346491115304452873049306425718839588656403082402175664136050707275207861387field",
+          "value": "ciphertext1qgq92vv4e4rnuudqtug2utkx7000p8r485qxct0tts9vrme95we2yqs7j5qjw22j8u3es4cd8x28xnhjmny7852t7v8c3j02lvsgqjexpuszw9ar"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "1850273694807680306957701428175192739245754467265193012140436200479609819478field",
+          "id": "6748694065930524051694025277719931670604310378983952484296384426472620025163field",
           "value": "{\n  program_id: test.aleo,\n  function_name: cache_total,\n  arguments: [\n    aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8s7pyjh9\n  ]\n}"
         }
       ],
-      "tpk": "5582946931104013804761995824389229816524446959504854535855220028591757702781group",
-      "tcm": "7643696013285596612514512690913778840777169110862747769323878480270353543320field",
-      "scm": "6569167315023091242600312010540626595986594229229790937956880959963300180772field"
+      "tpk": "5517244343701912635940692703846608447404250918415574958184958023765235540070group",
+      "tcm": "4245943680652427267274655649542589654865152892635033666372395606847838665833field",
+      "scm": "7553020108417171544204059344323771354840096576006307187987919856345933112179field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"

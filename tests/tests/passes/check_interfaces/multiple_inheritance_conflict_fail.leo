@@ -1,14 +1,17 @@
 // Test: Conflicting signatures from two interfaces
 
-interface IntCounter {
+export interface IntCounter {
     fn get_value() -> u64;
 }
 
-interface BoolChecker {
+export interface BoolChecker {
     fn get_value() -> bool;
 }
 
 program test.aleo: IntCounter + BoolChecker {
+    @noupgrade
+    constructor() {}
+
     fn get_value() -> u64 {
         return 0u64;
     }

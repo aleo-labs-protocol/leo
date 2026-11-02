@@ -1,4 +1,4 @@
-const X: u32 = 5;
+export const X: u32 = 5;
 
 program test.aleo {
     mapping map: u32 => u32;
@@ -30,4 +30,7 @@ program test.aleo {
 
         return f;
     }
+
+    @noupgrade
+    constructor() {}
 }

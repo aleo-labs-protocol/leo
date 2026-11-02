@@ -2,12 +2,15 @@ program const_generics.aleo {
     fn main() -> field {
         return abc::[0]() + abc::[1]();
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-fn abc::[C: field]() -> field {
+export fn abc::[C: field]() -> field {
     return def::[C]();
 }
 
-fn def::[C: field]() -> field {
+export fn def::[C: field]() -> field {
     return C;
 }

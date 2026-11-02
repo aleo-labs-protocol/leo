@@ -1,7 +1,12 @@
 program singleton_storage.aleo {
+    @noupgrade
+    constructor() {}
+
     storage counter: u8;
 
     storage vec: [u8];
+    storage nums: [u32];
+    mapping calls: u32 => u32;
 
     fn push() -> Final {
         return final { vec.push(42u8); };
@@ -34,5 +39,58 @@ program singleton_storage.aleo {
 
     fn set() -> Final {
         return final { vec.set(3u32, 42u8); };
+    }
+
+    fn get_statement_fallible_index(public x: u32) -> Final {
+        return final { nums.get(1u32 / x); };
+    }
+
+    fn push_current_len() -> Final {
+        return final { nums.push(nums.len()); };
+    }
+
+    fn push_fallible_value(public x: u32) -> Final {
+        return final { nums.push(1u32 / x); };
+    }
+
+    fn set_statement_fallible_index(public x: u32) -> Final {
+        return final { nums.set(1u32 / x, 42u32); };
+    }
+
+    fn swap_remove_fallible_index(public x: u32) -> Final {
+        return final { nums.swap_remove(1u32 / x); };
+    }
+
+    fn set_effectful_index() -> Final {
+        return final {
+            nums.push(0u32);
+            nums.set(next_index(), 42u32);
+        };
+    }
+
+    fn swap_remove_effectful_index() -> Final {
+        return final {
+            nums.push(0u32);
+            nums.swap_remove(next_index());
+        };
+    }
+
+    fn else_if_vector_ops(public skip: bool) -> Final {
+        return final {
+            if skip {
+                counter = 1u8;
+            } else if nums.pop() != none {
+                counter = 2u8;
+            } else if nums.swap_remove(0u32) == 42u32 {
+                counter = 3u8;
+            }
+        };
+    }
+
+    // This counter write makes repeated index evaluation observable.
+    final fn next_index() -> u32 {
+        let count: u32 = calls.get_or_use(0u32, 0u32);
+        calls.set(0u32, count + 1u32);
+        return 0u32;
     }
 }

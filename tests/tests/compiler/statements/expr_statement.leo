@@ -1,4 +1,4 @@
-fn foo(a: u8, b: u8) -> () {
+export fn foo(a: u8, b: u8) -> () {
     assert_eq(a, b);
 }
 
@@ -7,4 +7,7 @@ program test.aleo {
         foo(a, b);
         return a + b;
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -7,9 +7,12 @@ program dep.aleo {
     fn modify_shared(a: u32) -> Final {
         return final { finalize_modify_shared(a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_modify_shared(a: u32) {
+export final fn finalize_modify_shared(a: u32) {
     Mapping::set(shared, 0u32, a);
 }
 
@@ -23,9 +26,12 @@ program caller.aleo {
         let f: Final = dep.aleo::modify_shared(a);
         return final { finalize_do_work(f, a); };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_do_work(f: Final, a: u32) {
+export final fn finalize_do_work(f: Final, a: u32) {
     // [C] Check: read current value
     let current: u32 = Mapping::get_or_use(balances, 0u32, 0u32);
     // [I] Interaction: external call may change state

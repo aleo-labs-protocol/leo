@@ -1,4 +1,4 @@
-interface Foo {
+export interface Foo {
     fn bar() -> u32;
 }
 
@@ -10,4 +10,7 @@ program test.aleo: Foo {
     fn main(target: u32) -> u32 {
         return Foo@(target)::bar();
     }
+
+    @noupgrade
+    constructor() {}
 }

@@ -28,9 +28,12 @@ program test.aleo {
             );
         };
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(
+export final fn finalize(
     sig_correct: [u8; 65],
     sig_wrong_size: [u8; 64],
     sig_wrong_type: u64,

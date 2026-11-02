@@ -6,9 +6,12 @@ program test.aleo {
         let f: Final = final { finalize(); };
         return (c, f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize() -> Final {
+export final fn finalize() -> Final {
     Mapping::set(foo, 1u32, 1u32);
 }
 
@@ -22,9 +25,12 @@ program basic.aleo {
         let f: Final = final { finalize(c, f1); };
         return (c, f);
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize(input: u32, f: Final) {
+export final fn finalize(input: u32, f: Final) {
     f.run();
     assert_eq(input, 1u32);
 }

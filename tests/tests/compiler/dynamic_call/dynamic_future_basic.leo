@@ -1,4 +1,4 @@
-interface Greeter {
+export interface Greeter {
     fn greet(a: u32) -> (u32, Final);
 }
 
@@ -19,8 +19,11 @@ program test.aleo: Greeter {
             },
         );
     }
+
+    @noupgrade
+    constructor() {}
 }
 
-final fn finalize_main(f: Final) {
+export final fn finalize_main(f: Final) {
     f.run();
 }
