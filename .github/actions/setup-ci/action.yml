@@ -15,19 +15,21 @@ inputs:
 runs:
   using: composite
   steps:
+    - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
+
     - uses: dtolnay/rust-toolchain@1.96.0
       with:
         components: clippy
 
     - uses: actions/cache@v6
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && runner.environment == 'github-hosted'
       with:
         path: ~/.cache/leo-ci-apt/*.deb
         key: libclang-debs-ubuntu24-${{ runner.arch }}-${{ github.sha }}
         restore-keys: libclang-debs-ubuntu24-${{ runner.arch }}-
 
     - name: Install libclang on Linux
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && runner.environment == 'github-hosted'
       shell: bash
       run: |
         sudo apt-get update -qq
@@ -56,11 +58,13 @@ runs:
         "LIBCLANG_PATH=$llvmBin" >> $env:GITHUB_ENV
 
     - uses: Swatinem/rust-cache@v2
+      if: runner.environment == 'github-hosted'
       with:
         key: ${{ inputs.cache-key }}
         save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
     - uses: actions/cache@v6
+      if: runner.environment == 'github-hosted'
       with:
         path: ~/.aleo/resources
         key: aleo-resources-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
@@ -76,7 +80,7 @@ runs:
         tool: cargo-nextest@0.9.114
 
     - uses: actions/cache/restore@v6
-      if: inputs.snarkos == 'true'
+      if: inputs.snarkos == 'true' && runner.environment == 'github-hosted'
       id: snarkos-cache
       with:
         path: ~/.cache/leo-ci-snarkos
@@ -87,17 +91,19 @@ runs:
       shell: bash
       env:
         CACHE_HIT: ${{ steps.snarkos-cache.outputs.cache-hit }}
+        RUNNER_ENVIRONMENT: ${{ runner.environment }}
       run: |
         version="$(tr -d '[:space:]' < .resources/snarkos-version)"
         root="$HOME/.cache/leo-ci-snarkos"
-        if [ "$CACHE_HIT" != true ] || [ ! -x "$root/bin/snarkos" ]; then
+        if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then root="$root/$version"; fi
+        if [ ! -x "$root/bin/snarkos" ] || { [ "$RUNNER_ENVIRONMENT" = github-hosted ] && [ "$CACHE_HIT" != true ]; }; then
           cargo install snarkos --locked --version "$version" --features test_network --root "$root" --force
         fi
         "$root/bin/snarkos" --version
         echo "$root/bin" >> "$GITHUB_PATH"
 
     - uses: actions/cache/save@v6
-      if: inputs.snarkos == 'true' && steps.snarkos-cache.outputs.cache-hit != 'true'
+      if: inputs.snarkos == 'true' && runner.environment == 'github-hosted' && steps.snarkos-cache.outputs.cache-hit != 'true'
       with:
         path: ~/.cache/leo-ci-snarkos
         key: ${{ steps.snarkos-cache.outputs.cache-primary-key }}

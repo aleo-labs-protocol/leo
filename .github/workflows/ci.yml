@@ -56,11 +56,28 @@ jobs:
               summary.write(f'CI scope: **{scope}**.\n')
           PY
 
+  start-cpu-runners:
+    needs: changes
+    if: >-
+      needs.changes.outputs.scope == 'full' &&
+      (github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository)
+    uses: aleo-labs-protocol/gh-actions/.github/workflows/start-runner.yml@v2
+    permissions: { id-token: write, contents: read, actions: read }
+    secrets:
+      runner_app_key: ${{ secrets.RUNNER_APP_KEY }}
+    with:
+      role-to-assume: ${{ vars.RUNNER_ROLE_ARN }}
+      label: cpu
+      jobs-per-box: 2
+      runner-app-id: ${{ vars.RUNNER_APP_ID }}
+
   linux-tests:
     name: linux-workspace-tests
-    needs: changes
-    if: needs.changes.outputs.scope == 'full'
-    runs-on: ubuntu-24.04
+    needs: [changes, start-cpu-runners]
+    if: >-
+      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
+      (needs.start-cpu-runners.result == 'success' || needs.start-cpu-runners.result == 'skipped')
+    runs-on: ${{ fromJSON(needs.start-cpu-runners.result == 'success' && '["self-hosted", "linux", "x64", "cpu"]' || '["ubuntu-24.04"]') }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -72,6 +89,14 @@ jobs:
           cache-key: linux-ci-only-testnet
           nextest: 'true'
           snarkos: 'true'
+      - name: Prepare the shared runner test environment
+        if: runner.environment == 'self-hosted'
+        run: |
+          nproc
+          free -h
+          getconf GNU_LIBC_VERSION
+          mkdir -p "$RUNNER_TEMP/leo-tmp"
+          echo "TMPDIR=$RUNNER_TEMP/leo-tmp" >> "$GITHUB_ENV"
       - name: Build the workspace tests
         run: |
           ulimit -n 65536
@@ -196,9 +221,11 @@ jobs:
 
   rust-checks:
     name: ${{ matrix.check }}
-    needs: changes
-    if: needs.changes.outputs.scope == 'full'
-    runs-on: ubuntu-24.04
+    needs: [changes, start-cpu-runners]
+    if: >-
+      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
+      (needs.start-cpu-runners.result == 'success' || needs.start-cpu-runners.result == 'skipped')
+    runs-on: ${{ fromJSON(needs.start-cpu-runners.result == 'success' && '["self-hosted", "linux", "x64", "cpu"]' || '["ubuntu-24.04"]') }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
