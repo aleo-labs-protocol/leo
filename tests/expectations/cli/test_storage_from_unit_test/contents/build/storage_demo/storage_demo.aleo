@@ -81,11 +81,12 @@ function bump_counter:
 finalize bump_counter:
     contains counter__[false] into r0;
     get.or_use counter__[false] 0u64 into r1;
-    ternary r0 r1 0u64 into r2;
-    cast r0 r2 into r3 as Optional__DmN5CQ9hzeK;
-    ternary r3.is_some r3.val 0u64 into r4;
-    add r4 1u64 into r5;
-    set r5 into counter__[false];
+    cast true r1 into r2 as Optional__DmN5CQ9hzeK;
+    cast false 0u64 into r3 as Optional__DmN5CQ9hzeK;
+    ternary r0 r2 r3 into r4;
+    ternary r4.is_some r4.val 0u64 into r5;
+    add r5 1u64 into r6;
+    set r6 into counter__[false];
 
 function clear_counter:
     async clear_counter into r0;
@@ -180,11 +181,12 @@ finalize pop_history:
     ternary r1 r2 r0 into r3;
     set r3 into history__len__[false];
     get.or_use history__[r2] 0u32 into r4;
-    ternary r1 r4 0u32 into r5;
-    cast r1 r5 into r6 as Optional__JzunLORyB8U;
-    cast false 0u32 into r7 as Optional__JzunLORyB8U;
-    is.neq r6 r7 into r8;
-    assert.eq r8 true;
+    cast true r4 into r5 as Optional__JzunLORyB8U;
+    cast false 0u32 into r6 as Optional__JzunLORyB8U;
+    ternary r1 r5 r6 into r7;
+    cast false 0u32 into r8 as Optional__JzunLORyB8U;
+    is.neq r7 r8 into r9;
+    assert.eq r9 true;
 
 function set_history:
     input r0 as u32.private;

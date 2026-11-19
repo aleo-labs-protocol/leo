@@ -24,11 +24,12 @@ finalize oob_get:
     get.or_use vec__len__[false] 0u32 into r2;
     lt 0u32 r2 into r3;
     get.or_use vec__[0u32] 0u32 into r4;
-    ternary r3 r4 0u32 into r5;
-    cast r3 r5 into r6 as Optional__JzunLORyB8U;
-    cast false 0u32 into r7 as Optional__JzunLORyB8U;
-    is.eq r6 r7 into r8;
-    assert.eq r8 true;
+    cast true r4 into r5 as Optional__JzunLORyB8U;
+    cast false 0u32 into r6 as Optional__JzunLORyB8U;
+    ternary r3 r5 r6 into r7;
+    cast false 0u32 into r8 as Optional__JzunLORyB8U;
+    is.eq r7 r8 into r9;
+    assert.eq r9 true;
 
 function oob_set:
     async oob_set into r0;
@@ -77,11 +78,12 @@ finalize oob_pop:
     ternary r3 r4 r2 into r5;
     set r5 into vec__len__[false];
     get.or_use vec__[r4] 0u32 into r6;
-    ternary r3 r6 0u32 into r7;
-    cast r3 r7 into r8 as Optional__JzunLORyB8U;
-    cast false 0u32 into r9 as Optional__JzunLORyB8U;
-    is.eq r8 r9 into r10;
-    assert.eq r10 true;
+    cast true r6 into r7 as Optional__JzunLORyB8U;
+    cast false 0u32 into r8 as Optional__JzunLORyB8U;
+    ternary r3 r7 r8 into r9;
+    cast false 0u32 into r10 as Optional__JzunLORyB8U;
+    is.eq r9 r10 into r11;
+    assert.eq r11 true;
 
 constructor:
     assert.eq edition 0u16;
@@ -90,39 +92,15 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au16xd2mw53vel0nvyfxxa8xg28m84u87s0lgllp9g6kk35rqjgyq8qah295s",
+      "id": "au1y5q2sue4xsrww6w3450gz7ewwszu89s7xfc8z3vhekecnscd6y9sz8kgqg",
       "program": "test_oob.aleo",
       "function": "oob_get",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "3961197486889868425436352546984073839078118665165411493469466280567012058205field",
+          "id": "7935314202074182885987353066646291507223343076361676376667036066190712353977field",
           "value": "{\n  program_id: test_oob.aleo,\n  function_name: oob_get,\n  arguments: []\n}"
-        }
-      ],
-      "tpk": "7981053085130755109220824660426976121870810379074439786669633034831685925643group",
-      "tcm": "1972026825822913850151771635861552529053822353702925036266432391854296038009field",
-      "scm": "3373506719843842770296842989572420037715515309258645814277395836922481852951field"
-    }
-  ],
-  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
-}
-
-verified: true
-status: rejected
-{
-  "transitions": [
-    {
-      "id": "au1yttcvn7w6wj53qf4lfcsl0k6gs255kdw8nrjxh5ck2qjwja285rsfzmca6",
-      "program": "test_oob.aleo",
-      "function": "oob_set",
-      "inputs": [],
-      "outputs": [
-        {
-          "type": "future",
-          "id": "2139867490960949676712008865004471056843330356449080825326402275956810085134field",
-          "value": "{\n  program_id: test_oob.aleo,\n  function_name: oob_set,\n  arguments: []\n}"
         }
       ],
       "tpk": "7741601844666539001666024039402982534715897374550023665154670192555943804086group",
@@ -138,15 +116,15 @@ status: rejected
 {
   "transitions": [
     {
-      "id": "au1dysarzm2qtsylc785yaxh2hrngg0qfcrqtxyzk9swne2qvahdqfqrr73zj",
+      "id": "au12rdgsn6c34gaknsr5rrs7u2hyplcrexmxdvlwh6dvmw9psy7wuxq9u3hyq",
       "program": "test_oob.aleo",
-      "function": "oob_swap_remove",
+      "function": "oob_set",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "3198641669239140135076498609117014639258068485725865009595781772461241055207field",
-          "value": "{\n  program_id: test_oob.aleo,\n  function_name: oob_swap_remove,\n  arguments: []\n}"
+          "id": "4359411930747399687468795552849130630778692341149094789026794177305791943772field",
+          "value": "{\n  program_id: test_oob.aleo,\n  function_name: oob_set,\n  arguments: []\n}"
         }
       ],
       "tpk": "933855681493918551985687470197036272426346898098942205119692144951957333790group",
@@ -158,24 +136,48 @@ status: rejected
 }
 
 verified: true
+status: rejected
+{
+  "transitions": [
+    {
+      "id": "au1d3ymdjl7vqywrx0cnzd5hxxzvp8ldqa8lgax26lyv874lqdreupqq5xe6r",
+      "program": "test_oob.aleo",
+      "function": "oob_swap_remove",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "184949704482758161205512190544012258253606714199273590058401730701147145776field",
+          "value": "{\n  program_id: test_oob.aleo,\n  function_name: oob_swap_remove,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "2372600191360310466730899984372770159985559128975091816341615605713596468995group",
+      "tcm": "5853235491636016644972123751172913318557685922285260959087640681402195176895field",
+      "scm": "6376148113780901017011935352072049648711686986869714373089075707018072104747field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
 status: accepted
 {
   "transitions": [
     {
-      "id": "au1n59aaxyv6nty6a7s5eqjuch6kuk5ldegrjdc6ee8kg43u9r4zqpsqjxqjm",
+      "id": "au1ty52nn5wctzxqgaapgjpcrn5r00yzxuwg9arg6atwyrkf64vqsxq0g6qra",
       "program": "test_oob.aleo",
       "function": "oob_pop",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "5944745473318366361672403371987177523133101381821708612986559203868390023751field",
+          "id": "3386913372281347828562957387433267724557366521745249300891938738723747586118field",
           "value": "{\n  program_id: test_oob.aleo,\n  function_name: oob_pop,\n  arguments: []\n}"
         }
       ],
-      "tpk": "2372600191360310466730899984372770159985559128975091816341615605713596468995group",
-      "tcm": "5853235491636016644972123751172913318557685922285260959087640681402195176895field",
-      "scm": "6376148113780901017011935352072049648711686986869714373089075707018072104747field"
+      "tpk": "7519367406712661091265810033560010467750099554570243402063243590776075067862group",
+      "tcm": "7470301684228622630833315644936290798019430522515944686397507995270822590223field",
+      "scm": "3512923019782068683609519208373428502115058467933896558938883041710360245745field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"

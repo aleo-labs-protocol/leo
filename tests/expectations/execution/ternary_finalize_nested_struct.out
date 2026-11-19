@@ -1,0 +1,111 @@
+program test.aleo;
+
+struct Point:
+    x as u32;
+    y as u32;
+
+struct Segment:
+    lo as Point;
+    hi as Point;
+    tag as u32;
+
+mapping segs:
+    key as u32.public;
+    value as Segment.public;
+
+function update:
+    input r0 as boolean.private;
+    input r1 as Segment.private;
+    input r2 as Segment.private;
+    async update r0 r1 r2 into r3;
+    output r3 as test.aleo/update.future;
+
+finalize update:
+    input r0 as boolean.public;
+    input r1 as Segment.public;
+    input r2 as Segment.public;
+    ternary r0 r1 r2 into r3;
+    set r3 into segs[0u32];
+
+constructor:
+    assert.eq edition 0u16;
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au12m4l6ncqrutsryy557wercalwkjlwnvzwu0zcd7e9phl70n0su9szz9vae",
+      "program": "test.aleo",
+      "function": "update",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "7430108257505307796743208528877215524256512772076625678789197598597002044635field",
+          "value": "ciphertext1qyq2hnh0nqp2939a6htqnymzedrlphvr76ehzxa7gx5w4qyrr7rvcrg3crs97"
+        },
+        {
+          "type": "private",
+          "id": "5499756188845068818757574216700929422834768536675595798149342767210655715867field",
+          "value": "ciphertext1qvqynqn2l5jm6s9h9eyyvk5mt5auzt3w9ztpa9nagq2p3prdx29x2qy0897ug33eghw0j9u57nf6qgjgl38203clzgz4jv7pdtfw0yykpss8pfvqxsthcymu9xyrywpgt8mqfw20ff5g6w3e8t6gedgr66zs242hpgl"
+        },
+        {
+          "type": "private",
+          "id": "2962559795662054323811998464868471553708944966241294331239539626486372709021field",
+          "value": "ciphertext1qvqwm8y7utqtyhv3vfcj5sm0rmzwew9ynqp2me4fc4076unvhj4gyzpteu8x5ewdsnsnwjns5uqykcaycsknyvhgcuhyhqagmx832avmqltt0sfr4lze0snxltkjha5chfyxfydvdeccm9yh0angg8u27ngsgcrutkl"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "669103312837328689039746492184474528352571858691978250898236388114342302557field",
+          "value": "{\n  program_id: test.aleo,\n  function_name: update,\n  arguments: [\n    true,\n    {\n  lo: {\n    x: 1u32,\n    y: 2u32\n  },\n  hi: {\n    x: 3u32,\n    y: 4u32\n  },\n  tag: 5u32\n},\n    {\n  lo: {\n    x: 10u32,\n    y: 20u32\n  },\n  hi: {\n    x: 30u32,\n    y: 40u32\n  },\n  tag: 50u32\n}\n  ]\n}"
+        }
+      ],
+      "tpk": "4435182414136183130262225239916202916754973933386625330210643288715243337617group",
+      "tcm": "850142209754567944166319722250339409916042600529796761178314418357457776240field",
+      "scm": "6880818639492575671344261738303779886148232533224264415621330306086981058639field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au16nfpstalxzcqzxrqtgzs92ry3mz9502p560qdk23l8xjvuruvv9qj8jf8w",
+      "program": "test.aleo",
+      "function": "update",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "326591078231841944213396031941471573128298831470399432619980124515963160931field",
+          "value": "ciphertext1qyqr2tkc0vjq9v08jdtv64jjwa4jztl4ryfgpn79fkry8xrp6wxw5rgk0gnla"
+        },
+        {
+          "type": "private",
+          "id": "2336657116345093604960675149188604655268406513463962631942199255215020551451field",
+          "value": "ciphertext1qvqwuw7eh8t9gypllp94k5eqpcf88x00zfrtr4e20elcq7dw2m59zz9dmdp90m6evfehu8zgpdte700ksd7fc9qknwx5vxu96wdx3hj0qar88cd8f73xv9l2awj7uw3dxjexhdg0fdr4qqy67s8g89zzd92qy8v8luk"
+        },
+        {
+          "type": "private",
+          "id": "5441939335800718060171652963917577623984950365461230163312586188062988592106field",
+          "value": "ciphertext1qvqrmgf3nmx2anmt9wjddyy6nzty6df3d9lptkkq8h6yrqcyp6zwcrzwknldgufruuagswpkffrkl6cn9z9e9gwu9jp5jhth7q7md7cpp7eyzdfax9ntxcnr5xaagcgdemm7a5qy32jlxxpwt6sshx06xxvqw0za53w"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "3635914381699279277719516960593204561012167053389736155584104549514483195030field",
+          "value": "{\n  program_id: test.aleo,\n  function_name: update,\n  arguments: [\n    false,\n    {\n  lo: {\n    x: 1u32,\n    y: 2u32\n  },\n  hi: {\n    x: 3u32,\n    y: 4u32\n  },\n  tag: 5u32\n},\n    {\n  lo: {\n    x: 10u32,\n    y: 20u32\n  },\n  hi: {\n    x: 30u32,\n    y: 40u32\n  },\n  tag: 50u32\n}\n  ]\n}"
+        }
+      ],
+      "tpk": "2522887999940374826698654126645535027810075514268095352773581615775304946572group",
+      "tcm": "1804215531425177261902248378301676324038494384555044966602196492783038681001field",
+      "scm": "3550506856681924294077270970505890072867776518575635158053618611174190675462field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
