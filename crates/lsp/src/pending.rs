@@ -111,8 +111,7 @@ pub fn cancel_drained<R: PendingRequest>(
         }
         let response = Response {
             id: request.id().clone(),
-            result: None,
-            error: Some(ResponseError { code, message: message.clone(), data: None }),
+            response_result: Err(ResponseError { code, message: message.clone(), data: None }),
         };
         connection.sender.send(Message::Response(response))?;
     }

@@ -34,7 +34,7 @@ chrono             = "0.4"
 clap               = { version = "4.6", features = [ "derive", "env", "color", "unstable-styles" ] }
 color-backtrace    = "0.7"
 colored            = "3.1"
-criterion          = { package = "codspeed-criterion-compat", version = "4.7.0" }
+criterion          = { package = "codspeed-criterion-compat", version = "6.0" }
 crossbeam-channel  = "0.5"
 crossterm          = "0.29"
 ctrlc              = "3.5"
@@ -45,22 +45,22 @@ dunce              = "1.0"
 expect-test        = "1.5"
 fxhash             = "0.2"
 getrandom          = { version = "0.4", default-features = false, features = [ "wasm_js" ] }
-gix                = { version = "0.84", default-features = false, features = [ "blocking-http-transport-reqwest-rust-tls", "worktree-mutation", "max-performance-safe", "comfort", "basic", "extras", "sha1" ] }
+gix                = { version = "0.90", default-features = false, features = [ "blocking-http-transport-reqwest-rust-tls", "worktree-mutation", "max-performance", "comfort", "basic", "extras", "sha1" ] }
 glob               = "0.3"
 http               = "1"
 indexmap           = { version = "2.14", features = [ "serde" ] }
 libc               = "0.2"
 line-index         = "0.1"
 is-terminal        = "0.4"
-itertools          = "0.14"
+itertools          = "0.15"
 logos              = "0.16"
-lsp-server         = "0.7"
+lsp-server         = "0.10"
 lsp-types          = "0.97"
-nix                = { version = "0.31", features = [ "process", "term", "fs", "poll" ] }
+nix                = { version = "0.32", features = [ "process", "term", "fs", "poll" ] }
 num-format         = "0.4"
 num-traits         = "0.2"
 once_cell          = "1.21"
-parking_lot        = "0.12"
+parking_lot        = "0.13"
 paste              = "1.0"
 rand               = { version = "0.10", default-features = false }
 rand_chacha        = { version = "0.10", default-features = false }
@@ -70,12 +70,12 @@ regex              = "1.12"
 # clang-sys `dlopen`s libclang rather than link-time loading it. Not used directly.
 rocksdb            = { version = "0.25", default-features = false, features = ["bindgen-runtime"] }
 reqwest            = { version = "0.13", features = ["blocking", "json"] }
-rowan              = "0.16"
+rowan              = "0.17"
 rpassword          = "7.5"
 scoped-tls         = "1.0"
 serde              = { version = "1.0", features = [ "derive", "rc" ] }
 serde_json         = { version = "1.0", features = [ "preserve_order" ] }
-serial_test        = "3.5"
+serial_test        = "4.0"
 sha2               = "0.11"
 signal-hook        = { version = "0.4", features = [ "iterator" ] }
 similar            = "3.1"
@@ -87,10 +87,10 @@ snarkvm-synthesizer-program = { version = "4.13.1", features = [ "wasm" ] }
 sys-info           = "0.9"
 tempfile           = "3.27"
 thiserror          = "2.0"
-tree-sitter        = "0.26"
+tree-sitter        = "0.27"
 tree-sitter-language = "0.1"
 tokio              = { version = "1", features = [ "full" ] }
-tower-http         = { version = "0.6.11", features = [ "cors", "trace" ] }
+tower-http         = { version = "0.7", features = [ "cors", "trace" ] }
 tower_governor     = "0.8"
 tracing            = "0.1"
 tracing-subscriber = { version = "0.3", features = [ "env-filter", "fmt" ] }
