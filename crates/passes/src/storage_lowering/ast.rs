@@ -29,34 +29,99 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
     }
 
     /* Types */
-    fn reconstruct_array_type(&mut self, input: ArrayType) -> (TypeKind, Self::AdditionalOutput) {
-        let (length, stmts) = self.reconstruct_expression(*input.length, &());
-        (
-            TypeKind::Array(ArrayType {
-                element_type: Box::new(self.reconstruct_type(*input.element_type).0),
-                length: Box::new(length),
-            }),
-            stmts,
-        )
-    }
-
-    fn reconstruct_composite_type(&mut self, input: CompositeType) -> (TypeKind, Self::AdditionalOutput) {
-        let mut statements = Vec::new();
-
-        let const_arguments = input
-            .const_arguments
-            .into_iter()
-            .map(|arg| {
-                let (expr, stmts) = self.reconstruct_expression(arg, &Default::default());
-                statements.extend(stmts);
-                expr
-            })
-            .collect();
-
-        (TypeKind::Composite(CompositeType { const_arguments, ..input }), statements)
+    fn reconstruct_type(&mut self, input: TypeKind) -> (TypeKind, Self::AdditionalOutput) {
+        // Type expressions are compile-time values and cannot contain storage operations.
+        (input, vec![])
     }
 
     /* Expressions */
+    fn reconstruct_expression(&mut self, input: Expression, additional: &()) -> (Expression, Self::AdditionalOutput) {
+        let span = input.span();
+        let must_evaluate = !matches!(&input, Expression::Async(_)) && !expression_can_be_discarded(&input, self.state);
+        let original_type = must_evaluate.then(|| {
+            self.state.type_table.get(&input.id()).expect("Type checking assigns a type to effectful expressions.")
+        });
+
+        let (expression, mut statements) = match input {
+            Expression::Async(expr) => self.reconstruct_async(expr, additional),
+            Expression::Array(expr) => self.reconstruct_array(expr, additional),
+            Expression::ArrayAccess(expr) => self.reconstruct_array_access(*expr, additional),
+            Expression::Binary(expr) => self.reconstruct_binary(*expr, additional),
+            Expression::Call(expr) => self.reconstruct_call(*expr, additional),
+            Expression::DynamicOp(expr) => self.reconstruct_dynamic_op(*expr, additional),
+            Expression::Cast(expr) => self.reconstruct_cast(*expr, additional),
+            Expression::Composite(expr) => self.reconstruct_composite_init(expr, additional),
+            Expression::Err(expr) => self.reconstruct_err(expr, additional),
+            Expression::Path(expr) => self.reconstruct_path(expr, additional),
+            Expression::Literal(expr) => self.reconstruct_literal(expr, additional),
+            Expression::MemberAccess(expr) => self.reconstruct_member_access(*expr, additional),
+            Expression::Repeat(expr) => self.reconstruct_repeat(*expr, additional),
+            Expression::Ternary(expr) => self.reconstruct_ternary(*expr, additional),
+            Expression::Tuple(expr) => self.reconstruct_tuple(expr, additional),
+            Expression::TupleAccess(expr) => self.reconstruct_tuple_access(*expr, additional),
+            Expression::Unary(expr) => self.reconstruct_unary(*expr, additional),
+            Expression::Unit(expr) => self.reconstruct_unit(expr, additional),
+            Expression::Intrinsic(expr) => self.reconstruct_intrinsic(*expr, additional),
+        };
+
+        let Some(type_) = original_type else {
+            return (expression, statements);
+        };
+        self.state.type_table.insert(expression.id(), type_);
+        if expression_can_be_discarded(&expression, self.state) {
+            return (expression, statements);
+        }
+        let type_kind = self.state.types.resolve(type_);
+
+        if matches!(&type_kind, TypeKind::Unit) {
+            if matches!(&expression, Expression::Call(_) | Expression::DynamicOp(_) | Expression::Intrinsic(_)) {
+                statements.push(ExpressionStatement { expression, span, id: self.state.node_builder.next_id() }.into());
+            }
+            let unit = UnitExpression { span, id: self.state.node_builder.next_id() };
+            self.state.type_table.insert(unit.id, type_);
+            return (unit.into(), statements);
+        }
+
+        // Future bindings are tracked individually and cannot acquire an extra alias.
+        let contains_future = matches!(&type_kind, TypeKind::Future(_))
+            || matches!(&type_kind, TypeKind::Tuple(tuple) if tuple.elements().iter().any(|ty| matches!(ty, TypeKind::Future(_))));
+        if contains_future || matches!(&type_kind, TypeKind::Mapping(_) | TypeKind::Vector(_) | TypeKind::Err) {
+            return (expression, statements);
+        }
+
+        // Complete this operand before a later operand can emit statements that change storage.
+        let name = self.state.assigner.unique_symbol("$operand", "$");
+        let identifier = Identifier { name, span, id: self.state.node_builder.next_id() };
+        self.state.type_table.insert(identifier.id, type_);
+        // Dynamic record fields require an expected type when type checking runs again.
+        let needs_expected_type = matches!(&expression, Expression::MemberAccess(access)
+            if self.state.type_table.get(&access.inner.id())
+                .is_some_and(|ty| matches!(self.state.types.resolve(ty), TypeKind::DynRecord)));
+        let expression = if needs_expected_type {
+            let cast = CastExpression {
+                expression,
+                type_: TypeNode::new(&self.state.types, type_kind, span),
+                span,
+                id: self.state.node_builder.next_id(),
+            };
+            self.state.type_table.insert(cast.id, type_);
+            cast.into()
+        } else {
+            expression
+        };
+        statements.push(
+            DefinitionStatement {
+                place: DefinitionPlace::Single(identifier),
+                type_: None,
+                value: expression,
+                span,
+                id: self.state.node_builder.next_id(),
+            }
+            .into(),
+        );
+        (Path::from(identifier).to_local().into(), statements)
+    }
+
     fn reconstruct_array_access(
         &mut self,
         mut input: ArrayAccess,
@@ -716,6 +781,12 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
         // Merge side effects
         stmts_left.append(&mut stmts_right);
 
+        if matches!((&input.left, &input.right), (Expression::Unit(_), Expression::Unit(_)))
+            && matches!(input.op, BinaryOperation::Eq | BinaryOperation::Neq)
+        {
+            return (Literal::boolean(input.op == BinaryOperation::Eq, input.span, input.id).into(), stmts_left);
+        }
+
         (input.into(), stmts_left)
     }
 
@@ -1077,7 +1148,7 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
         let (reconstructed_expression, statements) = self.reconstruct_expression(input.expression, &Default::default());
         let legal_expression_statement = matches!(
             reconstructed_expression,
-            Expression::Call(_) | Expression::DynamicOp(_) | Expression::Intrinsic(_)
+            Expression::Call(_) | Expression::DynamicOp(_) | Expression::Intrinsic(_) | Expression::Unit(_)
         );
         if !legal_expression_statement && !keep_expression {
             (

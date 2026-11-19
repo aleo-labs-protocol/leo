@@ -475,7 +475,7 @@ impl AstReconstructor for DestructuringVisitor<'_> {
             }
             (
                 Single(identifier),
-                rhs @ (Expression::Call(..) | Expression::DynamicOp(..)),
+                rhs @ (Expression::Call(..) | Expression::DynamicOp(..) | Expression::Intrinsic(..)),
                 TypeKind::Tuple(tuple_type),
             ) => {
                 let definition_stmt = self.assign_tuple(rhs, identifier.name);

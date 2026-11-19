@@ -1,0 +1,369 @@
+program operand_order.aleo;
+
+struct Payout:
+    recipient as u32;
+    amount as u64;
+
+struct Optional__Cn0NJepTXVA:
+    is_some as boolean;
+    val as Payout;
+
+struct Optional__DmN5CQ9hzeK:
+    is_some as boolean;
+    val as u64;
+
+struct Optional__JzunLORyB8U:
+    is_some as boolean;
+    val as u32;
+
+mapping credits:
+    key as u32.public;
+    value as u64.public;
+
+mapping ticket__:
+    key as boolean.public;
+    value as u64.public;
+
+mapping payouts__:
+    key as u32.public;
+    value as Payout.public;
+
+mapping payouts__len__:
+    key as boolean.public;
+    value as u32.public;
+
+mapping target_calls__:
+    key as boolean.public;
+    value as u32.public;
+
+mapping network_calls__:
+    key as boolean.public;
+    value as u32.public;
+
+function check_order:
+    input r0 as u32.private;
+    async check_order r0 into r1;
+    output r1 as operand_order.aleo/check_order.future;
+
+finalize check_order:
+    input r0 as u32.public;
+    set 0u32 into payouts__len__[false];
+    get.or_use payouts__len__[false] 0u32 into r1;
+    add r1 1u32 into r2;
+    set r2 into payouts__len__[false];
+    cast 1u32 10u64 into r3 as Payout;
+    set r3 into payouts__[r1];
+    get.or_use payouts__len__[false] 0u32 into r4;
+    add r4 1u32 into r5;
+    set r5 into payouts__len__[false];
+    cast 2u32 20u64 into r6 as Payout;
+    set r6 into payouts__[r4];
+    get.or_use payouts__len__[false] 0u32 into r7;
+    lt r0 r7 into r8;
+    cast 0u32 0u64 into r9 as Payout;
+    get.or_use payouts__[r0] r9 into r10;
+    cast 0u32 0u64 into r11 as Payout;
+    ternary r8 r10.recipient r11.recipient into r12;
+    ternary r8 r10.amount r11.amount into r13;
+    cast r12 r13 into r14 as Payout;
+    cast r8 r14 into r15 as Optional__Cn0NJepTXVA;
+    assert.eq r15.is_some true;
+    get.or_use payouts__len__[false] 0u32 into r16;
+    lt r0 r16 into r17;
+    assert.eq r17 true;
+    get payouts__[r0] into r18;
+    sub r16 1u32 into r19;
+    get payouts__[r19] into r20;
+    set r20 into payouts__[r0];
+    set r19 into payouts__len__[false];
+    set r18.amount into credits[r15.val.recipient];
+    get credits[1u32] into r21;
+    assert.eq r21 10u64;
+    contains credits[2u32] into r22;
+    not r22 into r23;
+    assert.eq r23 true;
+
+function check_option_order:
+    async check_option_order into r0;
+    output r0 as operand_order.aleo/check_option_order.future;
+
+finalize check_option_order:
+    set 5u64 into ticket__[false];
+    set 7u64 into ticket__[false];
+    contains ticket__[false] into r0;
+    get.or_use ticket__[false] 0u64 into r1;
+    ternary r0 r1 0u64 into r2;
+    cast r0 r2 into r3 as Optional__DmN5CQ9hzeK;
+    assert.eq r3.is_some true;
+    assert.eq 7u64 r3.val;
+    set 5u64 into ticket__[false];
+    contains ticket__[false] into r4;
+    get.or_use ticket__[false] 0u64 into r5;
+    ternary r4 r5 0u64 into r6;
+    cast r4 r6 into r7 as Optional__DmN5CQ9hzeK;
+    assert.eq r7.is_some true;
+    set 7u64 into ticket__[false];
+    assert.eq r7.val 5u64;
+
+function check_dynamic_singleton:
+    async check_dynamic_singleton into r0;
+    output r0 as operand_order.aleo/check_dynamic_singleton.future;
+
+finalize check_dynamic_singleton:
+    set 7u64 into ticket__[false];
+    set 0u32 into target_calls__[false];
+    set 0u32 into network_calls__[false];
+    contains target_calls__[false] into r0;
+    get.or_use target_calls__[false] 0u32 into r1;
+    ternary r0 r1 0u32 into r2;
+    cast r0 r2 into r3 as Optional__JzunLORyB8U;
+    assert.eq r3.is_some true;
+    add r3.val 1u32 into r4;
+    set r4 into target_calls__[false];
+    contains target_calls__[false] into r5;
+    get.or_use target_calls__[false] 0u32 into r6;
+    ternary r5 r6 0u32 into r7;
+    cast r5 r7 into r8 as Optional__JzunLORyB8U;
+    assert.eq r8.is_some true;
+    is.eq r8.val 1u32 into r9;
+    ternary r9 9063389945604293180140082786415field 0field into r10;
+    contains network_calls__[false] into r11;
+    get.or_use network_calls__[false] 0u32 into r12;
+    ternary r11 r12 0u32 into r13;
+    cast r11 r13 into r14 as Optional__JzunLORyB8U;
+    assert.eq r14.is_some true;
+    add r14.val 1u32 into r15;
+    set r15 into network_calls__[false];
+    contains.dynamic r10 'aleo' 'ticket__'[false] into r16;
+    get.or_use.dynamic r10 'aleo' 'ticket__'[false] 0u64 into r17 as u64;
+    ternary r16 r17 0u64 into r18;
+    cast r16 r18 into r19 as Optional__DmN5CQ9hzeK;
+    assert.eq r19.is_some true;
+    assert.eq r19.val 7u64;
+    contains target_calls__[false] into r20;
+    get.or_use target_calls__[false] 0u32 into r21;
+    ternary r20 r21 0u32 into r22;
+    cast r20 r22 into r23 as Optional__JzunLORyB8U;
+    assert.eq r23.is_some true;
+    assert.eq r23.val 1u32;
+    contains network_calls__[false] into r24;
+    get.or_use network_calls__[false] 0u32 into r25;
+    ternary r24 r25 0u32 into r26;
+    cast r24 r26 into r27 as Optional__JzunLORyB8U;
+    assert.eq r27.is_some true;
+    assert.eq r27.val 1u32;
+
+function check_unit_order:
+    async check_unit_order into r0;
+    output r0 as operand_order.aleo/check_unit_order.future;
+
+finalize check_unit_order:
+    set 5u64 into ticket__[false];
+    set 7u64 into ticket__[false];
+    contains ticket__[false] into r0;
+    get.or_use ticket__[false] 0u64 into r1;
+    ternary r0 r1 0u64 into r2;
+    cast r0 r2 into r3 as Optional__DmN5CQ9hzeK;
+    assert.eq r3.is_some true;
+    assert.eq r3.val 7u64;
+    contains ticket__[false] into r4;
+    get.or_use ticket__[false] 0u64 into r5;
+    ternary r4 r5 0u64 into r6;
+    cast r4 r6 into r7 as Optional__DmN5CQ9hzeK;
+    assert.eq r7.is_some true;
+    assert.eq r7.val 7u64;
+    set 5u64 into ticket__[false];
+    set 7u64 into ticket__[false];
+    contains ticket__[false] into r8;
+    get.or_use ticket__[false] 0u64 into r9;
+    ternary r8 r9 0u64 into r10;
+    cast r8 r10 into r11 as Optional__DmN5CQ9hzeK;
+    assert.eq r11.is_some true;
+    assert.eq r11.val 7u64;
+
+function check_dynamic_vector:
+    async check_dynamic_vector into r0;
+    output r0 as operand_order.aleo/check_dynamic_vector.future;
+
+finalize check_dynamic_vector:
+    set 0u32 into payouts__len__[false];
+    get.or_use payouts__len__[false] 0u32 into r0;
+    add r0 1u32 into r1;
+    set r1 into payouts__len__[false];
+    cast 2u32 20u64 into r2 as Payout;
+    set r2 into payouts__[r0];
+    set 0u32 into target_calls__[false];
+    set 0u32 into network_calls__[false];
+    contains target_calls__[false] into r3;
+    get.or_use target_calls__[false] 0u32 into r4;
+    ternary r3 r4 0u32 into r5;
+    cast r3 r5 into r6 as Optional__JzunLORyB8U;
+    assert.eq r6.is_some true;
+    add r6.val 1u32 into r7;
+    set r7 into target_calls__[false];
+    contains target_calls__[false] into r8;
+    get.or_use target_calls__[false] 0u32 into r9;
+    ternary r8 r9 0u32 into r10;
+    cast r8 r10 into r11 as Optional__JzunLORyB8U;
+    assert.eq r11.is_some true;
+    is.eq r11.val 1u32 into r12;
+    ternary r12 9063389945604293180140082786415field 0field into r13;
+    contains network_calls__[false] into r14;
+    get.or_use network_calls__[false] 0u32 into r15;
+    ternary r14 r15 0u32 into r16;
+    cast r14 r16 into r17 as Optional__JzunLORyB8U;
+    assert.eq r17.is_some true;
+    add r17.val 1u32 into r18;
+    set r18 into network_calls__[false];
+    get.or_use.dynamic r13 'aleo' 'payouts__len__'[false] 0u32 into r19 as u32;
+    lt 0u32 r19 into r20;
+    cast 0u32 0u64 into r21 as Payout;
+    get.or_use.dynamic r13 'aleo' 'payouts__'[0u32] r21 into r22 as Payout;
+    cast 0u32 0u64 into r23 as Payout;
+    ternary r20 r22.recipient r23.recipient into r24;
+    ternary r20 r22.amount r23.amount into r25;
+    cast r24 r25 into r26 as Payout;
+    cast r20 r26 into r27 as Optional__Cn0NJepTXVA;
+    assert.eq r27.is_some true;
+    assert.eq r27.val.recipient 2u32;
+    contains target_calls__[false] into r28;
+    get.or_use target_calls__[false] 0u32 into r29;
+    ternary r28 r29 0u32 into r30;
+    cast r28 r30 into r31 as Optional__JzunLORyB8U;
+    assert.eq r31.is_some true;
+    assert.eq r31.val 1u32;
+    contains network_calls__[false] into r32;
+    get.or_use network_calls__[false] 0u32 into r33;
+    ternary r32 r33 0u32 into r34;
+    cast r32 r34 into r35 as Optional__JzunLORyB8U;
+    assert.eq r35.is_some true;
+    assert.eq r35.val 1u32;
+
+constructor:
+    assert.eq edition 0u16;
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au16h4d5mysm0wpl3rlc0td8w2cykd5zppe7575mqyp0dljjf63ycrs33c7j8",
+      "program": "operand_order.aleo",
+      "function": "check_order",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "5990363077328137555368214420364138742346667111643108035826967843070785654159field",
+          "value": "ciphertext1qyqtwl506r5pd93rnem6kr7le5sq4v3rxs67p3hlffls33vpfpy37qgt0dyfj"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "1191609608429922619215286148782434393347956015762646600745001447215091643413field",
+          "value": "{\n  program_id: operand_order.aleo,\n  function_name: check_order,\n  arguments: [\n    0u32\n  ]\n}"
+        }
+      ],
+      "tpk": "7348638653789945440347298392860761299324841608537156465619966374045725863559group",
+      "tcm": "8147531172971723077752371987188066558081351809752149227839848595654941617221field",
+      "scm": "7429404758539727932759142252686075680707401112946045401267229900006909605658field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1d3a2gae66wg74ezf3d94cy4m84h3440ctwjphy8259es7f9gfsyquqe5na",
+      "program": "operand_order.aleo",
+      "function": "check_option_order",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "8415631635608958093833030378500443186286290655683393129885585846177608846201field",
+          "value": "{\n  program_id: operand_order.aleo,\n  function_name: check_option_order,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "7927627782735880235308326849311139336561331401549944735775861345664816233074group",
+      "tcm": "102246219271905126904950594843740402635907517704078029023783171436669949542field",
+      "scm": "1849989200843903886290981531793867638864181021043239688881809527025591319515field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1ezydgl2aeqespangal9fj8s2gqufajy9c26wmw5jwrjhshusfczsjdd8uf",
+      "program": "operand_order.aleo",
+      "function": "check_unit_order",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "5933831171459715340185244958146393633461556397833517307057301368510885818809field",
+          "value": "{\n  program_id: operand_order.aleo,\n  function_name: check_unit_order,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "3622553325868814015091606677266857691624408193597967653593232384557194450338group",
+      "tcm": "541782486121624115487156466758471553847871027270594533206630907065200632210field",
+      "scm": "1523717412380233458149023835911605237538874051210759784691568701932116068484field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1n6j9l2824cvhlshdz6cd86a6q5es7p5fxv70z67c5jpdynkym5zsljyc5q",
+      "program": "operand_order.aleo",
+      "function": "check_dynamic_singleton",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "4190010430403293382483642158694598840818441806451127214582667480748766920514field",
+          "value": "{\n  program_id: operand_order.aleo,\n  function_name: check_dynamic_singleton,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "4691039103484893063658464860335679699279976590690506713079321368656718374609group",
+      "tcm": "6600607631965428797388096749511549585055877604335263977380394082553408644573field",
+      "scm": "5460363863287997148613866118481060173837043330825422214985541454980626020691field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au167xp558n0kqryuns8rfn8d9prv5q6tvmxzt9chmre2e8zwwczyxqk7rf03",
+      "program": "operand_order.aleo",
+      "function": "check_dynamic_vector",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "6682181705472918591998409889085019629587302709029910066639494637467667724424field",
+          "value": "{\n  program_id: operand_order.aleo,\n  function_name: check_dynamic_vector,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "3682313437069720433157255519648794961621039900493566815098586251511641079group",
+      "tcm": "443856137689409930434400160360416984390212225855031190575232630084379619147field",
+      "scm": "8076767054756992285147011843589875787792693457112756856894350674973740433585field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+

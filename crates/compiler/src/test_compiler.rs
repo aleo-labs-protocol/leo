@@ -230,6 +230,56 @@ fn test_compiler() {
     leo_test_framework::run_tests("compiler", runner);
 }
 
+#[test]
+#[serial]
+fn lowering_preserves_inferred_types() {
+    for source in [
+        r#"// --- library: hidden --- //
+        struct Hidden { x: u32 }
+        export fn make(x: u32) -> Hidden { return Hidden { x }; }
+        // --- Next Program --- //
+        program test.aleo {
+            fn main(value: u32) -> u32 {
+                let result = hidden::make(value);
+                return result.x;
+            }
+            @noupgrade constructor() {}
+        }"#,
+        r#"fn noop() {}
+        program test.aleo {
+            fn main(value: u32) -> u32 {
+                let result = (noop(), value + 1u32);
+                return result.1;
+            }
+            @noupgrade constructor() {}
+        }"#,
+        r#"// --- library: hidden --- //
+        struct Hidden { x: u32 }
+        export fn consume(item: Hidden) -> u32 { return item.x; }
+        // --- Next Program --- //
+        program test.aleo {
+            fn main(item: dyn record) -> u32 {
+                return hidden::consume(item.payload);
+            }
+            @noupgrade constructor() {}
+        }"#,
+        r#"program test.aleo {
+            fn main(item: dyn record) -> u64 {
+                let result: u64? = item.payload;
+                return result.unwrap_or(0u64);
+            }
+            @noupgrade constructor() {}
+        }"#,
+    ] {
+        let buf = BufferEmitter::new();
+        let handler = Handler::new(buf.clone());
+        let node_builder = Rc::new(NodeBuilder::default());
+        create_session_if_not_set_then(|_| {
+            assert!(run_test(StubType::FromLeo, source, &handler, &node_builder).is_ok(), "{}", buf.extract_errs());
+        });
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Interface ABI tests
 // ---------------------------------------------------------------------------
