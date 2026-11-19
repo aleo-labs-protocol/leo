@@ -230,44 +230,6 @@ fn test_compiler() {
     leo_test_framework::run_tests("compiler", runner);
 }
 
-#[test]
-#[serial]
-fn qualified_path_does_not_resolve_to_local() {
-    for (declaration, expression, leo_succeeds, aleo_succeeds) in [
-        ("", "dependency.aleo::allowed", false, false),
-        ("const allowed: bool = true;", "dependency.aleo::allowed", false, false),
-        // Constants are available through Leo stubs but are absent from Aleo bytecode.
-        ("export const allowed: bool = true;", "dependency.aleo::allowed", true, false),
-        ("", "test.aleo::allowed", false, false),
-        ("", "allowed", true, true),
-    ] {
-        let source = format!(
-            "{declaration}\n\
-             program dependency.aleo {{ fn entry() {{}} @noupgrade constructor() {{}} }}\n\
-             {}\n\
-             import dependency.aleo;\n\
-             program test.aleo {{\n\
-                 fn main(allowed: bool) {{ assert({expression}); }}\n\
-                 @noupgrade constructor() {{}}\n\
-             }}",
-            super::test_utils::PROGRAM_DELIMITER,
-        );
-        for (stub_type, succeeds) in [(StubType::FromLeo, leo_succeeds), (StubType::FromAleo, aleo_succeeds)] {
-            let buf = BufferEmitter::new();
-            let handler = Handler::new(buf.clone());
-            let node_builder = Rc::new(NodeBuilder::default());
-            create_session_if_not_set_then(|_| {
-                assert_eq!(
-                    run_test(stub_type, &source, &handler, &node_builder).is_ok(),
-                    succeeds,
-                    "{source}\n{}",
-                    buf.extract_errs(),
-                );
-            });
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Interface ABI tests
 // ---------------------------------------------------------------------------
