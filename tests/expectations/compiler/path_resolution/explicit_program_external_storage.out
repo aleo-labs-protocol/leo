@@ -1,0 +1,49 @@
+program provider.aleo;
+
+mapping count__:
+    key as boolean.public;
+    value as u64.public;
+
+function initialize:
+    async initialize into r0;
+    output r0 as provider.aleo/initialize.future;
+
+finalize initialize:
+    set 7u64 into count__[false];
+
+constructor:
+    assert.eq edition 0u16;
+// --- Next Program --- //
+import provider.aleo;
+program caller.aleo;
+
+struct Optional__DmN5CQ9hzeK:
+    is_some as boolean;
+    val as u64;
+
+function main:
+    async main into r0;
+    output r0 as caller.aleo/main.future;
+
+finalize main:
+    contains provider.aleo/count__[false] into r0;
+    get.or_use provider.aleo/count__[false] 0u64 into r1;
+    ternary r0 r1 0u64 into r2;
+    cast r0 r2 into r3 as Optional__DmN5CQ9hzeK;
+    assert.eq r3.is_some true;
+    assert.eq r3.val 7u64;
+
+constructor:
+    assert.eq edition 0u16;
+
+
+---
+Note: Treating dependencies as Aleo produces different results:
+
+[ETYC0372005] Error: unknown variable `provider.aleo::count`
+   ╭─[ outer.leo:3:12 ]
+   │
+ 3 │     return provider.aleo::count.unwrap();
+   │ 
+   │ Help: Check `provider.aleo::count` for typos and confirm it is declared in this scope. If it lives in another program, import it with the program-qualified name (e.g. `credits.aleo::credits`).
+───╯
