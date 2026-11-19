@@ -28,6 +28,8 @@ use itertools::Itertools;
 use leo_ast::{Function, Location, *};
 use leo_span::{Symbol, sym};
 
+use std::cell::RefCell;
+
 pub struct TransformVisitor<'a> {
     pub state: &'a mut CompilerState,
     /// Functions that should always be inlined.
@@ -322,18 +324,52 @@ impl AstReconstructor for TransformVisitor<'_> {
                 .zip_eq(input.arguments)
                 .collect::<IndexMap<_, _>>();
 
-            // Function to replace path expressions with their corresponding const argument or keep them unchanged.
-            let replace_path = |expr: &Expression| match expr {
-                Expression::Path(path) => parameter_to_argument
-                    .get(&path.identifier().name)
-                    .map_or(Expression::Path(path.clone()), |expr| expr.clone()),
-                _ => expr.clone(),
+            // Library functions keep the context of the program that uses them.
+            let context_program = (function_location.program != self.program
+                && !self.state.symbol_table.is_library(function_location.program))
+            .then_some(function_location.program);
+            let node_builder = self.state.node_builder.clone();
+            let address_ids = RefCell::new(Vec::new());
+
+            let replace_expression = |expr: &Expression| {
+                // Keep caller arguments in their original context.
+                if let Expression::Path(path) = expr {
+                    return parameter_to_argument
+                        .get(&path.identifier().name)
+                        .map_or_else(|| expr.clone(), Clone::clone);
+                }
+
+                // Preserve a concrete callee's program context when its body moves to another unit.
+                if let (Some(program), Expression::Intrinsic(intrinsic)) = (context_program, expr) {
+                    let name = match intrinsic.name {
+                        sym::_self_address | sym::_self_id => {
+                            return Literal::address(program.to_string(), intrinsic.span, node_builder.next_id())
+                                .into();
+                        }
+                        sym::_self_checksum => sym::_program_checksum,
+                        sym::_self_edition => sym::_program_edition,
+                        sym::_self_program_owner => sym::_program_owner,
+                        _ => return expr.clone(),
+                    };
+                    let address_id = node_builder.next_id();
+                    address_ids.borrow_mut().push(address_id);
+                    return IntrinsicExpression {
+                        name,
+                        arguments: vec![Literal::address(program.to_string(), intrinsic.span, address_id).into()],
+                        id: node_builder.next_id(),
+                        ..intrinsic.as_ref().clone()
+                    }
+                    .into();
+                }
+                expr.clone()
             };
 
-            // Replace path expressions with their corresponding const argument or keep them unchanged.
-            let reconstructed_block = Replacer::new(replace_path, false /* refresh IDs */, self.state)
+            let reconstructed_block = Replacer::new(replace_expression, false /* refresh IDs */, self.state)
                 .reconstruct_block(callee.block.clone())
                 .0;
+            for id in address_ids.into_inner() {
+                self.state.type_table.insert(id, Type::ADDRESS);
+            }
 
             // Run SSA formation on the inlined block and rename definitions. Renaming is necessary to avoid shadowing variables.
             let inlined_statements =
