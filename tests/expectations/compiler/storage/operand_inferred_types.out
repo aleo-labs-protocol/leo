@@ -1,0 +1,32 @@
+program test.aleo;
+
+struct Optional__DmN5CQ9hzeK:
+    is_some as boolean;
+    val as u64;
+
+struct Hidden__782WGxipguv:
+    x as u32;
+
+function inferred_return:
+    input r0 as u32.private;
+    cast r0 into r1 as Hidden__782WGxipguv;
+    output r1.x as u32.private;
+
+function inferred_unit_tuple:
+    input r0 as u32.private;
+    add r0 1u32 into r1;
+    output r1 as u32.private;
+
+function inferred_record_field:
+    input r0 as dynamic.record;
+    get.record.dynamic r0.payload into r1 as Hidden__782WGxipguv;
+    output r1.x as u32.private;
+
+function optional_record_field:
+    input r0 as dynamic.record;
+    get.record.dynamic r0.payload into r1 as Optional__DmN5CQ9hzeK;
+    ternary r1.is_some r1.val 0u64 into r2;
+    output r2 as u64.private;
+
+constructor:
+    assert.eq edition 0u16;
