@@ -20,9 +20,12 @@ constructor:
 import context_dep.aleo;
 program context_mid.aleo;
 
-function anchor:
-    input r0 as u32.private;
-    output r0 as u32.private;
+function check_call:
+    input r0 as address.private;
+    input r1 as address.private;
+    assert.eq self.caller r0;
+    assert.eq self.signer r1;
+    assert.neq self.caller self.signer;
 
 constructor:
     assert.eq edition 0u16;
@@ -51,7 +54,7 @@ function check_identity:
     assert.eq context_parent.aleo context_parent.aleo;
     assert.eq context_parent.aleo context_parent.aleo;
     assert.eq context_parent.aleo context_parent.aleo;
-    assert.eq self.caller self.signer;
+    call context_mid.aleo/check_call context_parent.aleo self.signer;
 
 function check_metadata:
     async check_metadata into r0;
@@ -71,6 +74,27 @@ verified: true
 status: accepted
 {
   "transitions": [
+    {
+      "id": "au1tjy5ssyanxsmudv6ty7pmxj4ae890fhhkqjnhmy93mcpwgwtuqgsw99dy4",
+      "program": "context_mid.aleo",
+      "function": "check_call",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "8434881558164016810480675155495980813139690465964858088621347675367326111894field",
+          "value": "ciphertext1qgq2jdrz8p65jljlj6xrk8vzpkjkarcuvznmv8n9uc66wr4n7u3z7r9g74a7mfyx89mxu0sufn0pfw6h3wjaskz0j0n63c9esl8ux2rspgumwza7"
+        },
+        {
+          "type": "private",
+          "id": "3429541377230381519349875561181684730703374659617835944394554146313825396409field",
+          "value": "ciphertext1qgqrj5rhf4hk5d8h2ue6l9emjx3zesga0wpeuzex70awmfprhqf0uqvv0tz2gphh0g9nkfethzqk44xmgdjlpvm43l9knkfx9n5r0yeepghcxaq8"
+        }
+      ],
+      "outputs": [],
+      "tpk": "1043506504306420611400457209952069321293385773421302378775266131975857017664group",
+      "tcm": "4419541118683892666504459250901893442265781661816314867237927705280230352961field",
+      "scm": "3609000689911673644292249378334827587729796752984632500404758660628038874950field"
+    },
     {
       "id": "au18jent5r7pd55j7l3m6hqkst4e244gkgdwfjkpmu8jluwawmxdupsl2al6q",
       "program": "context_parent.aleo",
@@ -96,20 +120,20 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au12qgup7pwqwufk6qusv89yh7ycnce9c2q625mf9xjk32qrqvgu5yqufjjtp",
+      "id": "au1aheq5nkmtdq3hptwvjm76slhf96lrf4qht6l5uxuf9h90nffdsps9dwgxr",
       "program": "context_parent.aleo",
       "function": "check_metadata",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "5031741265354220440217477155505944517204892058391726609564185082604459612644field",
+          "id": "2091870489262599012719619608965173334344592906377738700125042291897282234453field",
           "value": "{\n  program_id: context_parent.aleo,\n  function_name: check_metadata,\n  arguments: []\n}"
         }
       ],
-      "tpk": "1832300881891220569453675224116941050832232032471753639583359396852880711872group",
-      "tcm": "7816391739998701420004245450879888331090137470535105551801410479682670851377field",
-      "scm": "6822404101412209239980323331207380593307810608612881422815076652288377253459field"
+      "tpk": "856620745745033191253488073612975748466573482876019849653702831795142861258group",
+      "tcm": "1531226440065314772394767640091739869332245316461343971993571336533245212245field",
+      "scm": "3679567983927565857340092613941585647576153061169000237628259419755991903463field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"

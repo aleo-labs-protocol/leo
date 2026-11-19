@@ -41,6 +41,10 @@ export fn caller_value(value: address) -> address {
     return value;
 }
 
+export fn caller_and_signer() -> (address, address) {
+    return (std::ctx::caller(), std::ctx::signer());
+}
+
 export fn empty_args(value: [u32; 0]) -> address {
     return std::ctx::id();
 }
@@ -87,8 +91,11 @@ export fn nested(value: u32) -> (address, address, u32) {
 }
 
 program context_mid.aleo {
-    fn anchor(value: u32) -> u32 {
-        return value;
+    fn check_call(expected_caller: address, expected_signer: address) {
+        let (caller, signer) = context_dep.aleo::caller_and_signer();
+        assert_eq(caller, expected_caller);
+        assert_eq(signer, expected_signer);
+        assert_neq(caller, signer);
     }
 
     @noupgrade
@@ -125,7 +132,7 @@ program context_parent.aleo {
         assert_eq(context_lib::id(), context_parent.aleo);
         assert_eq(std::ctx::addr(), context_parent.aleo);
         assert_eq(std::ctx::id(), context_parent.aleo);
-        assert_eq(std::ctx::caller(), std::ctx::signer());
+        context_mid.aleo::check_call(context_parent.aleo, std::ctx::signer());
     }
 
     fn check_metadata() -> Final {
