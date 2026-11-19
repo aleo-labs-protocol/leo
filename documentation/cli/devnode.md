@@ -131,7 +131,7 @@ Both endpoints are mounted under the network prefix (for example `testnet`) and 
 | `POST` | `/{network}/program/{id}/view/{function}`          | Evaluate a view function at the latest block height.             |
 | `POST` | `/{network}/program/{id}/view/{function}/{height}` | Evaluate a view function if `height` is the latest block height. |
 
-Historical view evaluation is not supported with snarkVM 4.12.0. The endpoint with an explicit height accepts only the latest block height.
+If you specify a height, use the latest block height. The devnode rejects requests for earlier heights.
 
 The request body is a JSON array of the view function's inputs, each encoded as an Aleo value string. Pass `[]` when the function takes no inputs. The response is a JSON array of the function's outputs.
 
