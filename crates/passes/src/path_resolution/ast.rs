@@ -139,7 +139,7 @@ impl AstReconstructor for PathResolutionVisitor<'_> {
         let has_qualifier = !input.qualifier().is_empty();
 
         if has_qualifier {
-            // paths with qualifiers must refer to a global.
+            // Paths with qualifiers must refer to a global.
             input = input.resolve_as_global_in_module(
                 self.program,
                 &self.state.symbol_table.get_imports(&self.program),
@@ -160,7 +160,9 @@ impl AstReconstructor for PathResolutionVisitor<'_> {
             {
                 // If already inserted as a global variable in the symbol table, just resolve it to global.
                 input = potentially_global;
-            } else if self.state.symbol_table.lookup_local(input.identifier().name).is_some() {
+            } else if input.user_program().is_none()
+                && self.state.symbol_table.lookup_local(input.identifier().name).is_some()
+            {
                 // If already inserted as a local variable in the symbol table, just resolve it to local
                 input = input.to_local();
             } else {
