@@ -119,6 +119,7 @@ program operand_order.aleo: Ledger {
     }
 
     final fn select_network() -> identifier {
+        assert_eq(target_calls.unwrap(), 1u32);
         network_calls = network_calls.unwrap() + 1u32;
         return 'aleo';
     }
