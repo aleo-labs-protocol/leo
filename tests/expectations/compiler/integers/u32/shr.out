@@ -6,10 +6,10 @@ function main:
     input r2 as u32.private;
     shr r0 2u8 into r3;
     shr r0 2u16 into r4;
-    is.eq r3 r4 into r5;
-    shr r0 r1 into r6;
-    is.eq r6 r2 into r7;
-    and r5 r7 into r8;
+    shr r0 r1 into r5;
+    is.eq r3 r4 into r6;
+    is.eq r5 r2 into r7;
+    and r6 r7 into r8;
     output r8 as boolean.private;
 
 constructor:

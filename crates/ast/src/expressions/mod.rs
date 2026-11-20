@@ -312,11 +312,20 @@ impl Expression {
 
     /// Returns true if we can confidently say evaluating this expression has no side effects, false otherwise
     pub fn is_pure(&self, get_type: &impl Fn(NodeID) -> TypeKind) -> bool {
+        self.is_pure_with(get_type, |child| child.is_pure(get_type))
+    }
+
+    /// Checks the current operation and delegates the purity check for each operand.
+    pub fn is_pure_with(
+        &self,
+        get_type: &impl Fn(NodeID) -> TypeKind,
+        mut operand_is_pure: impl FnMut(&Expression) -> bool,
+    ) -> bool {
         match self {
             // Discriminate intrinsics
             Expression::Intrinsic(intr) => {
                 if let Some(intrinsic) = Intrinsic::from_symbol(intr.name, &intr.type_parameters) {
-                    intrinsic.is_pure() && intr.arguments.iter().all(|arg| arg.is_pure(get_type))
+                    intrinsic.is_pure() && intr.arguments.iter().all(&mut operand_is_pure)
                 } else {
                     false
                 }
@@ -338,10 +347,10 @@ impl Expression {
                     // These can only halt for integers.
                     Add | Mul | Pow | Sub => {
                         !matches!(get_type(expr.id()), TypeKind::Integer(..))
-                            && expr.left.is_pure(get_type)
-                            && expr.right.is_pure(get_type)
+                            && operand_is_pure(&expr.left)
+                            && operand_is_pure(&expr.right)
                     }
-                    _ => expr.left.is_pure(get_type) && expr.right.is_pure(get_type),
+                    _ => operand_is_pure(&expr.left) && operand_is_pure(&expr.right),
                 }
             }
             Expression::Unary(expr) => {
@@ -350,8 +359,8 @@ impl Expression {
                     // These can halt for any of their operand types.
                     Abs | Inverse | SquareRoot => false,
                     // Negate can only halt for integers.
-                    Negate => expr.receiver.is_pure(get_type) && !matches!(get_type(expr.id()), TypeKind::Integer(..)),
-                    _ => expr.receiver.is_pure(get_type),
+                    Negate => operand_is_pure(&expr.receiver) && !matches!(get_type(expr.id()), TypeKind::Integer(..)),
+                    _ => operand_is_pure(&expr.receiver),
                 }
             }
 
@@ -359,24 +368,24 @@ impl Expression {
             Expression::Literal(..) | Expression::Path(..) | Expression::Unit(..) => true,
 
             // Recurse
-            Expression::ArrayAccess(expr) => expr.array.is_pure(get_type) && expr.index.is_pure(get_type),
+            Expression::ArrayAccess(expr) => operand_is_pure(&expr.array) && operand_is_pure(&expr.index),
             Expression::MemberAccess(expr) => {
                 // Keep dyn record owner handling in sync with type checking and code generation.
                 let is_dynamic_record_read =
                     matches!(get_type(expr.inner.id()), TypeKind::DynRecord) && expr.name.name != sym::owner;
-                !is_dynamic_record_read && expr.inner.is_pure(get_type)
+                !is_dynamic_record_read && operand_is_pure(&expr.inner)
             }
-            Expression::Repeat(expr) => expr.expr.is_pure(get_type) && expr.count.is_pure(get_type),
-            Expression::TupleAccess(expr) => expr.tuple.is_pure(get_type),
-            Expression::Array(expr) => expr.elements.iter().all(|e| e.is_pure(get_type)),
+            Expression::Repeat(expr) => operand_is_pure(&expr.expr) && operand_is_pure(&expr.count),
+            Expression::TupleAccess(expr) => operand_is_pure(&expr.tuple),
+            Expression::Array(expr) => expr.elements.iter().all(&mut operand_is_pure),
             Expression::Composite(expr) => {
-                expr.const_arguments.iter().all(|e| e.is_pure(get_type))
-                    && expr.members.iter().all(|init| init.expression.as_ref().is_none_or(|e| e.is_pure(get_type)))
+                expr.const_arguments.iter().all(&mut operand_is_pure)
+                    && expr.members.iter().all(|init| init.expression.as_ref().is_none_or(&mut operand_is_pure))
             }
             Expression::Ternary(expr) => {
-                expr.condition.is_pure(get_type) && expr.if_true.is_pure(get_type) && expr.if_false.is_pure(get_type)
+                operand_is_pure(&expr.condition) && operand_is_pure(&expr.if_true) && operand_is_pure(&expr.if_false)
             }
-            Expression::Tuple(expr) => expr.elements.iter().all(|e| e.is_pure(get_type)),
+            Expression::Tuple(expr) => expr.elements.iter().all(&mut operand_is_pure),
         }
     }
 
