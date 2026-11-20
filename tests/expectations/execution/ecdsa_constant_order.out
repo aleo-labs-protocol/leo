@@ -12,6 +12,18 @@ finalize main:
     ecdsa.verify.keccak256.eth r1 r2 r0 into r3;
     assert.eq true r3;
 
+function check_digest:
+    input r0 as [u8; 32u32].private;
+    async check_digest r0 into r1;
+    output r1 as constant_ecdsa.aleo/check_digest.future;
+
+finalize check_digest:
+    input r0 as [u8; 32u32].public;
+    cast 171u8 83u8 115u8 236u8 104u8 151u8 142u8 16u8 42u8 144u8 132u8 214u8 208u8 122u8 161u8 227u8 40u8 23u8 77u8 18u8 51u8 126u8 10u8 2u8 142u8 195u8 176u8 198u8 58u8 189u8 184u8 158u8 122u8 144u8 109u8 157u8 232u8 65u8 0u8 97u8 67u8 222u8 37u8 202u8 184u8 59u8 56u8 6u8 24u8 151u8 44u8 72u8 3u8 191u8 151u8 140u8 91u8 2u8 212u8 232u8 99u8 70u8 91u8 138u8 27u8 into r1 as [u8; 65u32];
+    cast 2u8 187u8 80u8 226u8 216u8 154u8 78u8 215u8 6u8 99u8 208u8 128u8 101u8 159u8 224u8 173u8 75u8 155u8 195u8 224u8 108u8 23u8 162u8 39u8 67u8 57u8 102u8 203u8 89u8 206u8 238u8 2u8 13u8 into r2 as [u8; 33u32];
+    ecdsa.verify.digest r1 r2 r0 into r3;
+    assert.eq true r3;
+
 constructor:
     assert.eq edition 0u16;
 verified: true
@@ -39,6 +51,36 @@ status: accepted
       "tpk": "932902105444239517980596565691908870668917795454138192289088332646102103453group",
       "tcm": "4534045528378062984919568849257618109414740950022974037600860386185923697801field",
       "scm": "919245366506739687912770902847963156737622134026017456623407014687413152843field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1c848ns2h3vtd2ll7x7l2qs2yvnuv67xwxgs8zynr6ctwx92y3vzs2tuunh",
+      "program": "constant_ecdsa.aleo",
+      "function": "check_digest",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "6849560539626176798045442433799573490335475871316229823371736756508356670198field",
+          "value": "ciphertext1quq2728wnukk5lazvuvq9k63cc3ay4h37e7r6yqqjym30h7ufgp3jyj9z6ffk7x26wkqvvq3n5ey9ud8s9wmjljht85ghg4fd6emgzlhq8vee74ct2f66n9xlxeqmy5djf3v5nsm9qsamedzvrh4th630z0qwgelf28uxd9g62chds7pwq4dkhzj8uq5y589qlyjyr3n3pafgnsq740l592q7y335nk6jm240cxq34eaksrme45603td08leseesqvql2m562s823q2m388gnusnparklvl6mt680aa28hts3d70ewwk6p8x7jpz9twr700xh6tfg2c8zgcl8egf8gzu6yhgc7k0yaz0wmk5pqyfmk5k"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "1911539963521108848263687619765208068678232257796456293594577737332901133074field",
+          "value": "{\n  program_id: constant_ecdsa.aleo,\n  function_name: check_digest,\n  arguments: [\n    [\n  94u8,\n  76u8,\n  213u8,\n  97u8,\n  97u8,\n  101u8,\n  51u8,\n  51u8,\n  21u8,\n  86u8,\n  52u8,\n  204u8,\n  133u8,\n  101u8,\n  203u8,\n  175u8,\n  248u8,\n  37u8,\n  79u8,\n  157u8,\n  236u8,\n  41u8,\n  189u8,\n  155u8,\n  31u8,\n  248u8,\n  200u8,\n  100u8,\n  170u8,\n  197u8,\n  105u8,\n  252u8\n]\n  ]\n}"
+        }
+      ],
+      "tpk": "4435182414136183130262225239916202916754973933386625330210643288715243337617group",
+      "tcm": "850142209754567944166319722250339409916042600529796761178314418357457776240field",
+      "scm": "6880818639492575671344261738303779886148232533224264415621330306086981058639field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
