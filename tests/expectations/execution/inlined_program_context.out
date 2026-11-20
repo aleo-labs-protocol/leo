@@ -1,0 +1,141 @@
+program context_dep.aleo;
+
+struct Optional__JzunLORyB8U:
+    is_some as boolean;
+    val as u32;
+
+function anchor:
+    input r0 as u32.private;
+    output r0 as u32.private;
+
+closure retained:
+    input r0 as u32;
+    assert.eq true true;
+    output context_dep.aleo as address;
+    output r0 as u32;
+
+constructor:
+    assert.eq edition 0u16;
+// --- Next Program --- //
+import context_dep.aleo;
+program context_mid.aleo;
+
+function check_call:
+    input r0 as address.private;
+    input r1 as address.private;
+    assert.eq self.caller r0;
+    assert.eq self.signer r1;
+    assert.neq self.caller self.signer;
+
+constructor:
+    assert.eq edition 0u16;
+// --- Next Program --- //
+import context_dep.aleo;
+import context_mid.aleo;
+program context_parent.aleo;
+
+function check_identity:
+    input r0 as u32.private;
+    assert.eq r0 r0;
+    assert.eq context_parent.aleo context_parent.aleo;
+    call context_dep.aleo/retained r0 into r1 r2;
+    add r0 1u32 into r3;
+    call context_dep.aleo/retained r3 into r4 r5;
+    assert.eq r1 context_dep.aleo;
+    assert.eq r4 context_dep.aleo;
+    assert.eq r2 r0;
+    assert.eq r5 r3;
+    cast true r0 into r6 as context_dep.aleo/Optional__JzunLORyB8U;
+    assert.eq r6.is_some true;
+    gt r6.val 0u32 into r7;
+    assert.eq r7 true;
+    assert.eq r0 r0;
+    assert.eq context_parent.aleo context_parent.aleo;
+    assert.eq context_parent.aleo context_parent.aleo;
+    assert.eq context_parent.aleo context_parent.aleo;
+    assert.eq context_parent.aleo context_parent.aleo;
+    call context_mid.aleo/check_call context_parent.aleo self.signer;
+
+function check_metadata:
+    async check_metadata into r0;
+    output r0 as context_parent.aleo/check_metadata.future;
+
+finalize check_metadata:
+    assert.eq context_dep.aleo/checksum context_dep.aleo/checksum;
+    assert.eq context_dep.aleo/edition context_dep.aleo/edition;
+    assert.eq context_dep.aleo/program_owner context_dep.aleo/program_owner;
+    assert.eq checksum checksum;
+    assert.eq edition edition;
+    assert.eq program_owner program_owner;
+
+constructor:
+    assert.eq edition 0u16;
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1tjy5ssyanxsmudv6ty7pmxj4ae890fhhkqjnhmy93mcpwgwtuqgsw99dy4",
+      "program": "context_mid.aleo",
+      "function": "check_call",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "8434881558164016810480675155495980813139690465964858088621347675367326111894field",
+          "value": "ciphertext1qgq2jdrz8p65jljlj6xrk8vzpkjkarcuvznmv8n9uc66wr4n7u3z7r9g74a7mfyx89mxu0sufn0pfw6h3wjaskz0j0n63c9esl8ux2rspgumwza7"
+        },
+        {
+          "type": "private",
+          "id": "3429541377230381519349875561181684730703374659617835944394554146313825396409field",
+          "value": "ciphertext1qgqrj5rhf4hk5d8h2ue6l9emjx3zesga0wpeuzex70awmfprhqf0uqvv0tz2gphh0g9nkfethzqk44xmgdjlpvm43l9knkfx9n5r0yeepghcxaq8"
+        }
+      ],
+      "outputs": [],
+      "tpk": "1043506504306420611400457209952069321293385773421302378775266131975857017664group",
+      "tcm": "4419541118683892666504459250901893442265781661816314867237927705280230352961field",
+      "scm": "3609000689911673644292249378334827587729796752984632500404758660628038874950field"
+    },
+    {
+      "id": "au18jent5r7pd55j7l3m6hqkst4e244gkgdwfjkpmu8jluwawmxdupsl2al6q",
+      "program": "context_parent.aleo",
+      "function": "check_identity",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "848691418492964949612458361755836931274845050930026198377337134796047957866field",
+          "value": "ciphertext1qyqqg6k6a6se3pk6eqzsp8catrgqem0ldj7738g236xlsn76phwj6pcpnug67"
+        }
+      ],
+      "outputs": [],
+      "tpk": "7746047146545543446742057904550202472611886872316036833009917201705905996431group",
+      "tcm": "4320592220324322526216308097494051446030852113282086804219760798619699368553field",
+      "scm": "3609000689911673644292249378334827587729796752984632500404758660628038874950field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1aheq5nkmtdq3hptwvjm76slhf96lrf4qht6l5uxuf9h90nffdsps9dwgxr",
+      "program": "context_parent.aleo",
+      "function": "check_metadata",
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "2091870489262599012719619608965173334344592906377738700125042291897282234453field",
+          "value": "{\n  program_id: context_parent.aleo,\n  function_name: check_metadata,\n  arguments: []\n}"
+        }
+      ],
+      "tpk": "856620745745033191253488073612975748466573482876019849653702831795142861258group",
+      "tcm": "1531226440065314772394767640091739869332245316461343971993571336533245212245field",
+      "scm": "3679567983927565857340092613941585647576153061169000237628259419755991903463field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+

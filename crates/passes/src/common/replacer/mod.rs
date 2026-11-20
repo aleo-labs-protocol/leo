@@ -49,7 +49,7 @@ pub struct Replacer<'a, F>
 where
     F: Fn(&Expression) -> Expression,
 {
-    state: &'a mut CompilerState,
+    state: &'a CompilerState,
     refresh_expr_ids: bool,
     replace: F,
 }
@@ -58,7 +58,7 @@ impl<'a, F> Replacer<'a, F>
 where
     F: Fn(&Expression) -> Expression,
 {
-    pub fn new(replace: F, refresh_expr_ids: bool, state: &'a mut CompilerState) -> Self {
+    pub fn new(replace: F, refresh_expr_ids: bool, state: &'a CompilerState) -> Self {
         Self { replace, refresh_expr_ids, state }
     }
 }
