@@ -14,6 +14,10 @@ export final fn finalize_register(addr: address) {
     Mapping::set(users, addr, true);
 }
 
+// --- Next Module: outer.leo --- //
+
+export const enabled: bool = true;
+
 // --- Next Program --- //
 import registry.aleo;
 
@@ -29,4 +33,10 @@ program relay.aleo {
 export final fn finalize_send(addr: address) {
     let a: bool = Mapping::get(registry.aleo::foo, addr);
     assert_eq(a, true);
+}
+
+// --- Next Module: outer.leo --- //
+
+export fn read(enabled: bool) -> bool {
+    return registry.aleo::enabled;
 }

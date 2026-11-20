@@ -250,11 +250,9 @@ impl Path {
     ///    segments and identifier form the path inside that program.
     ///
     /// 2. **Local or explicitly-qualified program access**
-    ///    Otherwise, the path is resolved relative to the current module context.
-    ///    The final location is constructed by combining:
-    ///      - the current module path,
-    ///      - any user-written qualifier segments, and
-    ///      - the final identifier.
+    ///    An explicitly qualified program path is resolved from that program's root.
+    ///    Its location contains the user-written qualifier segments and the final identifier.
+    ///    Otherwise, the current module path is added before those segments.
     ///
     /// If the user explicitly wrote a program (via `user_program`), it overrides
     /// the default `program` parameter. Otherwise, the current program is used.
@@ -296,12 +294,12 @@ impl Path {
 
             Self { user_program: None, qualifier, identifier, target, span, id }
         } else {
-            // Case 2: Resolve relative to the current module.
-            //
-            // Construct the path by concatenating:
-            //   current_module + user qualifier + identifier.
+            // Case 2: Explicit program paths start at the program root.
+            // Other paths are relative to the current module.
             let mut path: Vec<Symbol> = Vec::new();
-            path.extend(current_module);
+            if user_program.is_none() {
+                path.extend(current_module);
+            }
             path.extend(qualifier.iter().map(|id| id.name));
             path.push(identifier.name);
 
