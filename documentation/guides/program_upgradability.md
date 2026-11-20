@@ -140,6 +140,8 @@ Checksum-governed upgrades are bytecode-sensitive. Do not assume that bytecode i
 
 Version consistency matters beyond checksums, though. A program's constructor cannot change between upgrades, and compiler behavior or supported features can change (or even break) across versions. Building every edition with the same pinned toolchain avoids both bytecode drift and subtle semantic differences a different compiler version could introduce.
 
+If your constructor calls a `final fn` from another program, check which edition the helper reads before you change compiler versions. Earlier compilers could compile `std::ctx::edition()` in the helper as a read of the calling program’s edition. Recompiling the same source can change the constructor bytecode to read the defining program’s edition. See [Constructor](../language/structure.md#constructor) for an example.
+
 Pin the Leo compiler version used for the initial deployment and all subsequent upgrades. Before deploying or approving an upgrade, check the local toolchain:
 
 ```bash
