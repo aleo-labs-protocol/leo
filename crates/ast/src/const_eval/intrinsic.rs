@@ -70,18 +70,18 @@ fn evaluate_intrinsic_inner(
     };
 
     let doschnorr = |values: &mut Vec<Value>| -> Result<Value, String> {
-        let signature: Signature = type_fail(pop_value(values)?.try_into())?;
-        let address: Address = type_fail(pop_value(values)?.try_into())?;
         let message: SvmValue = type_fail(pop_value(values)?.try_into())?;
+        let address: Address = type_fail(pop_value(values)?.try_into())?;
+        let signature: Signature = type_fail(pop_value(values)?.try_into())?;
         let is_valid =
             snark(snarkvm::synthesizer::program::evaluate_schnorr_verification(&signature, &address, &message))?;
         Ok(Boolean::new(is_valid).into())
     };
 
     let doecdsa = |values: &mut Vec<Value>, variant: ECDSAVerifyVariant| -> Result<Value, String> {
-        let signature: SvmValue = type_fail(pop_value(values)?.try_into())?;
-        let public_key: SvmValue = type_fail(pop_value(values)?.try_into())?;
         let message: SvmValue = type_fail(pop_value(values)?.try_into())?;
+        let public_key: SvmValue = type_fail(pop_value(values)?.try_into())?;
+        let signature: SvmValue = type_fail(pop_value(values)?.try_into())?;
         let is_valid = snark(snarkvm::synthesizer::program::evaluate_ecdsa_verification(
             variant,
             &signature,

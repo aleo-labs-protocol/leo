@@ -1,4 +1,4 @@
-[ECEV0378002] Error: compile-time evaluation of this intrinsic failed: failed to fill whole buffer
+[ECEV0378002] Error: compile-time evaluation of this intrinsic failed: signature error
    ╭─[ compiler-test:2:19 ]
    │
  2 │     let v: bool = ECDSA::verify_digest([0u8; 65], [0u8; 33], [0u8; 32]);

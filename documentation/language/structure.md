@@ -24,24 +24,23 @@ For the canonical list of which declarations belong inside vs. Outside the `prog
 
 ### Constructor
 
-A `constructor` is a special, mandatory function in the `program { ... }` block. Declare it as `constructor() { ... }`. Each program must declare exactly one constructor.
+Declare exactly one `constructor() { ... }` inside each `program { ... }` block. A constructor takes no parameters and returns no value. The network runs it when you deploy the program and on every upgrade. If a check fails, the network rejects the deployment or upgrade. The constructor logic is fixed at the first deployment.
 
-It has no parameters or return value, and it is not a regular `fn`. Do not call it directly. The network runs it on-chain during the initial deployment and each upgrade. It controls the program upgrade policy.
-
-Two properties set a `constructor` apart from an ordinary function:
-
-- **Immutable.** The logic set at first deployment can never be changed, modified, or deleted by a future upgrade.
-- **Policy-bearing.** It carries exactly one upgrade annotation — `@noupgrade`, `@admin`, `@checksum`, or `@custom` — that selects how the program may be upgraded. The managed modes (`@noupgrade`, `@admin`, `@checksum`) require an **empty** body, since the compiler generates their logic. `@custom` requires a **non-empty** body that you write yourself. A constructor with no annotation, or with more than one, is a compile error.
+Choose one annotation to set the upgrade policy. For `@noupgrade`, `@admin`, or `@checksum`, leave the constructor body empty. The compiler generates the checks. For `@custom`, write the checks in the constructor body.
 
 ```leo file=../code_snippets/upgradability/noupgrade/src/main.leo#file
 ```
 
-Inside a `constructor`, you can read on-chain program metadata through the [`std::ctx`](./standard_library.md#stdctx) module — namely `std::ctx::addr()`, `std::ctx::edition()`, `std::ctx::program_owner()`, and `std::ctx::checksum()`. A `@custom` constructor typically branches on `std::ctx::edition()` to apply different rules at first deployment (`edition == 0`) versus later upgrades:
+In a custom constructor, use [`std::ctx`](./standard_library.md#stdctx) to read the program’s address, edition, owner, or checksum. Edition `0` identifies the initial deployment. The following constructor uses the edition to apply different checks during an upgrade.
 
 ```leo file=../code_snippets/upgradability/timelock/src/main.leo#file
 ```
 
-For the annotation argument grammar, the meaning of each `std::ctx::*()` accessor, and worked patterns for every upgrade mode, see the [Upgrading Programs guide](../guides/program_upgradability.md).
+If your constructor calls a `final fn` from another program, metadata accessors inside that helper refer to the program that defines it. For example, suppose the constructor in `child.aleo` calls an edition check defined in `test.aleo`. Inside the helper, `std::ctx::edition()` reads the edition of `test.aleo`. If the helper rejects edition `2` and `test.aleo` is at edition `2`, the check fails even on the first deployment of `child.aleo`.
+
+To check the calling program’s edition, read `std::ctx::edition()` in its constructor and pass that value to the helper. You can share the same comparison across programs in a [library function](./libraries.md).
+
+See [Upgrading Programs](../guides/program_upgradability.md) for annotation arguments, examples of each upgrade policy, and guidance on recompiling an existing constructor.
 
 ### Constant
 

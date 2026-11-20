@@ -1,0 +1,19 @@
+program dependency.aleo {
+    fn entry() {}
+
+    @noupgrade
+    constructor() {}
+}
+
+// --- Next Program --- //
+
+import dependency.aleo;
+
+program test.aleo {
+    fn main(allowed: bool) {
+        assert(dependency.aleo::allowed);
+    }
+
+    @noupgrade
+    constructor() {}
+}

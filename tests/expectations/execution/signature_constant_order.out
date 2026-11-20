@@ -1,0 +1,18 @@
+program constant_signature.aleo;
+
+function signature_message:
+    input r0 as signature.private;
+    sign.verify sign1nxwl6v4h0zlxzpu6v0t4a49wung6qyc39zn5hguamcj0qv5t9spq03n0xgp7k7cs72gc3zc0qrfmuwuyjcje8zmsyzv756xym8ns5q8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkap3wxd aleo1zecnqchckrzw7dlsyf65g6z5le2rmys403ecwmcafrag0e030yxqrnlg8j r0 into r1;
+    assert.eq true r1;
+
+function field_message:
+    input r0 as field.private;
+    sign.verify sign1sq2kkhl3dz8dx8cuag0rglcu0s3t9gcwqwn9t3f8jukxzmdszsqmkzcxd5a36gv4jn2llms3qkqdztp0fek6c9a3f9uyafu07c4rup8esm5elrqqunzqzmac7kzutl6zk7mqht3c0m9kg4hklv7h2js0qmxavwnpuwyl4lzldl6prs4qeqy9wxyp8y44nnydg3h8sg6ue99qkcgamsx aleo1zecnqchckrzw7dlsyf65g6z5le2rmys403ecwmcafrag0e030yxqrnlg8j r0 into r1;
+    assert.eq true r1;
+
+constructor:
+    assert.eq edition 0u16;
+status: success
+output: ()
+status: success
+output: ()

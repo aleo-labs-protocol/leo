@@ -1,0 +1,7 @@
+[ETYC0372005] Error: unknown function `provider.aleo::orders::check`
+   ╭─[ outer.leo:3:12 ]
+   │
+ 3 │     return provider.aleo::orders::check(x);
+   │ 
+   │ Help: Check `provider.aleo::orders::check` for typos and confirm it is declared in this scope. If it lives in another program, import it with the program-qualified name (e.g. `credits.aleo::credits`).
+───╯
