@@ -41,6 +41,10 @@ Inside a `constructor`, you can read on-chain program metadata through the [`std
 ```leo file=../code_snippets/upgradability/timelock/src/main.leo#file
 ```
 
+**Migration for imported helpers.** When you recompile a constructor that calls a `final fn` from another program, check which program's edition your upgrade policy uses. For example, if the constructor in `child.aleo` calls `test.aleo::checks::check_edition::[2u16]()`, then `std::ctx::edition()` inside the helper reads the edition of `test.aleo`. If the helper rejects edition `2`, it can reject the first deployment of `child.aleo` when `test.aleo` is at edition `2`. Earlier compiler versions used the edition of `child.aleo` for this call.
+
+To check the edition of `child.aleo`, read `std::ctx::edition()` in its constructor and pass the value to the helper. For a check that several programs share, put the comparison in a [library function](./libraries.md) and pass each program's edition as an argument.
+
 For the annotation argument grammar, the meaning of each `std::ctx::*()` accessor, and worked patterns for every upgrade mode, see the [Upgrading Programs guide](../guides/program_upgradability.md).
 
 ### Constant
