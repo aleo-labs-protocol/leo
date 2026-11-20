@@ -39,11 +39,11 @@ function main:
     add 17u32 r0[3u32] into r2;
     add r2 r1[3u32] into r3;
     cast 66u32 66u32 66u32 66u32 66u32 66u32 into r4 as [u32; 6u32];
-    cast 1000004u32 r4[1u32] r4[2u32] r4[3u32] r4[4u32] r4[5u32] into r5 as [u32; 6u32];
-    cast 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 into r6 as [u32; 29u32];
-    cast r6[0u32] r6[1u32] r6[2u32] r6[3u32] r6[4u32] r6[5u32] r6[6u32] r6[7u32] r6[8u32] r6[9u32] r6[10u32] r6[11u32] r6[12u32] r6[13u32] 333333u32 r6[15u32] r6[16u32] r6[17u32] r6[18u32] r6[19u32] r6[20u32] r6[21u32] r6[22u32] r6[23u32] r6[24u32] r6[25u32] r6[26u32] r6[27u32] r6[28u32] into r7 as [u32; 29u32];
-    add 35u32 r7[14u32] into r8;
-    add r5[0u32] r8 into r9;
+    cast 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 43u32 into r5 as [u32; 29u32];
+    cast r5[0u32] r5[1u32] r5[2u32] r5[3u32] r5[4u32] r5[5u32] r5[6u32] r5[7u32] r5[8u32] r5[9u32] r5[10u32] r5[11u32] r5[12u32] r5[13u32] 333333u32 r5[15u32] r5[16u32] r5[17u32] r5[18u32] r5[19u32] r5[20u32] r5[21u32] r5[22u32] r5[23u32] r5[24u32] r5[25u32] r5[26u32] r5[27u32] r5[28u32] into r6 as [u32; 29u32];
+    add 35u32 r6[14u32] into r7;
+    cast 1000004u32 r4[1u32] r4[2u32] r4[3u32] r4[4u32] r4[5u32] into r8 as [u32; 6u32];
+    add r8[0u32] r7 into r9;
     add r9 6u32 into r10;
     add r10 999999u32 into r11;
     add r3 r11 into r12;

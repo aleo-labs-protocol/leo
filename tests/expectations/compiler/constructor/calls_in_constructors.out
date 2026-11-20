@@ -17,7 +17,7 @@ program child.aleo;
 function main:
 
 constructor:
-    assert.neq edition 2u16;
+    assert.neq test.aleo/edition 2u16;
 // --- Next Program --- //
 import child.aleo;
 import test.aleo;
