@@ -169,7 +169,7 @@ leo query transaction {TRANSACTION_ID}
 
 Use the transaction API endpoint to verify if a transaction succeeded. Successful and failed transactions both execute a fee transaction. If only the fee transaction appears, the transaction failed. Failed Testnet and Mainnet transactions still require a fee because the network performs a computation.
 
-A [full list of API endpoints](https://docs.provable.com/docs/api/v2/provable-api-v-2) is available in the explorer documentation.
+A [full list of API endpoints](https://docs.provable.com/docs/api/v2/provable-api-v-2.html) is available in the explorer documentation.
 
 ## Record Scanning
 
