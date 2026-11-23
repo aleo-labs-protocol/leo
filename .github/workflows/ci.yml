@@ -59,35 +59,58 @@ jobs:
               summary.write(f'CI scope: **{scope}**.\n')
           PY
 
-  start-cpu-runners:
+  linux-tests:
+    name: linux-workspace-tests
     needs: changes
-    if: >-
-      needs.changes.outputs.scope == 'full' &&
+    if: needs.changes.outputs.scope == 'full'
+    # The fleet: this repository's own pull requests, except Dependabot's, and master. A fork's
+    # pull request, Dependabot's, and any copy of this repository use a hosted runner. The org's
+    # fleet starter boots boxes when a fleet job is queued, so no job here starts them.
+    runs-on: &linux-runner >-
+      ${{ fromJSON(
       github.repository == 'aleo-labs-protocol/leo' &&
       (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master') ||
        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
-        github.event.pull_request.user.login != 'dependabot[bot]'))
-    uses: aleo-labs-protocol/gh-actions/.github/workflows/start-runner.yml@6ff65649ab274bf5ddd901105b8114d944b8f9a8 # v2
-    permissions: { id-token: write, contents: read, actions: read }
-    secrets:
-      runner_app_key: ${{ secrets.RUNNER_APP_KEY }}
-    with:
-      role-to-assume: ${{ vars.RUNNER_ROLE_ARN }}
-      label: cpu
-      jobs-per-box: 2
-      runner-app-id: ${{ vars.RUNNER_APP_ID }}
-
-  linux-tests:
-    needs: [changes, start-cpu-runners]
-    if: >-
-      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
-      (needs.start-cpu-runners.result == 'success' || needs.start-cpu-runners.result == 'skipped')
-    uses: aleo-labs-protocol/leo/.github/workflows/linux-ci.yml@b2ae7361deac76ed94ef771e52350fb6151ddc14
-    with:
-      suite: workspace
+        github.event.pull_request.user.login != 'dependabot[bot]')) &&
+      '["self-hosted", "linux", "x64", "cpu"]' || '["ubuntu-24.04"]') }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci
+        with:
+          cache-key: linux-ci-only-testnet
+          nextest: 'true'
+          snarkos: 'true'
+      # A box keeps /tmp between jobs; RUNNER_TEMP is emptied after each one.
+      - name: Use a temporary directory of this job's own
+        if: runner.environment == 'self-hosted'
+        run: |
+          tmpdir="$(mktemp -d "$RUNNER_TEMP/leo-XXXXXXXX")"
+          echo "TMPDIR=$tmpdir" >> "$GITHUB_ENV"
+      - name: Build the workspace tests
+        run: |
+          ulimit -n 65536
+          start=$SECONDS
+          cargo nextest run --no-run --all --locked --cargo-profile ci --features only_testnet
+          echo "Linux test build: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+      - name: Run the workspace tests
+        run: |
+          ulimit -n 65536
+          start=$SECONDS
+          cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
+          echo "Linux test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: linux-test-mismatches
+          path: tests/mismatches
+          if-no-files-found: ignore
 
   test-macos:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'schedule' && github.repository == 'aleo-labs-protocol/leo') || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
     timeout-minutes: 90
     defaults:
@@ -125,7 +148,7 @@ jobs:
           if-no-files-found: ignore
 
   test-windows:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'schedule' && github.repository == 'aleo-labs-protocol/leo') || github.event_name == 'workflow_dispatch'
     runs-on: windows-2025
     env:
       RUST_MIN_STACK: '16777216'
@@ -186,13 +209,42 @@ jobs:
         working-directory: tree-sitter
 
   rust-checks:
-    needs: [changes, start-cpu-runners]
-    if: >-
-      !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
-      (needs.start-cpu-runners.result == 'success' || needs.start-cpu-runners.result == 'skipped')
-    uses: aleo-labs-protocol/leo/.github/workflows/linux-ci.yml@b2ae7361deac76ed94ef771e52350fb6151ddc14
-    with:
-      suite: rust
+    name: ${{ matrix.check }}
+    needs: changes
+    if: needs.changes.outputs.scope == 'full'
+    runs-on: *linux-runner
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [clippy, fmt-validate, cargo-doc]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci
+        with:
+          cache-key: ${{ matrix.check }}
+          nextest: ${{ matrix.check == 'fmt-validate' }}
+      - name: Clippy
+        if: matrix.check == 'clippy'
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Validate formatter semantics
+        if: matrix.check == 'fmt-validate'
+        run: |
+          cargo nextest run -p leo-fmt --locked --cargo-profile ci --features validate \
+            -E 'test(/validate_/) - test(validate_ast_equivalence_repos)'
+      - name: Build Cargo documentation
+        if: matrix.check == 'cargo-doc'
+        env:
+          RUSTDOCFLAGS: --enable-index-page -Zunstable-options
+          RUSTC_BOOTSTRAP: '1'
+        # On a box, target/ persists between jobs. rustdoc locks doc/ while it rewrites the
+        # search index of everything in it, so a doc/ left by earlier jobs slows every crate.
+        run: |
+          cargo clean --doc
+          cargo doc --no-deps --document-private-items --workspace
 
   docs-lint:
     if: github.event_name != 'schedule'
