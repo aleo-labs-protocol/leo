@@ -62,7 +62,11 @@ jobs:
   linux-tests:
     name: linux-workspace-tests
     needs: changes
-    if: needs.changes.outputs.scope == 'full'
+    # The nightly run uses hosted runners, and saves the Rust and snarkOS caches that fork and
+    # Dependabot pull requests restore: master's runs are on the fleet, which saves none.
+    if: &linux-if >-
+      ${{ !cancelled() && (needs.changes.outputs.scope == 'full' ||
+      (github.event_name == 'schedule' && github.repository == 'aleo-labs-protocol/leo')) }}
     # The fleet: this repository's own pull requests, except Dependabot's, and master. A fork's
     # pull request, Dependabot's, and any copy of this repository use a hosted runner. The org's
     # fleet starter boots boxes when a fleet job is queued, so no job here starts them.
@@ -211,7 +215,7 @@ jobs:
   rust-checks:
     name: ${{ matrix.check }}
     needs: changes
-    if: needs.changes.outputs.scope == 'full'
+    if: *linux-if
     runs-on: *linux-runner
     timeout-minutes: 60
     strategy:

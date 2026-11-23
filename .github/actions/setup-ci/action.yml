@@ -17,9 +17,18 @@ runs:
   steps:
     - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
 
+    # This action also runs `rustup default`, which on a box would change the toolchain of
+    # every repository's jobs. There, runner-job-setup has installed rust-toolchain.toml's
+    # toolchain under the box's rustup lock, and only Clippy is added, under the same lock.
     - uses: dtolnay/rust-toolchain@1.96.0
+      if: runner.environment == 'github-hosted'
       with:
         components: clippy
+
+    - name: Add Clippy on a self-hosted runner
+      if: runner.environment == 'self-hosted'
+      shell: bash
+      run: flock /tmp/rustup.lock rustup component add clippy
 
     - uses: actions/cache@v6
       if: runner.os == 'Linux' && runner.environment == 'github-hosted'
@@ -95,8 +104,9 @@ runs:
       run: |
         version="$(tr -d '[:space:]' < .resources/snarkos-version)"
         root="$HOME/.cache/leo-ci-snarkos"
-        if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then root="$root/$version"; fi
-        if [ ! -x "$root/bin/snarkos" ] || { [ "$RUNNER_ENVIRONMENT" = github-hosted ] && [ "$CACHE_HIT" != true ]; }; then
+        # A box keeps one install for each version and doesn't use the Actions cache.
+        if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then root="$root/$version"; CACHE_HIT=true; fi
+        if [ "$CACHE_HIT" != true ] || [ ! -x "$root/bin/snarkos" ]; then
           cargo install snarkos --locked --version "$version" --features test_network --root "$root" --force
         fi
         "$root/bin/snarkos" --version
