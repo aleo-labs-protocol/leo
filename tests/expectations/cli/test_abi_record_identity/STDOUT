@@ -1,0 +1,748 @@
+{
+  "satisfied": true,
+  "problems": []
+}
+build/foo/abi.json
+{
+  "program": "foo.aleo",
+  "structs": [
+    {
+      "path": [
+        "sibling",
+        "Token"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "types",
+        "Token"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "path": [
+        "Token"
+      ],
+      "fields": [
+        {
+          "name": "owner",
+          "ty": {
+            "Primitive": "Address"
+          },
+          "mode": "Private"
+        },
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          },
+          "mode": "Private"
+        }
+      ]
+    }
+  ],
+  "mappings": [],
+  "storage_variables": [],
+  "functions": [
+    {
+      "name": "echo_record",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "foo.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "foo.aleo"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_struct",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_external",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "record_dep.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "record_dep.aleo"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_sibling",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "sibling",
+                  "Token"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "sibling",
+                  "Token"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_leo_module",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "record_dep.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "record_dep.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_other_program",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "interface_dep.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "interface_dep.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_library_root",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "shapes_lib",
+                  "Token"
+                ],
+                "program": "shapes_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "shapes_lib",
+                  "Token"
+                ],
+                "program": "shapes_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_library_module",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "shapes_lib",
+                  "types",
+                  "Token"
+                ],
+                "program": "shapes_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "shapes_lib",
+                  "types",
+                  "Token"
+                ],
+                "program": "shapes_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_bytecode",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "bytecode_dep.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "bytecode_dep.aleo"
+          }
+        }
+      ]
+    }
+  ]
+}
+build/interface_dep/abi.json
+{
+  "program": "interface_dep.aleo",
+  "structs": [],
+  "records": [],
+  "mappings": [],
+  "storage_variables": [],
+  "functions": [
+    {
+      "name": "echo_external",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "record_dep.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "record_dep.aleo"
+          }
+        }
+      ]
+    }
+  ]
+}
+build/foo/interfaces/CompositeKinds.json
+{
+  "name": "CompositeKinds",
+  "program": "foo.aleo",
+  "path": [
+    "CompositeKinds"
+  ],
+  "parents": [],
+  "functions": [
+    {
+      "name": "echo_record",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "foo.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "foo.aleo"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_struct",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "path": [
+        "Token"
+      ],
+      "fields": []
+    }
+  ],
+  "mappings": [],
+  "storage_variables": [],
+  "structs": [
+    {
+      "path": [
+        "types",
+        "Token"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+build/foo/interfaces/PrototypeOnly.json
+{
+  "name": "PrototypeOnly",
+  "program": "foo.aleo",
+  "path": [
+    "PrototypeOnly"
+  ],
+  "parents": [],
+  "functions": [
+    {
+      "name": "echo_prototype",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "PrototypeToken"
+            ],
+            "program": "foo.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "PrototypeToken"
+            ],
+            "program": "foo.aleo"
+          }
+        }
+      ]
+    },
+    {
+      "name": "echo_struct_prototype",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "PrototypeToken"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "PrototypeToken"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "path": [
+        "PrototypeToken"
+      ],
+      "fields": []
+    }
+  ],
+  "mappings": [],
+  "storage_variables": [],
+  "structs": [
+    {
+      "path": [
+        "types",
+        "PrototypeToken"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+build/foo/interfaces/types/ModuleKinds.json
+{
+  "name": "ModuleKinds",
+  "program": "foo.aleo",
+  "path": [
+    "types",
+    "ModuleKinds"
+  ],
+  "parents": [],
+  "functions": [
+    {
+      "name": "echo_local",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "types",
+                  "Token"
+                ],
+                "program": "foo.aleo"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    }
+  ],
+  "records": [],
+  "mappings": [],
+  "storage_variables": [],
+  "structs": [
+    {
+      "path": [
+        "types",
+        "Token"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+build/foo/interfaces/types/ModuleRecords.json
+{
+  "name": "ModuleRecords",
+  "program": "foo.aleo",
+  "path": [
+    "types",
+    "ModuleRecords"
+  ],
+  "parents": [],
+  "functions": [
+    {
+      "name": "echo_module_record",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "ModuleRecord"
+            ],
+            "program": "foo.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "ModuleRecord"
+            ],
+            "program": "foo.aleo"
+          }
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "path": [
+        "ModuleRecord"
+      ],
+      "fields": [
+        {
+          "name": "owner",
+          "ty": {
+            "Primitive": "Address"
+          },
+          "mode": "Private"
+        },
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          },
+          "mode": "Private"
+        }
+      ]
+    }
+  ],
+  "mappings": [],
+  "storage_variables": [],
+  "structs": []
+}
+build/foo/interfaces/interface_dep.aleo/ExternalRecords.json
+{
+  "name": "ExternalRecords",
+  "program": "interface_dep.aleo",
+  "path": [
+    "ExternalRecords"
+  ],
+  "parents": [],
+  "functions": [
+    {
+      "name": "echo_external",
+      "inputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "record_dep.aleo"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Record": {
+            "path": [
+              "Token"
+            ],
+            "program": "record_dep.aleo"
+          }
+        }
+      ]
+    }
+  ],
+  "records": [],
+  "mappings": [],
+  "storage_variables": [],
+  "structs": []
+}
