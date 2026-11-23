@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [master]
+  schedule:
+    - cron: '17 6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -19,6 +21,7 @@ env:
 
 jobs:
   changes:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     outputs:
       scope: ${{ steps.scope.outputs.scope }}
@@ -60,7 +63,8 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.scope == 'full' &&
-      (github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository)
+      (github.event.pull_request == null ||
+       (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'))
     uses: aleo-labs-protocol/gh-actions/.github/workflows/start-runner.yml@v2
     permissions: { id-token: write, contents: read, actions: read }
     secrets:
@@ -95,8 +99,8 @@ jobs:
           nproc
           free -h
           getconf GNU_LIBC_VERSION
-          mkdir -p "$RUNNER_TEMP/leo-tmp"
-          echo "TMPDIR=$RUNNER_TEMP/leo-tmp" >> "$GITHUB_ENV"
+          tmpdir="$(mktemp -d "$RUNNER_TEMP/leo-XXXXXXXX")"
+          echo "TMPDIR=$tmpdir" >> "$GITHUB_ENV"
       - name: Build the workspace tests
         run: |
           ulimit -n 65536
@@ -116,10 +120,8 @@ jobs:
           path: tests/mismatches
           if-no-files-found: ignore
 
-  macos-tests:
-    name: macos-workspace-tests
-    needs: changes
-    if: needs.changes.outputs.scope == 'full'
+  test-macos:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
     timeout-minutes: 90
     defaults:
@@ -156,10 +158,8 @@ jobs:
           path: tests/mismatches
           if-no-files-found: ignore
 
-  windows-tests:
-    name: windows-workspace-tests
-    needs: changes
-    if: needs.changes.outputs.scope == 'full'
+  test-windows:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-2025
     env:
       RUST_MIN_STACK: '16777216'
@@ -256,6 +256,7 @@ jobs:
         run: cargo doc --no-deps --document-private-items --workspace
 
   docs-lint:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -356,7 +357,7 @@ jobs:
   code-quality:
     name: code-quality
     needs: [changes, code-style, rust-checks, docs-lint]
-    if: always()
+    if: always() && github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - name: Check required results
@@ -378,7 +379,7 @@ jobs:
   test-linux:
     name: test-linux
     needs: [changes, linux-tests]
-    if: always()
+    if: always() && github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - name: Check Linux results
@@ -390,40 +391,10 @@ jobs:
           test "$CHANGES_RESULT" = success
           if [ "$SCOPE" = full ]; then test "$TEST_RESULT" = success; fi
 
-  test-macos:
-    name: test-macos
-    needs: [changes, macos-tests]
-    if: always()
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check macOS results
-        env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          SCOPE: ${{ needs.changes.outputs.scope }}
-          TEST_RESULT: ${{ needs.macos-tests.result }}
-        run: |
-          test "$CHANGES_RESULT" = success
-          if [ "$SCOPE" = full ]; then test "$TEST_RESULT" = success; fi
-
-  test-windows:
-    name: test-windows
-    needs: [changes, windows-tests]
-    if: always()
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check Windows results
-        env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          SCOPE: ${{ needs.changes.outputs.scope }}
-          TEST_RESULT: ${{ needs.windows-tests.result }}
-        run: |
-          test "$CHANGES_RESULT" = success
-          if [ "$SCOPE" = full ]; then test "$TEST_RESULT" = success; fi
-
   leo-executable:
     name: leo-executable
     needs: [changes, build-leo, cli-checks]
-    if: always()
+    if: always() && github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - name: Check CLI results

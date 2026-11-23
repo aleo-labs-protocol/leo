@@ -61,7 +61,7 @@ runs:
       if: runner.environment == 'github-hosted'
       with:
         key: ${{ inputs.cache-key }}
-        save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        save-if: ${{ github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/master') }}
 
     - uses: actions/cache@v6
       if: runner.environment == 'github-hosted'
