@@ -1,0 +1,33 @@
+{
+  "program": "foo.aleo",
+  "version": "0.1.0",
+  "description": "",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "interface_dep.aleo",
+      "location": "local",
+      "path": "interface_dep",
+      "edition": null
+    },
+    {
+      "name": "record_dep.aleo",
+      "location": "local",
+      "path": "record_dep",
+      "edition": null
+    },
+    {
+      "name": "shapes_lib",
+      "location": "local",
+      "path": "shapes_lib",
+      "edition": null
+    },
+    {
+      "name": "bytecode_dep.aleo",
+      "location": "local",
+      "path": "bytecode_dep.aleo",
+      "edition": null
+    }
+  ],
+  "dev_dependencies": null
+}
