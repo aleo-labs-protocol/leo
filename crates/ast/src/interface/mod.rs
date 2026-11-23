@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the Leo library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Identifier, Node, NodeID, TypeKind, indent_display::Indent};
+use crate::{Identifier, Location, Node, NodeID, TypeKind, indent_display::Indent};
 use leo_span::{Span, Symbol};
 use serde::Serialize;
 use std::fmt;
@@ -53,7 +53,8 @@ impl Interface {
         self.identifier.name
     }
 
-    /// Returns `true` if `ty` is a composite type whose name matches a record declared in this interface.
+    /// Checks the first path segment against the names of directly declared records.
+    #[deprecated(note = "use is_record_type_at to match the defining program and module")]
     pub fn is_record_type(&self, ty: &TypeKind) -> bool {
         if let TypeKind::Composite(ct) = ty
             && let Some(loc) = ct.path.try_global_location()
@@ -62,6 +63,29 @@ impl Interface {
             return self.records.iter().any(|(n, _)| *n == name);
         }
         false
+    }
+
+    /// Returns `true` if `ty` resolves to a record declared directly in this interface.
+    ///
+    /// `interface_location` must be the canonical location used to retrieve this interface.
+    /// This context is required because an `Interface` value does not carry its defining
+    /// program or containing module path.
+    /// Record identity includes the defining program, module path, and record name.
+    /// Inherited record prototypes are not included.
+    pub fn is_record_type_at(&self, ty: &TypeKind, interface_location: &Location) -> bool {
+        let TypeKind::Composite(composite) = ty else {
+            return false;
+        };
+        let Some(record_location) = composite.path.try_global_location() else {
+            return false;
+        };
+        let Some(&record_name) = record_location.path.last() else {
+            return false;
+        };
+
+        record_location.program == interface_location.program
+            && record_location.module_path() == interface_location.module_path()
+            && self.records.iter().any(|(name, _)| *name == record_name)
     }
 }
 
