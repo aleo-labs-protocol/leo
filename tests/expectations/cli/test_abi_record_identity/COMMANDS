@@ -3,7 +3,7 @@ set -euo pipefail
 
 LEO_BIN=${1}
 
-"${LEO_BIN}" --disable-update-check build >/dev/null
+"${LEO_BIN}" build >/dev/null
 
 check_kind() {
     local file=$1
