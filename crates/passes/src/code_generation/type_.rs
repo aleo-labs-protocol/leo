@@ -126,7 +126,7 @@ impl CodeGeneratingVisitor<'_> {
         interface_context: Option<(&Location, &Interface)>,
     ) -> (AleoType, Option<AleoVisibility>) {
         if matches!(type_, TypeKind::DynRecord)
-            || interface_context.is_some_and(|(location, interface)| interface.is_record_type(type_, location))
+            || interface_context.is_some_and(|(location, interface)| interface.is_record_type_at(type_, location))
         {
             return (AleoType::DynamicRecord, None);
         }
@@ -144,7 +144,7 @@ impl CodeGeneratingVisitor<'_> {
         if matches!(type_, TypeKind::Future(..)) {
             (AleoType::DynamicFuture, None)
         } else if matches!(type_, TypeKind::DynRecord)
-            || interface_context.is_some_and(|(location, interface)| interface.is_record_type(type_, location))
+            || interface_context.is_some_and(|(location, interface)| interface.is_record_type_at(type_, location))
         {
             (AleoType::DynamicRecord, None)
         } else {

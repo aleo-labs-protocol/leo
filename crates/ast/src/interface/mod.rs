@@ -53,6 +53,18 @@ impl Interface {
         self.identifier.name
     }
 
+    /// Checks the first path segment against the names of directly declared records.
+    #[deprecated(note = "use is_record_type_at to match the defining program and module")]
+    pub fn is_record_type(&self, ty: &TypeKind) -> bool {
+        if let TypeKind::Composite(ct) = ty
+            && let Some(loc) = ct.path.try_global_location()
+            && let Some(&name) = loc.path.first()
+        {
+            return self.records.iter().any(|(n, _)| *n == name);
+        }
+        false
+    }
+
     /// Returns `true` if `ty` resolves to a record declared directly in this interface.
     ///
     /// `interface_location` must be the canonical location used to retrieve this interface.
@@ -60,7 +72,7 @@ impl Interface {
     /// program or containing module path.
     /// Record identity includes the defining program, module path, and record name.
     /// Inherited record prototypes are not included.
-    pub fn is_record_type(&self, ty: &TypeKind, interface_location: &Location) -> bool {
+    pub fn is_record_type_at(&self, ty: &TypeKind, interface_location: &Location) -> bool {
         let TypeKind::Composite(composite) = ty else {
             return false;
         };
@@ -147,19 +159,27 @@ mod tests {
             let undeclared = Symbol::intern("Undeclared");
             let interface = Interface { records: vec![(token, RecordPrototype::default())], ..Default::default() };
 
+            #[allow(deprecated)]
+            let root_record = interface.is_record_type(&composite_type(library, &[token]));
+            assert!(root_record);
+
             let root_interface = Location::new(library, vec![processor]);
             let module_interface = Location::new(library, vec![algorithms, processor]);
             let nested_interface = Location::new(library, vec![algorithms, nested, processor]);
 
-            assert!(interface.is_record_type(&composite_type(library, &[token]), &root_interface));
-            assert!(interface.is_record_type(&composite_type(library, &[algorithms, token]), &module_interface));
+            assert!(interface.is_record_type_at(&composite_type(library, &[token]), &root_interface));
+            assert!(interface.is_record_type_at(&composite_type(library, &[algorithms, token]), &module_interface));
             assert!(
-                interface.is_record_type(&composite_type(library, &[algorithms, nested, token]), &nested_interface)
+                interface.is_record_type_at(&composite_type(library, &[algorithms, nested, token]), &nested_interface)
             );
-            assert!(!interface.is_record_type(&composite_type(other_library, &[algorithms, token]), &module_interface));
-            assert!(!interface.is_record_type(&composite_type(library, &[sibling, token]), &module_interface));
-            assert!(!interface.is_record_type(&composite_type(library, &[algorithms, undeclared]), &module_interface));
-            assert!(!interface.is_record_type(&TypeKind::Boolean, &module_interface));
+            assert!(
+                !interface.is_record_type_at(&composite_type(other_library, &[algorithms, token]), &module_interface)
+            );
+            assert!(!interface.is_record_type_at(&composite_type(library, &[sibling, token]), &module_interface));
+            assert!(
+                !interface.is_record_type_at(&composite_type(library, &[algorithms, undeclared]), &module_interface)
+            );
+            assert!(!interface.is_record_type_at(&TypeKind::Boolean, &module_interface));
         });
     }
 }

@@ -2664,7 +2664,7 @@ impl TypeCheckingVisitor<'_> {
                     .collect(),
             )),
             other => {
-                if interface.is_record_type(other, interface_location) {
+                if interface.is_record_type_at(other, interface_location) {
                     TypeKind::DynRecord
                 } else {
                     other.clone()
@@ -3050,7 +3050,7 @@ impl TypeCheckingVisitor<'_> {
         // Check argument types. Record-typed parameters require `dyn record` at the call site.
         for (expected_input, argument) in func_proto.input.iter().zip(arguments.iter()) {
             let proto_type = expected_input.type_().kind().clone();
-            if interface.is_record_type(&proto_type, interface_location) {
+            if interface.is_record_type_at(&proto_type, interface_location) {
                 // Visit without an expected type so only the explicit error below fires.
                 let actual_type = self.visit_expression(argument, &None);
                 if !matches!(actual_type, TypeKind::DynRecord | TypeKind::Err) {
