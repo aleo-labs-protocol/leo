@@ -135,6 +135,15 @@ pub trait AstReconstructor {
         input: Expression,
         additional: &Self::AdditionalInput,
     ) -> (Expression, Self::AdditionalOutput) {
+        self.default_reconstruct_expression(input, additional)
+    }
+
+    /// Dispatches an expression to the reconstruction method for its variant.
+    fn default_reconstruct_expression(
+        &mut self,
+        input: Expression,
+        additional: &Self::AdditionalInput,
+    ) -> (Expression, Self::AdditionalOutput) {
         match input {
             Expression::Async(async_) => self.reconstruct_async(async_, additional),
             Expression::Array(array) => self.reconstruct_array(array, additional),

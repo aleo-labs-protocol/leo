@@ -388,7 +388,7 @@ pub fn run_without_ledger(config: &Config, cases: &[Case]) -> Result<Vec<Evaluat
 
             // Views and transitions take different snarkVM paths:
             //   - Transitions go through `authorize` + `evaluate`, producing a transition object.
-            //   - Views go through `evaluate_view_at_height`, returning plaintext outputs with no transition and
+            //   - Views go through `StackTrait::evaluate_view`, returning plaintext outputs with no transition and
             //     no transaction.
             let is_view = vm
                 .process()
@@ -424,12 +424,8 @@ fn handle_view(
         Ok(v) => v,
         Err(e) => return failed(format!("Failed to parse view input: {e}")),
     };
-    // For an empty in-memory consensus store there is no block 0, so route directly through
-    // `evaluate_view_with_stack_at_height` with a fabricated `FinalizeGlobalState`. Tests are off-consensus
-    // by construction, so the values here only matter for queries that read `block.height` / `block.timestamp`
-    // / `network.id`; the timestamp is fixed so those reads are deterministic. `VM::evaluate_view_at_height`
-    // cannot be used here: it resolves the program edition from on-chain deployments, which an empty store
-    // does not have.
+    // Evaluate the view against the seeded in-memory store. The fixed block state makes reads of
+    // `block.height`, `block.timestamp`, and `network.id` deterministic.
     let state = match snarkvm::synthesizer::program::FinalizeGlobalState::new::<CurrentNetwork>(
         0,
         0,
@@ -461,14 +457,7 @@ fn handle_view(
         Err(e) => return failed(format!("Failed to derive program owner: {e}")),
     };
     let response = match catch_unwind(AssertUnwindSafe(|| {
-        snarkvm::synthesizer::process::evaluate_view_with_stack_at_height(
-            state,
-            vm.finalize_store(),
-            &stack,
-            &function_id,
-            parsed_inputs,
-            0,
-        )
+        stack.evaluate_view(state, vm.finalize_store(), &function_id, parsed_inputs)
     })) {
         Ok(Ok(resp)) => resp,
         Ok(Err(e)) => return failed(format!("{e}")),
@@ -594,7 +583,7 @@ pub fn run_with_ledger(
                     &genesis_private_key,
                     &aleo_program,
                     edition,
-                    latest_consensus_version,
+                    CurrentNetwork::CONSENSUS_VERSION(ledger.latest_height())?,
                     &mut rng,
                 )
                 .map_err(|e| anyhow!("Failed to deploy program {name}: {e}"))?
@@ -681,7 +670,8 @@ pub fn run_with_ledger(
                                 SvmValue::from_str("1_000_000_000_000u64").expect("Failed to parse amount"),
                             ]
                             .iter(),
-                            latest_consensus_version,
+                            CurrentNetwork::CONSENSUS_VERSION(ledger.latest_height())
+                                .expect("Failed to determine funding consensus version"),
                             &mut rng,
                         )
                         .expect("Failed to generate funding transaction");
@@ -749,7 +739,7 @@ pub fn run_with_ledger(
                                 &case.program_name,
                                 &case.function,
                                 case.input.iter(),
-                                latest_consensus_version,
+                                CurrentNetwork::CONSENSUS_VERSION(ledger.latest_height())?,
                                 &mut rng,
                             )
                         } else {

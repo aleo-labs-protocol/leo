@@ -1,0 +1,7 @@
+[ETYC0372005] Error: unknown variable `dependency.aleo::allowed`
+   ╭─[ compiler-test:7:16 ]
+   │
+ 7 │         assert(dependency.aleo::allowed);
+   │ 
+   │ Help: Check `dependency.aleo::allowed` for typos and confirm it is declared in this scope. If it lives in another program, import it with the program-qualified name (e.g. `credits.aleo::credits`).
+───╯

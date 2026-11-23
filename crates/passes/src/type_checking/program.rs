@@ -101,7 +101,7 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         // Check if any record name is a prefix for another record name. We don't really collect all possible prefixes
         // here but only adjacent ones. That is, if we have records `Foo`, `FooBar`, and `FooBarBaz`, we only emit
         // errors for `Foo/FooBar` and for `FooBar/FooBarBaz` but not for `Foo/FooBarBaz`.
-        for ((prev_name, _), (curr_name, curr_span)) in record_info.iter().tuple_windows() {
+        for [(prev_name, _), (curr_name, curr_span)] in record_info.iter().array_windows::<2>() {
             if curr_name.starts_with(prev_name) {
                 self.state.handler.emit_err(crate::errors::type_checker::record_prefixed_by_other_record(
                     curr_name, prev_name, *curr_span,

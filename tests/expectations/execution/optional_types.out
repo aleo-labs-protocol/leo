@@ -151,13 +151,13 @@ function optional_array:
     cast true r5 into r6 as Optional__IeL1hLZCJ5A;
     assert.eq r3.is_some true;
     assert.eq r3.is_some true;
-    assert.eq r6.is_some true;
-    assert.eq r6.is_some true;
     ternary r3.val[0u32].is_some r3.val[0u32].val 10u128 into r7;
     ternary r3.val[1u32].is_some r3.val[1u32].val 11u128 into r8;
     add r7 r8 into r9;
+    assert.eq r6.is_some true;
     ternary r6.val[0u32].is_some r6.val[0u32].val 12u128 into r10;
     add r9 r10 into r11;
+    assert.eq r6.is_some true;
     ternary r6.val[2u32].is_some r6.val[2u32].val 13u128 into r12;
     add r11 r12 into r13;
     output r13 as u128.private;

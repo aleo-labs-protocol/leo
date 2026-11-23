@@ -1,0 +1,103 @@
+name: Set up Leo CI
+description: Install the pinned toolchain, native build tools, and cached test dependencies.
+
+inputs:
+  cache-key:
+    description: Separate build outputs by job, platform, profile, and features.
+    required: true
+  nextest:
+    description: Install cargo-nextest.
+    default: 'false'
+  snarkos:
+    description: Install snarkOS with local test-network support.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@1.96.0
+      with:
+        components: clippy
+
+    - uses: actions/cache@v6
+      if: runner.os == 'Linux'
+      with:
+        path: ~/.cache/leo-ci-apt/*.deb
+        key: libclang-debs-ubuntu24-${{ runner.arch }}-${{ github.sha }}
+        restore-keys: libclang-debs-ubuntu24-${{ runner.arch }}-
+
+    - name: Install libclang on Linux
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        mkdir -p "$HOME/.cache/leo-ci-apt"
+        sudo apt-get -o Dir::Cache::archives="$HOME/.cache/leo-ci-apt" \
+          -o APT::Keep-Downloaded-Packages=true install -y libclang-dev
+
+    - name: Configure libclang on macOS
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        clang_path="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib"
+        test -f "$clang_path/libclang.dylib"
+        echo "LIBCLANG_PATH=$clang_path" >> "$GITHUB_ENV"
+        echo "DYLD_LIBRARY_PATH=$clang_path:${DYLD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
+    - name: Configure libclang on Windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $llvmBin = 'C:\Program Files\LLVM\bin'
+        if (!(Test-Path "$llvmBin\libclang.dll")) {
+          choco install llvm --no-progress -y
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        }
+        "LIBCLANG_PATH=$llvmBin" >> $env:GITHUB_ENV
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ inputs.cache-key }}
+        save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+
+    - uses: actions/cache@v6
+      with:
+        path: ~/.aleo/resources
+        key: aleo-resources-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: aleo-resources-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Create Aleo home
+      shell: bash
+      run: mkdir -p "$HOME/.aleo"
+
+    - uses: taiki-e/install-action@v2
+      if: inputs.nextest == 'true'
+      with:
+        tool: cargo-nextest@0.9.114
+
+    - uses: actions/cache/restore@v6
+      if: inputs.snarkos == 'true'
+      id: snarkos-cache
+      with:
+        path: ~/.cache/leo-ci-snarkos
+        key: snarkos-test-network-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-rust-1.96.0-${{ hashFiles('.resources/snarkos-version') }}
+
+    - name: Install snarkOS
+      if: inputs.snarkos == 'true'
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.snarkos-cache.outputs.cache-hit }}
+      run: |
+        version="$(tr -d '[:space:]' < .resources/snarkos-version)"
+        root="$HOME/.cache/leo-ci-snarkos"
+        if [ "$CACHE_HIT" != true ] || [ ! -x "$root/bin/snarkos" ]; then
+          cargo install snarkos --locked --version "$version" --features test_network --root "$root" --force
+        fi
+        "$root/bin/snarkos" --version
+        echo "$root/bin" >> "$GITHUB_PATH"
+
+    - uses: actions/cache/save@v6
+      if: inputs.snarkos == 'true' && steps.snarkos-cache.outputs.cache-hit != 'true'
+      with:
+        path: ~/.cache/leo-ci-snarkos
+        key: ${{ steps.snarkos-cache.outputs.cache-primary-key }}
