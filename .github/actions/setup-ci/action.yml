@@ -15,7 +15,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@v2
+    - uses: aleo-labs-protocol/gh-actions/.github/actions/runner-job-setup@6ff65649ab274bf5ddd901105b8114d944b8f9a8 # v2
 
     - uses: dtolnay/rust-toolchain@1.96.0
       with:
