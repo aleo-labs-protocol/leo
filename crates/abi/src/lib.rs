@@ -192,6 +192,16 @@ pub(crate) fn resolve_io_mode(mode: ast::Mode, is_view: bool) -> abi::Mode {
     }
 }
 
+/// Includes the enclosing module for resolved types and preserves explicit library qualifiers in the ABI.
+fn composite_ref_path(path: &ast::Path) -> abi::Path {
+    if let Some(location) = path.try_global_location()
+        && path.qualifier().first().is_none_or(|first| first.name != location.program)
+    {
+        return location.path.iter().map(|s| s.to_string()).collect();
+    }
+    path.segments_iter().map(|s| s.to_string()).collect()
+}
+
 fn convert_plaintext(ty: &ast::TypeKind) -> abi::Plaintext {
     match ty {
         ast::TypeKind::Address => abi::Plaintext::Primitive(abi::Primitive::Address),
@@ -207,7 +217,7 @@ fn convert_plaintext(ty: &ast::TypeKind) -> abi::Plaintext {
             length: extract_array_length(&arr_ty.length),
         }),
         ast::TypeKind::Composite(comp_ty) => abi::Plaintext::Struct(abi::StructRef {
-            path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
+            path: composite_ref_path(&comp_ty.path),
             program: comp_ty.path.program().map(|s| s.to_string()),
         }),
         ast::TypeKind::Optional(opt_ty) => {
@@ -240,7 +250,7 @@ fn convert_function_input(ty: &ast::TypeKind, ctx: &Ctx, mode: abi::Mode) -> abi
         && is_record(comp_ty, ctx)
     {
         return abi::FunctionInput::Record(abi::RecordRef {
-            path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
+            path: composite_ref_path(&comp_ty.path),
             program: comp_ty.path.program().map(|s| s.to_string()),
         });
     }
@@ -252,7 +262,7 @@ fn convert_function_output(ty: &ast::TypeKind, ctx: &Ctx, mode: abi::Mode) -> ab
         ast::TypeKind::Future(_) => abi::FunctionOutput::Final,
         ast::TypeKind::DynRecord => abi::FunctionOutput::DynamicRecord,
         ast::TypeKind::Composite(comp_ty) if is_record(comp_ty, ctx) => abi::FunctionOutput::Record(abi::RecordRef {
-            path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
+            path: composite_ref_path(&comp_ty.path),
             program: comp_ty.path.program().map(|s| s.to_string()),
         }),
         _ => abi::FunctionOutput::Plaintext { ty: convert_plaintext(ty), mode },

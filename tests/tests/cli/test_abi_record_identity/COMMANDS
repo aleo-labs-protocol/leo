@@ -1,38 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LEO_BIN=${1}
+LEO_BIN=$1
+fixture=$(mktemp -d)
+trap 'rm -rf "$fixture"' EXIT
+cp -R . "$fixture/project"
+cd "$fixture/project"
 
-"${LEO_BIN}" build >/dev/null
+# Give each module and library a struct with the same name as the program record.
+cp src/types.leo src/sibling.leo
+cp src/types.leo record_dep/src/types.leo
+cp src/types.leo interface_dep/src/types.leo
+"$LEO_BIN" new --library shapes_lib >/dev/null
+cp src/types.leo shapes_lib/src/lib.leo
+cp src/types.leo shapes_lib/src/types.leo
 
-check_kind() {
-    local file=$1
-    local function=$2
-    local expected=$3
-    local unexpected=$4
-    local block
+# Import the record from both a Leo package and a local bytecode dependency.
+"$LEO_BIN" build --path record_dep >/dev/null
+"$LEO_BIN" abi record_dep/build/record_dep/record_dep.aleo \
+    --satisfies record_dep/build/record_dep/interfaces/types/ModuleRecords.json --output compatibility.json >/dev/null
+cat compatibility.json
+echo
+sed 's/record_dep[.]aleo/bytecode_dep.aleo/g' record_dep/build/record_dep/record_dep.aleo > bytecode_dep.aleo
+"$LEO_BIN" build >/dev/null
 
-    block=$(awk -v name="${function}" '
-        index($0, "\"name\": \"" name "\"") { active = 1 }
-        active { print }
-        active && /^    },?$/ { exit }
-    ' "${file}")
-
-    grep -q "\"${expected}\"" <<<"${block}"
-    ! grep -q "\"${unexpected}\"" <<<"${block}"
-}
-
-for file in build/foo/abi.json build/foo/interfaces/CompositeKinds.json; do
-    check_kind "${file}" echo_record Record Struct
-    check_kind "${file}" echo_struct Struct Record
+for abi in build/foo/abi.json build/interface_dep/abi.json \
+    build/foo/interfaces/CompositeKinds.json build/foo/interfaces/PrototypeOnly.json \
+    build/foo/interfaces/types/ModuleKinds.json build/foo/interfaces/types/ModuleRecords.json \
+    build/foo/interfaces/interface_dep.aleo/ExternalRecords.json; do
+    echo "$abi"
+    cat "$abi"
+    echo
 done
-
-check_kind build/foo/interfaces/PrototypeOnly.json echo_prototype Record Struct
-
-for file in build/foo/abi.json build/interface_dep/abi.json build/foo/interfaces/interface_dep.aleo/ExternalRecords.json; do
-    check_kind "${file}" echo_external Record Struct
-done
-
-echo "ABI record lookup uses resolved locations"
-
-rm -rf build

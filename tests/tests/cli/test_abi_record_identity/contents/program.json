@@ -15,6 +15,18 @@
       "location": "local",
       "path": "record_dep",
       "edition": null
+    },
+    {
+      "name": "shapes_lib",
+      "location": "local",
+      "path": "shapes_lib",
+      "edition": null
+    },
+    {
+      "name": "bytecode_dep.aleo",
+      "location": "local",
+      "path": "bytecode_dep.aleo",
+      "edition": null
     }
   ],
   "dev_dependencies": null

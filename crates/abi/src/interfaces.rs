@@ -27,6 +27,7 @@ use crate::{
     collect_from_plaintext,
     collect_transitive_from_records,
     collect_transitive_from_structs,
+    composite_ref_path,
     convert_plaintext,
     convert_record,
     convert_record_field,
@@ -445,22 +446,22 @@ fn convert_output(
     convert_function_output(output.type_.kind(), prototype_record_locations, cs, resolve_io_mode(output.mode, is_view))
 }
 
-/// Checks if a composite type is a record in the context of an interface ABI.
-///
-/// Direct record prototype locations are checked first. Those locations use the interface's
-/// owning program and containing module path; inherited parent prototypes are not added here.
-/// Concrete composites are then resolved from the surrounding source by their complete location.
-fn is_record_for_interface(
-    comp_ty: &ast::CompositeType,
+/// Resolves an interface record reference. An implementor must declare each prototype record at its program root.
+fn interface_record_ref(
+    ty: &ast::TypeKind,
     prototype_record_locations: &HashSet<ast::Location>,
     cs: &CompositeSource<'_>,
-) -> bool {
-    if let Some(location) = comp_ty.path.try_global_location()
-        && prototype_record_locations.contains(location)
-    {
-        return true;
-    }
-    cs.is_record(comp_ty)
+) -> Option<abi::RecordRef> {
+    let ast::TypeKind::Composite(comp_ty) = ty else { return None };
+    let location = comp_ty.path.try_global_location()?;
+    let path = if prototype_record_locations.contains(location) {
+        vec![comp_ty.path.identifier().name.to_string()]
+    } else if cs.is_record(comp_ty) {
+        composite_ref_path(&comp_ty.path)
+    } else {
+        return None;
+    };
+    Some(abi::RecordRef { path, program: Some(location.program.to_string()) })
 }
 
 fn convert_function_input(
@@ -472,13 +473,8 @@ fn convert_function_input(
     if let ast::TypeKind::DynRecord = ty {
         return abi::FunctionInput::DynamicRecord;
     }
-    if let ast::TypeKind::Composite(comp_ty) = ty
-        && is_record_for_interface(comp_ty, prototype_record_locations, cs)
-    {
-        return abi::FunctionInput::Record(abi::RecordRef {
-            path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
-            program: comp_ty.path.program().map(|s| s.to_string()),
-        });
+    if let Some(record) = interface_record_ref(ty, prototype_record_locations, cs) {
+        return abi::FunctionInput::Record(record);
     }
     abi::FunctionInput::Plaintext { ty: convert_plaintext(ty), mode }
 }
@@ -489,15 +485,12 @@ fn convert_function_output(
     cs: &CompositeSource<'_>,
     mode: abi::Mode,
 ) -> abi::FunctionOutput {
+    if let Some(record) = interface_record_ref(ty, prototype_record_locations, cs) {
+        return abi::FunctionOutput::Record(record);
+    }
     match ty {
         ast::TypeKind::Future(_) => abi::FunctionOutput::Final,
         ast::TypeKind::DynRecord => abi::FunctionOutput::DynamicRecord,
-        ast::TypeKind::Composite(comp_ty) if is_record_for_interface(comp_ty, prototype_record_locations, cs) => {
-            abi::FunctionOutput::Record(abi::RecordRef {
-                path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
-                program: comp_ty.path.program().map(|s| s.to_string()),
-            })
-        }
         _ => abi::FunctionOutput::Plaintext { ty: convert_plaintext(ty), mode },
     }
 }
