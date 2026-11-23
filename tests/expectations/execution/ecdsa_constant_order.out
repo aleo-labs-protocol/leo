@@ -1,0 +1,88 @@
+program constant_ecdsa.aleo;
+
+function main:
+    input r0 as [u8; 240u32].private;
+    async main r0 into r1;
+    output r1 as constant_ecdsa.aleo/main.future;
+
+finalize main:
+    input r0 as [u8; 240u32].public;
+    cast 171u8 83u8 115u8 236u8 104u8 151u8 142u8 16u8 42u8 144u8 132u8 214u8 208u8 122u8 161u8 227u8 40u8 23u8 77u8 18u8 51u8 126u8 10u8 2u8 142u8 195u8 176u8 198u8 58u8 189u8 184u8 158u8 122u8 144u8 109u8 157u8 232u8 65u8 0u8 97u8 67u8 222u8 37u8 202u8 184u8 59u8 56u8 6u8 24u8 151u8 44u8 72u8 3u8 191u8 151u8 140u8 91u8 2u8 212u8 232u8 99u8 70u8 91u8 138u8 27u8 into r1 as [u8; 65u32];
+    cast 27u8 227u8 26u8 148u8 54u8 26u8 57u8 27u8 186u8 251u8 42u8 76u8 205u8 112u8 79u8 87u8 220u8 4u8 212u8 187u8 into r2 as [u8; 20u32];
+    ecdsa.verify.keccak256.eth r1 r2 r0 into r3;
+    assert.eq true r3;
+
+function check_digest:
+    input r0 as [u8; 32u32].private;
+    async check_digest r0 into r1;
+    output r1 as constant_ecdsa.aleo/check_digest.future;
+
+finalize check_digest:
+    input r0 as [u8; 32u32].public;
+    cast 171u8 83u8 115u8 236u8 104u8 151u8 142u8 16u8 42u8 144u8 132u8 214u8 208u8 122u8 161u8 227u8 40u8 23u8 77u8 18u8 51u8 126u8 10u8 2u8 142u8 195u8 176u8 198u8 58u8 189u8 184u8 158u8 122u8 144u8 109u8 157u8 232u8 65u8 0u8 97u8 67u8 222u8 37u8 202u8 184u8 59u8 56u8 6u8 24u8 151u8 44u8 72u8 3u8 191u8 151u8 140u8 91u8 2u8 212u8 232u8 99u8 70u8 91u8 138u8 27u8 into r1 as [u8; 65u32];
+    cast 2u8 187u8 80u8 226u8 216u8 154u8 78u8 215u8 6u8 99u8 208u8 128u8 101u8 159u8 224u8 173u8 75u8 155u8 195u8 224u8 108u8 23u8 162u8 39u8 67u8 57u8 102u8 203u8 89u8 206u8 238u8 2u8 13u8 into r2 as [u8; 33u32];
+    ecdsa.verify.digest r1 r2 r0 into r3;
+    assert.eq true r3;
+
+constructor:
+    assert.eq edition 0u16;
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1529am9e2yzm08u3k52rs0nnwd3w8cdcqxhg8ndlu2k3y0q0p9qgq2smu3w",
+      "program": "constant_ecdsa.aleo",
+      "function": "main",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "4191935229030188833823029945791685440429897397576698926958474012162721074312field",
+          "value": "ciphertext1xqqryequ8hqwyy6rr2ddesdwm2jtv5xw6rhdjkq3nsuwtsyhhrgewr0ceeds8duz8l9xdcaszkkusctgg8wjjumrxx0r4c0am2ssvem3pugx3ylgh8psthyupuwqfyuafcalt23u428pkyh0nv59r0n6hzwqdjg09sjh4k4a0ms366xse70c4jq98rk0lmrzgrw7lyvvk0lkw7c9whra3amjjc6gg24md4mfyxvlw75v0sndrhg5v0u8klhstw46my9ru74trgm0w0d6vkuegg9rl7g6pulkejs2c2gqqmss7p9nzu8svyff3zltlwpfceuynnwf2r88hf5sf9eca06qzsjyeetnph33af42qjwkq0sgradl77uq3hgh6x2qlnentkx85pwas2362tzx8lm9gsmseuqg824hyc49scfqegxzrr8qua5vqxtukh60rctlywxq5n5trkqwsv94prxse9wq6axygmkrz84qs2mzu5htz9ss09ep42kg20zr3vrft7ddzfxyetedlhky8xth0lmatxteqa5ke35xylwcnrv6yvvc7yvzjzjmzj4lrl4clumkp2tzr5aha85yrj2yqsq0v88phdlnxkylqc9pxzzkex2rkljluptl69xh508hxt7vwkfydhfvuve9z7nukz3q4uethuhek4lf3zzj4g5pz4kqe90xldhm562h94rlatny536qf4cy8lh5uefjdfp8hdlzlj7r4vxsty4xkrz3zqskn732265tqmx2zvy8xfwcgamd08y29p86mchz3ycy359nzd6shu05qwv935xym2ffspq2p3u9x6crnnfe06mzwxjnxcrugf3f52xx9wx4zjzhfytm6z25q36huyd0gjng0kj3uathqkm3yg6t58symww23djxxfamcm46efsslv7weqk2qnmg5hfm89hwv036n3485eq09ndz2t09nednwpn3zvsgqkvgx5zd5mgy2lepkv66l5n0ggkun9jenec5j8g6h28ry3f3ec84wysfgj0l85x0rm7vrhvf4yc8jcsxq80vpgc4lrdsvgrynl5nwralg8n5hzxurwnx77e42f69ulawygc7k7sshuag9ula6vhz43g9pvn8428cav3mvrtcscvync6e6ugaxrdfm5yxvp60gmx0994r078se8vfvvjdp628qmnkxxqyaxklv4t2f2pujvgph6njx84r49vaq2cvfvkh2gzmq2e28x2x27xl4strksefdmvygk4lyfqq7v4nx0j2vu9g56s6uasjqwrrmaj3amkjh3m0prhz795q0m0z2dh4ccmhkmwx7pu8nxt737ck09qm526tdfuh8afmtz7vr8sdqj7vstd4uqplye6gppt69sw7r8r9dpvfu49ckx23xj690nt4z9y0w60s8j7e4sds6vv3qwr74nere3lgs0h0t98y3fxxtkgpg5yzxt4xn4entr6gtjfdqucxgpcr8j440ahaqse0w23dtgh44jjvv7usw0pncm4ll3x2gdxtevgunqupghmksq9q9qk8k0uljnn367r8td8npgdg8p7dqk0amljdxqyfp7h6uhprgymuvj0t0l07v6xm2zty4avlwxgxlllkxuj5lrrrpeleg0x96h0jd3zcpyaztf6r0ya236w6h9yt4fufw0vqcc6qwkls7xvhj5j6f62kx3vn50hkcl4rpad88ydy3xn4478hkjy72yn7rhsyuwe85n6uregftfqpy00ntt0lcd3qem0962wkmrztuvkzd5ul6s8kwk6rm4g828cwa4sdpdr0h3syq5y99y3gauwd5uyggjedq3xgvrrdm3k6807atrjjycjdwjr4jdkl6sgege566nhur7hqf80ntq3epcf086jjtg74knj8uy9ae0pwsm6ynwz0gca9vxeuwugnu3wf4x2prlqxmnrltxe6v9uwem0py20uuxa2c2htxpzkhjkkfvz6ammn3zgvl8avqmhmj2cyjf5quupdm3l3w5ljuhgkkklzmmplev8ywzksxvqmnvzj6cw77e7eutgd6hy2uqvjf4c0af6wfzj8jgfzeq5n49tsspeu4nvplfry6fnfu0zmcpksqr092vl7jrj3uu5s9jeazl6ws244zqg4hz3w549ygs52f6gcgpd4p93k3d44qsa432djvjupl7c432aq6h0yl3978z3zwrl06vmh6ed5s7tyu9y9xsy9sfsafk4g9ym7ujcruhntzvtlm6a624u7q4xp5rv9swke3r3wkdrxmdh9uchkd5mx6yz2g5xwtl0q2ej463kl4mmdaf7tq9wxt8t8a0xxj966mnth3gsa5pggxq3zpr5syle7jwf2cge6lwnsjxjc6rqmr2t4nry8vu3dh52zpmvd5ns58myr3yakju6rljwnen7hgnkhrpsrmwey7d787f389kz3q7hp8dk"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "3272838109658743467261443587761556611389923422458670598069202420285723185371field",
+          "value": "{\n  program_id: constant_ecdsa.aleo,\n  function_name: main,\n  arguments: [\n    [\n  43u8,\n  204u8,\n  92u8,\n  231u8,\n  0u8,\n  0u8,\n  0u8,\n  1u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  15u8,\n  66u8,\n  64u8,\n  0u8,\n  0u8,\n  39u8,\n  18u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  160u8,\n  184u8,\n  106u8,\n  51u8,\n  230u8,\n  248u8,\n  236u8,\n  97u8,\n  204u8,\n  98u8,\n  241u8,\n  176u8,\n  203u8,\n  42u8,\n  214u8,\n  223u8,\n  227u8,\n  193u8,\n  14u8,\n  139u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  116u8,\n  45u8,\n  53u8,\n  204u8,\n  110u8,\n  76u8,\n  110u8,\n  66u8,\n  226u8,\n  166u8,\n  225u8,\n  182u8,\n  214u8,\n  225u8,\n  157u8,\n  59u8,\n  177u8,\n  77u8,\n  61u8,\n  26u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  160u8,\n  184u8,\n  105u8,\n  145u8,\n  198u8,\n  33u8,\n  139u8,\n  54u8,\n  193u8,\n  209u8,\n  157u8,\n  74u8,\n  46u8,\n  158u8,\n  176u8,\n  206u8,\n  54u8,\n  6u8,\n  235u8,\n  72u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  34u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8,\n  195u8,\n  80u8,\n  191u8,\n  171u8,\n  9u8,\n  64u8,\n  213u8,\n  162u8,\n  65u8,\n  12u8,\n  0u8,\n  126u8,\n  6u8,\n  200u8,\n  177u8,\n  187u8,\n  36u8,\n  227u8,\n  67u8,\n  145u8,\n  221u8,\n  197u8,\n  41u8,\n  142u8,\n  24u8,\n  132u8,\n  13u8,\n  244u8,\n  56u8,\n  232u8,\n  224u8,\n  91u8,\n  154u8,\n  200u8,\n  0u8,\n  0u8,\n  0u8,\n  0u8\n]\n  ]\n}"
+        }
+      ],
+      "tpk": "932902105444239517980596565691908870668917795454138192289088332646102103453group",
+      "tcm": "4534045528378062984919568849257618109414740950022974037600860386185923697801field",
+      "scm": "919245366506739687912770902847963156737622134026017456623407014687413152843field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1c848ns2h3vtd2ll7x7l2qs2yvnuv67xwxgs8zynr6ctwx92y3vzs2tuunh",
+      "program": "constant_ecdsa.aleo",
+      "function": "check_digest",
+      "inputs": [
+        {
+          "type": "private",
+          "id": "6849560539626176798045442433799573490335475871316229823371736756508356670198field",
+          "value": "ciphertext1quq2728wnukk5lazvuvq9k63cc3ay4h37e7r6yqqjym30h7ufgp3jyj9z6ffk7x26wkqvvq3n5ey9ud8s9wmjljht85ghg4fd6emgzlhq8vee74ct2f66n9xlxeqmy5djf3v5nsm9qsamedzvrh4th630z0qwgelf28uxd9g62chds7pwq4dkhzj8uq5y589qlyjyr3n3pafgnsq740l592q7y335nk6jm240cxq34eaksrme45603td08leseesqvql2m562s823q2m388gnusnparklvl6mt680aa28hts3d70ewwk6p8x7jpz9twr700xh6tfg2c8zgcl8egf8gzu6yhgc7k0yaz0wmk5pqyfmk5k"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "1911539963521108848263687619765208068678232257796456293594577737332901133074field",
+          "value": "{\n  program_id: constant_ecdsa.aleo,\n  function_name: check_digest,\n  arguments: [\n    [\n  94u8,\n  76u8,\n  213u8,\n  97u8,\n  97u8,\n  101u8,\n  51u8,\n  51u8,\n  21u8,\n  86u8,\n  52u8,\n  204u8,\n  133u8,\n  101u8,\n  203u8,\n  175u8,\n  248u8,\n  37u8,\n  79u8,\n  157u8,\n  236u8,\n  41u8,\n  189u8,\n  155u8,\n  31u8,\n  248u8,\n  200u8,\n  100u8,\n  170u8,\n  197u8,\n  105u8,\n  252u8\n]\n  ]\n}"
+        }
+      ],
+      "tpk": "4435182414136183130262225239916202916754973933386625330210643288715243337617group",
+      "tcm": "850142209754567944166319722250339409916042600529796761178314418357457776240field",
+      "scm": "6880818639492575671344261738303779886148232533224264415621330306086981058639field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
