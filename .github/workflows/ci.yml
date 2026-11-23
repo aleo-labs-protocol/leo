@@ -82,7 +82,7 @@ jobs:
     if: >-
       !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
       (needs.start-cpu-runners.result == 'success' || needs.start-cpu-runners.result == 'skipped')
-    uses: aleo-labs-protocol/leo/.github/workflows/linux-ci.yml@master
+    uses: aleo-labs-protocol/leo/.github/workflows/linux-ci.yml@b2ae7361deac76ed94ef771e52350fb6151ddc14
     with:
       suite: workspace
 
@@ -190,7 +190,7 @@ jobs:
     if: >-
       !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.scope == 'full' &&
       (needs.start-cpu-runners.result == 'success' || needs.start-cpu-runners.result == 'skipped')
-    uses: aleo-labs-protocol/leo/.github/workflows/linux-ci.yml@master
+    uses: aleo-labs-protocol/leo/.github/workflows/linux-ci.yml@b2ae7361deac76ed94ef771e52350fb6151ddc14
     with:
       suite: rust
 
