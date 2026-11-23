@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the Leo library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{CompilerState, expression_can_be_discarded};
+use crate::{CompilerState, expression_can_be_discarded_with};
 
 use leo_ast::*;
 use leo_span::{Span, Symbol, sym};
@@ -24,7 +24,7 @@ use indexmap::IndexMap;
 pub(super) struct TernaryGuard {
     pub(super) condition: Expression,
     pub(super) selects_true: bool,
-    pub(super) used: bool,
+    pub(super) binding: Option<Identifier>,
 }
 
 pub struct StorageLoweringVisitor<'a> {
@@ -34,6 +34,18 @@ pub struct StorageLoweringVisitor<'a> {
     pub new_mappings: IndexMap<Location, Mapping>,
     /// Source ternary selections surrounding the expression currently being lowered.
     pub(super) ternary_guards: Vec<TernaryGuard>,
+    // Lowering can reuse a source node ID for an expression with different operands.
+    pub source_discardability: IndexMap<NodeID, bool>,
+    pub lowered_discardability: IndexMap<NodeID, bool>,
+}
+
+pub(super) fn can_discard(expr: &Expression, state: &CompilerState, cache: &mut IndexMap<NodeID, bool>) -> bool {
+    if let Some(&result) = cache.get(&expr.id()) {
+        return result;
+    }
+    let result = expression_can_be_discarded_with(expr, state, |child| can_discard(child, state, cache));
+    cache.insert(expr.id(), result);
+    result
 }
 
 impl StorageLoweringVisitor<'_> {
@@ -44,8 +56,18 @@ impl StorageLoweringVisitor<'_> {
         for index in 0..self.ternary_guards.len() {
             let (condition, selects_true) = {
                 let guard = &mut self.ternary_guards[index];
-                guard.used = true;
-                (guard.condition.clone(), guard.selects_true)
+                let condition = match &guard.condition {
+                    Expression::Path(_) | Expression::Literal(_) => guard.condition.clone(),
+                    expr => {
+                        let identifier = guard.binding.get_or_insert_with(|| Identifier {
+                            name: self.state.assigner.unique_symbol("$ternary_condition", "$"),
+                            span: expr.span(),
+                            id: self.state.node_builder.next_id(),
+                        });
+                        (*identifier).into()
+                    }
+                };
+                (condition, guard.selects_true)
             };
 
             let selected = if selects_true {
@@ -319,28 +341,7 @@ impl StorageLoweringVisitor<'_> {
             None => (self.literal_default_network(), vec![]),
         };
         let index_argument = arguments.into_iter().next().expect("type checking guarantees one argument");
-        let index_type = self
-            .state
-            .type_table
-            .get(&index_argument.id())
-            .expect("type checking should assign a type to the vector index");
-        let index_must_be_evaluated_once = !expression_can_be_discarded(&index_argument, self.state);
-        let (index_expr, mut index_stmts) = self.reconstruct_expression(index_argument, &());
-        self.state.type_table.insert(index_expr.id(), index_type);
-        let index_expr = if index_must_be_evaluated_once {
-            let index_var_sym = self.state.assigner.unique_symbol("$index", "$");
-            let index_var_ident =
-                Identifier { name: index_var_sym, span: Default::default(), id: self.state.node_builder.next_id() };
-            self.state.type_table.insert(index_var_ident.id, index_type);
-            index_stmts.push(self.state.assigner.simple_definition(
-                index_var_ident,
-                index_expr,
-                self.state.node_builder.next_id(),
-            ));
-            index_var_ident.into()
-        } else {
-            index_expr
-        };
+        let (index_expr, index_stmts) = self.reconstruct_expression(index_argument, &());
 
         let base_name = member.name.to_string();
         let val_mapping_sym = Symbol::intern(&format!("{base_name}__"));

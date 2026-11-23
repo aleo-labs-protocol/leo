@@ -1,0 +1,63 @@
+program provider.aleo;
+
+struct Receipt__A7mbFYenBJ:
+    amount as u32;
+
+struct Receipt__7bOSkCSA04A:
+    amount as u32;
+
+function entry:
+    input r0 as u32.private;
+    output r0 as u32.private;
+
+constructor:
+    assert.eq edition 0u16;
+// --- Next Program --- //
+import provider.aleo;
+program caller.aleo;
+
+function main:
+    input r0 as u32.private;
+    add r0 1u32 into r1;
+    cast r1 into r2 as provider.aleo/Receipt__A7mbFYenBJ;
+    output r2.amount as u32.private;
+
+constructor:
+    assert.eq edition 0u16;
+
+
+---
+Note: Treating dependencies as Aleo produces different results:
+
+[ETYC0372017] Error: the type `provider.aleo::orders::Receipt` is not found in the current scope
+   ╭─[ outer.leo:2:31 ]
+   │
+ 2 │ export fn evaluate(x: u32) -> provider.aleo::orders::Receipt {
+   │ 
+   │ Help: Check the type name for typos. If it comes from another program, qualify it with the program name, e.g. `credits.aleo::credits` instead of `credits`.
+───╯
+[ETYC0372017] Error: the type `provider.aleo::orders::Receipt` is not found in the current scope
+   ╭─[ outer.leo:3:5 ]
+   │
+ 3 │ ╭─▶     let receipt: provider.aleo::orders::Receipt = provider.aleo::orders::Receipt {
+   ┆ ┆   
+ 5 │ ├─▶     };
+   │ │            
+   │ ╰──────────── here
+   │     
+   │     Help: Check the type name for typos. If it comes from another program, qualify it with the program name, e.g. `credits.aleo::credits` instead of `credits`.
+───╯
+[ETYC0372005] Error: unknown struct or record `provider.aleo::orders::Receipt`
+   ╭─[ outer.leo:3:51 ]
+   │
+ 3 │     let receipt: provider.aleo::orders::Receipt = provider.aleo::orders::Receipt {
+   │ 
+   │ Help: Check `provider.aleo::orders::Receipt` for typos and confirm it is declared in this scope. If it lives in another program, import it with the program-qualified name (e.g. `credits.aleo::credits`).
+───╯
+[ETYC0372017] Error: the type `provider.aleo::orders::Receipt` is not found in the current scope
+   ╭─[ compiler-test:7:16 ]
+   │
+ 7 │         return outer::evaluate(x).amount;
+   │ 
+   │ Help: Check the type name for typos. If it comes from another program, qualify it with the program name, e.g. `credits.aleo::credits` instead of `credits`.
+───╯

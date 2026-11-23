@@ -21,7 +21,7 @@ use leo_errors::Result;
 use leo_span::Symbol;
 
 use indexmap::{IndexMap, map::Entry};
-use snarkvm::prelude::anyhow;
+use snarkvm::prelude::{Program as SvmProgram, TestnetV0, anyhow};
 use std::path::{Path, PathBuf};
 
 /// Either the bytecode of an Aleo program (if it was a network dependency) or
@@ -254,6 +254,36 @@ impl Package {
             network,
             endpoint,
             network_retries,
+            None,
+            None,
+        )
+    }
+
+    /// Load an Aleo bytecode file as a package, including its local and network imports.
+    ///
+    /// Local imports use the same layouts as `leo abi`: `<root>/<name>/<name>.aleo` for a build bundle, or
+    /// `<imports-directory>/<name>.aleo` for a flat bundle. Imports that are not present there are fetched from the
+    /// network.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_aleo_file<P: AsRef<Path>, Q: AsRef<Path>>(
+        path: P,
+        home_path: Q,
+        imports_directory: Option<&Path>,
+        no_cache: bool,
+        no_local: bool,
+        network: Option<NetworkName>,
+        endpoint: Option<&str>,
+        network_retries: u32,
+    ) -> Result<Self> {
+        Self::from_aleo_file_impl(
+            path.as_ref(),
+            home_path.as_ref(),
+            imports_directory,
+            no_cache,
+            no_local,
+            network,
+            endpoint,
+            network_retries,
         )
     }
 
@@ -281,6 +311,8 @@ impl Package {
             network,
             endpoint,
             network_retries,
+            None,
+            None,
         )
     }
 
@@ -308,7 +340,100 @@ impl Package {
             network,
             endpoint,
             network_retries,
+            None,
+            None,
         )
+    }
+
+    /// Update project or workspace dependencies without changing manifests or build artifacts.
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_dependencies(
+        path: &Path,
+        home_path: &Path,
+        name: Option<&str>,
+        dry_run: bool,
+        network: NetworkName,
+        endpoint: &str,
+        network_retries: u32,
+    ) -> Result<(Lock, Lock)> {
+        let workspace = Workspace::discover(path)?;
+        let root = workspace.as_ref().map_or(path, |workspace| workspace.root_directory.as_path());
+        let paths =
+            workspace.as_ref().map_or_else(|| vec![path.to_path_buf()], |workspace| workspace.member_paths.clone());
+        let mut constraints = IndexMap::new();
+        for path in &paths {
+            let manifest = Manifest::read_from_file(path.join(MANIFEST_FILENAME))?;
+            for dependency in collect_declared_deps(path, &manifest, true)?.values() {
+                if dependency.location == Location::Network
+                    && let Some(edition) = dependency.edition
+                {
+                    let program = canonicalize_program_name(&dependency.name);
+                    if let Some(previous) = constraints.insert(program.clone(), edition)
+                        && previous != edition
+                    {
+                        return Err(anyhow!(
+                            "Conflicting editions for network dependency `{program}`: {previous} and {edition}."
+                        )
+                        .into());
+                    }
+                }
+            }
+        }
+        std::fs::create_dir_all(home_path).map_err(|error| crate::errors::failed_path(home_path.display(), error))?;
+        let old_lock = Lock::read(root)?;
+        let mut resolution_lock = old_lock.clone();
+        resolution_lock.unlock_git(name);
+        let mut new_lock = Lock::default();
+        new_lock.carry_over(&old_lock, |_| false);
+        let mut resolved = IndexMap::new();
+        let mut found = name.is_none();
+        for path in paths {
+            let package = Self::from_directory_impl(
+                &path,
+                home_path,
+                true,
+                true,
+                false,
+                false,
+                false,
+                Some(network),
+                Some(endpoint),
+                network_retries,
+                Some((&resolution_lock, &mut new_lock)),
+                Some((name, &constraints)),
+            )?;
+            for unit in &package.compilation_units {
+                if let Some(name) = name {
+                    found |= unit.dependencies.iter().any(|dependency| {
+                        matches!(dependency.location, Location::Network | Location::Git)
+                            && bare_unit_name(&dependency.name) == bare_unit_name(name)
+                    });
+                }
+                if !unit.is_local
+                    && let Some(edition) = unit.edition
+                    && let Some(previous) = resolved.insert(unit.name, edition)
+                    && previous != edition
+                {
+                    return Err(anyhow!(
+                        "Conflicting editions for network dependency `{}`: {previous} and {edition}.",
+                        unit.name
+                    )
+                    .into());
+                }
+            }
+        }
+        if !found {
+            return Err(anyhow!(
+                "No network or Git dependency named `{}` exists in this project or workspace.",
+                name.unwrap_or_default()
+            )
+            .into());
+        }
+        new_lock.carry_over(&old_lock, |_| true);
+        if !dry_run {
+            new_lock.write(root)?;
+        }
+        Ok((old_lock, new_lock))
     }
 
     pub fn test_files(&self) -> impl Iterator<Item = PathBuf> {
@@ -333,6 +458,119 @@ impl Package {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn from_aleo_file_impl(
+        path: &Path,
+        home_path: &Path,
+        imports_directory: Option<&Path>,
+        no_cache: bool,
+        no_local: bool,
+        network: Option<NetworkName>,
+        endpoint: Option<&str>,
+        network_retries: u32,
+    ) -> Result<Self> {
+        if path.extension().and_then(|extension| extension.to_str()) != Some("aleo") {
+            return Err(anyhow!("Expected an Aleo bytecode file with the `.aleo` extension: {}", path.display()).into());
+        }
+
+        let path = path.canonicalize().map_err(|error| crate::errors::failed_path(path.display(), error))?;
+        if !path.is_file() {
+            return Err(anyhow!("Expected an Aleo bytecode file: {}", path.display()).into());
+        }
+        let home_path =
+            home_path.canonicalize().map_err(|error| crate::errors::failed_path(home_path.display(), error))?;
+        let bytecode = std::fs::read_to_string(&path).map_err(|error| {
+            crate::errors::util_file_io_error(format_args!("Trying to read Aleo file at {}", path.display()), error)
+        })?;
+        let source_name = path.file_stem().and_then(|name| name.to_str()).unwrap_or("program");
+        let main_program: SvmProgram<TestnetV0> =
+            bytecode.parse().map_err(|_| crate::errors::snarkvm_parsing_error(source_name))?;
+        let program_name = main_program.id().to_string();
+        let program_symbol = symbol(&program_name)?;
+        let base_directory = path
+            .parent()
+            .ok_or_else(|| anyhow!("Aleo bytecode file has no parent directory: {}", path.display()))?
+            .to_path_buf();
+
+        let main_dependency = Dependency {
+            name: program_name.clone(),
+            location: Location::Local,
+            path: Some(path.clone()),
+            edition: None,
+            ..Default::default()
+        };
+        let imports_directory = if no_local {
+            None
+        } else {
+            imports_directory
+                .map(|imports_directory| -> Result<PathBuf> {
+                    let imports_directory = imports_directory
+                        .canonicalize()
+                        .map_err(|error| crate::errors::failed_path(imports_directory.display(), error))?;
+                    if !imports_directory.is_dir() {
+                        return Err(
+                            anyhow!("Expected an Aleo imports directory: {}", imports_directory.display()).into()
+                        );
+                    }
+                    Ok(imports_directory)
+                })
+                .transpose()?
+        };
+        let declared_deps = IndexMap::from([(program_symbol, main_dependency.clone())]);
+
+        let mut map: IndexMap<Symbol, (Dependency, CompilationUnit)> = IndexMap::new();
+        let mut digraph = DiGraph::new(Default::default());
+        let old_lock = Lock::default();
+        let lock_directory = Workspace::discover_root(&base_directory)?.or_else(|| {
+            base_directory
+                .ancestors()
+                .find(|directory| directory.join(MANIFEST_FILENAME).is_file())
+                .map(Path::to_path_buf)
+        });
+        let mut new_lock = lock_directory.as_deref().map(Lock::read).transpose()?.unwrap_or_default();
+        Self::graph_build(
+            &home_path,
+            network,
+            endpoint,
+            &main_dependency,
+            main_dependency.clone(),
+            &mut map,
+            &mut digraph,
+            no_cache,
+            false,
+            imports_directory.as_deref(),
+            network_retries,
+            &declared_deps,
+            &old_lock,
+            &mut new_lock,
+            false,
+            None,
+        )?;
+
+        let compilation_units = digraph
+            .post_order()
+            .map_err(|_| crate::errors::circular_dependency_error())?
+            .into_iter()
+            .map(|name| {
+                map.swap_remove(&name)
+                    .map(|(_, unit)| unit)
+                    .ok_or_else(|| anyhow!("Dependency graph contains an unknown program `{name}`.").into())
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let manifest = Manifest {
+            program: program_name,
+            version: "0.0.0".to_string(),
+            description: String::new(),
+            license: String::new(),
+            leo: env!("CARGO_PKG_VERSION").to_string(),
+            dependencies: None,
+            dev_dependencies: None,
+            no_std: false,
+        };
+
+        Ok(Package { base_directory, workspace_root: None, compilation_units, manifest, dep_graph: digraph })
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn from_directory_impl(
         path: &Path,
         home_path: &Path,
@@ -344,6 +582,8 @@ impl Package {
         network: Option<NetworkName>,
         endpoint: Option<&str>,
         network_retries: u32,
+        resolution: Option<(&Lock, &mut Lock)>,
+        update: Option<(Option<&str>, &IndexMap<String, u16>)>,
     ) -> Result<Self> {
         let map_err = |path: &Path, err| {
             crate::errors::util_file_io_error(format_args!("Trying to find path at {}", path.display()), err)
@@ -371,9 +611,12 @@ impl Package {
 
             // The lock lives at the workspace root, else beside this package's `program.json`.
             let lock_dir = workspace_root.as_deref().unwrap_or(&path).to_path_buf();
-            // New lock records only this build's resolutions; others are carried over from the old lock after.
-            let old_lock = Lock::read(&lock_dir);
-            let mut new_lock = Lock::default();
+            // Reuse network pins and record Git resolutions for this build.
+            let persist = resolution.is_none();
+            let file_lock = if persist { Lock::read(&lock_dir)? } else { Lock::default() };
+            let mut file_resolution = Lock::default();
+            file_resolution.carry_over(&file_lock, |_| false);
+            let (old_lock, new_lock) = resolution.unwrap_or((&file_lock, &mut file_resolution));
 
             let first_dependency = Dependency {
                 name: manifest.program.clone(),
@@ -395,6 +638,7 @@ impl Package {
                         ..Default::default()
                     })
                     .collect();
+                test_dependencies.sort_by(|a, b| a.name.cmp(&b.name));
                 if let Some(deps) = manifest.dev_dependencies.as_ref() {
                     // Canonicalize dev-dependency paths like regular dependencies, so the same local
                     // library in both lists dedups instead of comparing relative against absolute.
@@ -424,19 +668,21 @@ impl Package {
                     &mut digraph,
                     no_cache,
                     no_local,
+                    None,
                     network_retries,
                     &declared_deps,
-                    &old_lock,
-                    &mut new_lock,
+                    old_lock,
+                    new_lock,
                     offline,
+                    update,
                 )?;
             }
 
             // Workspace: carry all entries since the lock is shared. Standalone: carry only dev-git
             // names (a plain build skips dev deps, so their pins may legitimately be unresolved).
-            if workspace_root.is_some() {
-                new_lock.carry_over(&old_lock, |_| true);
-            } else {
+            if persist && workspace_root.is_some() {
+                new_lock.carry_over(old_lock, |_| true);
+            } else if persist {
                 let dev_git_names: Vec<&str> = if with_tests {
                     Vec::new()
                 } else {
@@ -448,13 +694,15 @@ impl Package {
                         .map(|dep| dep.name.as_str())
                         .collect()
                 };
-                new_lock.carry_over(&old_lock, |entry| dev_git_names.contains(&entry.name.as_str()));
+                new_lock.carry_over(old_lock, |entry| dev_git_names.contains(&entry.name.as_str()));
             }
-            // Persist the lock (and drop a stale one when no git deps remain).
-            new_lock.write(&lock_dir)?;
-
             let ordered_dependency_symbols =
                 digraph.post_order().map_err(|_| crate::errors::circular_dependency_error())?;
+
+            // Commit the complete lock only after the dependency graph is valid.
+            if persist {
+                new_lock.write(&lock_dir)?;
+            }
 
             (
                 ordered_dependency_symbols.into_iter().map(|symbol| map.swap_remove(&symbol).unwrap().1).collect(),
@@ -478,12 +726,46 @@ impl Package {
         graph: &mut DiGraph<Symbol>,
         no_cache: bool,
         no_local: bool,
+        aleo_imports_directory: Option<&Path>,
         network_retries: u32,
         declared_deps: &IndexMap<Symbol, Dependency>,
         old_lock: &Lock,
         new_lock: &mut Lock,
         offline: bool,
+        update: Option<(Option<&str>, &IndexMap<String, u16>)>,
     ) -> Result<()> {
+        let mut new = new;
+        if new.location == Location::Network
+            && let Some(imports_directory) = aleo_imports_directory
+        {
+            let path = aleo_import_path(imports_directory, &new.name);
+            if path.exists() {
+                if !path.is_file() {
+                    return Err(anyhow!("Expected Aleo import `{}` to be a file: {}", new.name, path.display()).into());
+                }
+                let bytecode = std::fs::read_to_string(&path).map_err(|error| {
+                    crate::errors::util_file_io_error(
+                        format_args!("Trying to read Aleo file at {}", path.display()),
+                        error,
+                    )
+                })?;
+                let imported: SvmProgram<TestnetV0> =
+                    bytecode.parse().map_err(|_| crate::errors::snarkvm_parsing_error(bare_unit_name(&new.name)))?;
+                if imported.id().to_string() != new.name {
+                    return Err(anyhow!(
+                        "Aleo import `{}` resolved to `{}`, but that file declares `{}`.",
+                        new.name,
+                        path.display(),
+                        imported.id()
+                    )
+                    .into());
+                }
+                new.location = Location::Local;
+                new.path = Some(path);
+                new.edition = None;
+            }
+        }
+
         let name_symbol = symbol(&new.name)?;
 
         let unit = match map.entry(name_symbol) {
@@ -494,7 +776,9 @@ impl Package {
                 assert_eq!(new.name, existing_dep.name);
                 if new.location != existing_dep.location
                     || new.path != existing_dep.path
-                    || new.edition != existing_dep.edition
+                    || (new.edition != existing_dep.edition
+                        && !(new.location == Location::Network
+                            && new.edition.is_none_or(|edition| occupied.get().1.edition == Some(edition))))
                     || new.git != existing_dep.git
                 {
                     return Err(crate::errors::conflicting_dependency(existing_dep, new).into());
@@ -524,14 +808,31 @@ impl Package {
                         let Some(network) = network else {
                             return Err(anyhow!("A network must be provided to fetch network dependencies.").into());
                         };
+                        let selected = update.is_some_and(|(name, _)| {
+                            name.is_none_or(|name| bare_unit_name(&new.name) == bare_unit_name(name))
+                        });
+                        let edition = new
+                            .edition
+                            .or_else(|| declared_deps.get(&name_symbol).and_then(|dependency| dependency.edition))
+                            .or_else(|| {
+                                update.and_then(|(_, constraints)| {
+                                    constraints.get(&canonicalize_program_name(&new.name)).copied()
+                                })
+                            });
+                        let edition = if selected && edition.is_none() && bare_unit_name(&new.name) != "credits" {
+                            Some(crate::fetch_latest_edition(&new.name, endpoint, network, network_retries)?)
+                        } else {
+                            edition
+                        };
                         CompilationUnit::fetch(
                             name_symbol,
-                            new.edition,
+                            edition,
                             home_path,
                             network,
                             endpoint,
-                            no_cache,
+                            no_cache || selected,
                             network_retries,
+                            new_lock,
                         )?
                     }
                     (_, Location::Git) => CompilationUnit::from_git(
@@ -602,16 +903,36 @@ impl Package {
                 graph,
                 no_cache,
                 no_local,
+                aleo_imports_directory,
                 network_retries,
                 declared_deps,
                 old_lock,
                 new_lock,
                 offline,
+                update,
             )?;
         }
 
         Ok(())
     }
+}
+
+/// Return the default directory for local imports of an Aleo bytecode file.
+pub fn default_aleo_imports_directory(path: &Path) -> Option<PathBuf> {
+    let parent = path.parent()?;
+    if parent.file_name() == path.file_stem() {
+        return parent.parent().map(Path::to_path_buf);
+    }
+
+    let imports = parent.join("imports");
+    imports.is_dir().then_some(imports)
+}
+
+/// Return the preferred path for an Aleo import in a flat or per-unit imports directory.
+pub fn aleo_import_path(imports_directory: &Path, program_name: &str) -> PathBuf {
+    let bare_name = bare_unit_name(program_name);
+    let per_unit_path = imports_directory.join(bare_name).join(program_name);
+    if per_unit_path.exists() { per_unit_path } else { imports_directory.join(program_name) }
 }
 
 fn main_template(name: &str) -> String {
@@ -719,10 +1040,23 @@ fn collect_declared_deps_recursive(
         // Only recurse into newly discovered dependencies to avoid infinite
         // recursion on circular manifests (cycles are caught later by
         // `DiGraph::post_order`).
-        let Entry::Vacant(e) = declared.entry(sym) else {
-            continue;
-        };
-        e.insert(dep.clone());
+        match declared.entry(sym) {
+            Entry::Occupied(mut entry) => {
+                let existing = entry.get_mut();
+                if existing.location == Location::Network && dep.location == Location::Network {
+                    if let (Some(previous), Some(edition)) = (existing.edition, dep.edition)
+                        && previous != edition
+                    {
+                        return Err(crate::errors::conflicting_dependency(existing, dep).into());
+                    }
+                    existing.edition = existing.edition.or(dep.edition);
+                }
+                continue;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(dep.clone());
+            }
+        }
         if dep.location == Location::Local
             && let Some(path) = &dep.path
         {
@@ -740,6 +1074,38 @@ fn collect_declared_deps_recursive(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use leo_span::create_session_if_not_set_then;
+
+    const LEAF_PROGRAM: &str = "\
+program leaf.aleo;
+
+function identity:
+    input r0 as u32.private;
+    output r0 as u32.private;
+";
+
+    const DEPENDENCY_PROGRAM: &str = "\
+import leaf.aleo;
+
+program dependency.aleo;
+
+function times_two:
+    input r0 as u32.private;
+    call leaf.aleo/identity r0 into r1;
+    add r1 r1 into r2;
+    output r2 as u32.private;
+";
+
+    const MAIN_PROGRAM: &str = "\
+import dependency.aleo;
+
+program standalone.aleo;
+
+function main:
+    input r0 as u32.private;
+    call dependency.aleo/times_two r0 into r1;
+    output r1 as u32.private;
+";
 
     fn dummy_package(base: &str) -> Package {
         dummy_package_with(base, None)
@@ -825,5 +1191,138 @@ mod tests {
         let pkg = dummy_package_with("/tmp/standalone", None);
         assert_eq!(pkg.build_directory(), PathBuf::from("/tmp/standalone/build"));
         assert_eq!(pkg.unit_build_directory("demo"), PathBuf::from("/tmp/standalone/build/demo"));
+    }
+
+    #[test]
+    fn aleo_file_uses_sibling_imports_directory() {
+        create_session_if_not_set_then(|_| {
+            let root = crate::test_util::unique_dir("aleo-file-flat-imports");
+            let program_path = root.join("standalone.aleo");
+            let home = root.join("home");
+            crate::test_util::write_file(&program_path, MAIN_PROGRAM);
+            crate::test_util::write_file(&root.join("imports/dependency.aleo"), DEPENDENCY_PROGRAM);
+            crate::test_util::write_file(&root.join("imports/leaf.aleo"), LEAF_PROGRAM);
+            std::fs::create_dir_all(&home).expect("test registry directory should be created");
+
+            let package =
+                Package::from_aleo_file(&program_path, &home, Some(&root.join("imports")), false, false, None, None, 0)
+                    .expect("standalone Aleo program should load with its local import");
+
+            let names = package.compilation_units.iter().map(|unit| unit.name.to_string()).collect::<Vec<_>>();
+            assert_eq!(names, ["leaf.aleo", "dependency.aleo", "standalone.aleo"]);
+            assert!(package.compilation_units.iter().all(|unit| unit.is_local));
+            assert_eq!(package.manifest.program, "standalone.aleo");
+
+            std::fs::remove_dir_all(root).expect("test directory should be removed");
+        });
+    }
+
+    #[test]
+    fn aleo_file_uses_per_unit_build_layout() {
+        create_session_if_not_set_then(|_| {
+            let root = crate::test_util::unique_dir("aleo-file-per-unit-imports");
+            let program_path = root.join("standalone/standalone.aleo");
+            let home = root.join("home");
+            crate::test_util::write_file(&program_path, MAIN_PROGRAM);
+            crate::test_util::write_file(&root.join("dependency/dependency.aleo"), DEPENDENCY_PROGRAM);
+            crate::test_util::write_file(&root.join("leaf/leaf.aleo"), LEAF_PROGRAM);
+            std::fs::create_dir_all(&home).expect("test registry directory should be created");
+
+            let package = Package::from_aleo_file(&program_path, &home, Some(&root), false, false, None, None, 0)
+                .expect("standalone Aleo build artifact should load with its local import");
+
+            let names = package.compilation_units.iter().map(|unit| unit.name.to_string()).collect::<Vec<_>>();
+            assert_eq!(names, ["leaf.aleo", "dependency.aleo", "standalone.aleo"]);
+            assert!(package.compilation_units.iter().all(|unit| unit.is_local));
+
+            std::fs::remove_dir_all(root).expect("test directory should be removed");
+        });
+    }
+
+    #[test]
+    fn missing_aleo_import_is_classified_as_network() {
+        create_session_if_not_set_then(|_| {
+            let root = crate::test_util::unique_dir("aleo-file-network-import");
+            let program_path = root.join("standalone.aleo");
+            crate::test_util::write_file(&program_path, MAIN_PROGRAM);
+
+            let unit =
+                CompilationUnit::from_aleo_path(Symbol::intern("standalone.aleo"), &program_path, &IndexMap::new())
+                    .expect("test Aleo program should load");
+
+            let dependency = unit.dependencies.first().expect("test program should have one direct import");
+            assert_eq!(dependency.name, "dependency.aleo");
+            assert_eq!(dependency.location, Location::Network);
+
+            std::fs::remove_dir_all(root).expect("test directory should be removed");
+        });
+    }
+
+    #[test]
+    fn aleo_file_resolves_local_import_below_network_import() {
+        create_session_if_not_set_then(|_| {
+            let root = crate::test_util::unique_dir("aleo-file-mixed-transitive-imports");
+            let program_path = root.join("standalone.aleo");
+            let imports = root.join("imports");
+            let home = root.join("home");
+            crate::test_util::write_file(&program_path, MAIN_PROGRAM);
+            crate::test_util::write_file(&root.join(MANIFEST_FILENAME), r#"{"program":"standalone.aleo"}"#);
+            crate::test_util::write_file(&imports.join("leaf.aleo"), LEAF_PROGRAM);
+            crate::test_util::write_file(
+                &home.join("registry/testnet/dependency/0/dependency.aleo"),
+                DEPENDENCY_PROGRAM,
+            );
+
+            let dependency: SvmProgram<TestnetV0> = DEPENDENCY_PROGRAM.parse().expect("fixture program must parse");
+            crate::test_util::write_file(
+                &root.join(LOCK_FILENAME),
+                &serde_json::json!({"version": 2, "network": [{
+                    "name": "dependency.aleo",
+                    "network": "testnet",
+                    "edition": 0,
+                    "checksum": dependency.to_checksum().map(|byte| *byte),
+                }]})
+                .to_string(),
+            );
+
+            let package = Package::from_aleo_file(
+                &program_path,
+                &home,
+                Some(&imports),
+                false,
+                false,
+                Some(NetworkName::TestnetV0),
+                Some("http://localhost:1"),
+                0,
+            )
+            .expect("a local transitive import below a network import should be used");
+
+            let units =
+                package.compilation_units.iter().map(|unit| (unit.name.to_string(), unit.is_local)).collect::<Vec<_>>();
+            assert_eq!(units, [
+                ("leaf.aleo".to_string(), true),
+                ("dependency.aleo".to_string(), false),
+                ("standalone.aleo".to_string(), true)
+            ]);
+
+            std::fs::remove_dir_all(root).expect("test directory should be removed");
+        });
+    }
+
+    #[test]
+    fn aleo_file_rejects_non_directory_imports_path() {
+        create_session_if_not_set_then(|_| {
+            let root = crate::test_util::unique_dir("aleo-file-invalid-imports-directory");
+            let program_path = root.join("standalone.aleo");
+            let home = root.join("home");
+            crate::test_util::write_file(&program_path, MAIN_PROGRAM);
+            std::fs::create_dir_all(&home).expect("test registry directory should be created");
+
+            let error = Package::from_aleo_file(&program_path, &home, Some(&program_path), false, false, None, None, 0)
+                .expect_err("an imports path that is not a directory should fail");
+            assert!(error.to_string().contains("Expected an Aleo imports directory"));
+
+            std::fs::remove_dir_all(root).expect("test directory should be removed");
+        });
     }
 }

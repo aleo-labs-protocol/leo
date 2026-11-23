@@ -38,41 +38,59 @@ program complex.aleo {
     }
     fn check1() -> Final<Fn()> {
         return async {
-            let p = _optional_unwrap(_mapping_contains(complex.aleo::point__, false) ? _mapping_get_or_use(complex.aleo::point__, false, complex.aleo::Point { x: 0field, y: 0field }) : none);
+            let $operand$0 = _mapping_contains(complex.aleo::point__, false) ? _mapping_get_or_use(complex.aleo::point__, false, complex.aleo::Point { x: 0field, y: 0field }) : none;
+            let $operand$1 = _optional_unwrap($operand$0);
+            let p = $operand$1;
             assert(p.x == 1field);
             assert(p.y == 2field);
-            let ps = _optional_unwrap(_mapping_contains(complex.aleo::points__, false) ? _mapping_get_or_use(complex.aleo::points__, false, [complex.aleo::Point { x: 0field, y: 0field }; 2]) : none);
+            let $operand$2 = _mapping_contains(complex.aleo::points__, false) ? _mapping_get_or_use(complex.aleo::points__, false, [complex.aleo::Point { x: 0field, y: 0field }; 2]) : none;
+            let $operand$3 = _optional_unwrap($operand$2);
+            let ps = $operand$3;
             assert(ps[0].x == 10field);
             assert(ps[1].y == 40field);
-            let s = _optional_unwrap(_mapping_contains(complex.aleo::stats__, false) ? _mapping_get_or_use(complex.aleo::stats__, false, complex.aleo::Stats { values: [0u32; 3], active: false }) : none);
+            let $operand$4 = _mapping_contains(complex.aleo::stats__, false) ? _mapping_get_or_use(complex.aleo::stats__, false, complex.aleo::Stats { values: [0u32; 3], active: false }) : none;
+            let $operand$5 = _optional_unwrap($operand$4);
+            let s = $operand$5;
             assert(s.values[1] == 10u32);
             assert(s.active == true);
-            let a = _optional_unwrap(_mapping_contains(complex.aleo::arr_u32__, false) ? _mapping_get_or_use(complex.aleo::arr_u32__, false, [0u32; 3]) : none);
+            let $operand$6 = _mapping_contains(complex.aleo::arr_u32__, false) ? _mapping_get_or_use(complex.aleo::arr_u32__, false, [0u32; 3]) : none;
+            let $operand$7 = _optional_unwrap($operand$6);
+            let a = $operand$7;
             assert(a[2] == 9u32);
-            let b = _optional_unwrap(_mapping_contains(complex.aleo::arr_bool__, false) ? _mapping_get_or_use(complex.aleo::arr_bool__, false, [false; 2]) : none);
+            let $operand$8 = _mapping_contains(complex.aleo::arr_bool__, false) ? _mapping_get_or_use(complex.aleo::arr_bool__, false, [false; 2]) : none;
+            let $operand$9 = _optional_unwrap($operand$8);
+            let b = $operand$9;
             assert(b[0] == true);
             assert(b[1] == false);
-            let n = _optional_unwrap(_mapping_contains(complex.aleo::nested__, false) ? _mapping_get_or_use(complex.aleo::nested__, false, [[0u8; 2]; 2]) : none);
+            let $operand$10 = _mapping_contains(complex.aleo::nested__, false) ? _mapping_get_or_use(complex.aleo::nested__, false, [[0u8; 2]; 2]) : none;
+            let $operand$11 = _optional_unwrap($operand$10);
+            let n = $operand$11;
             assert(n[0][1] == 2u8);
             assert(n[1][0] == 3u8);
         };
     }
     fn check2() -> Final<Fn()> {
         return async {
-            let p = _optional_unwrap_or(_mapping_contains(complex.aleo::point__, false) ? _mapping_get_or_use(complex.aleo::point__, false, complex.aleo::Point { x: 0field, y: 0field }) : none, complex.aleo::Point { x: 0field, y: 0field });
+            let $operand$12 = _mapping_contains(complex.aleo::point__, false) ? _mapping_get_or_use(complex.aleo::point__, false, complex.aleo::Point { x: 0field, y: 0field }) : none;
+            let p = _optional_unwrap_or($operand$12, complex.aleo::Point { x: 0field, y: 0field });
             assert(p.x == 1field);
             assert(p.y == 2field);
-            let ps = _optional_unwrap_or(_mapping_contains(complex.aleo::points__, false) ? _mapping_get_or_use(complex.aleo::points__, false, [complex.aleo::Point { x: 0field, y: 0field }; 2]) : none, [complex.aleo::Point { x: 0field, y: 0field }, complex.aleo::Point { x: 0field, y: 0field }]);
+            let $operand$13 = _mapping_contains(complex.aleo::points__, false) ? _mapping_get_or_use(complex.aleo::points__, false, [complex.aleo::Point { x: 0field, y: 0field }; 2]) : none;
+            let ps = _optional_unwrap_or($operand$13, [complex.aleo::Point { x: 0field, y: 0field }, complex.aleo::Point { x: 0field, y: 0field }]);
             assert(ps[0].x == 10field);
             assert(ps[1].y == 40field);
-            let s = _optional_unwrap_or(_mapping_contains(complex.aleo::stats__, false) ? _mapping_get_or_use(complex.aleo::stats__, false, complex.aleo::Stats { values: [0u32; 3], active: false }) : none, complex.aleo::Stats { values: [0u32, 0u32, 0u32], active: false });
+            let $operand$14 = _mapping_contains(complex.aleo::stats__, false) ? _mapping_get_or_use(complex.aleo::stats__, false, complex.aleo::Stats { values: [0u32; 3], active: false }) : none;
+            let s = _optional_unwrap_or($operand$14, complex.aleo::Stats { values: [0u32, 0u32, 0u32], active: false });
             assert(s.values[2] == 15u32);
             assert(s.active == true);
-            let a = _optional_unwrap_or(_mapping_contains(complex.aleo::arr_u32__, false) ? _mapping_get_or_use(complex.aleo::arr_u32__, false, [0u32; 3]) : none, [0u32, 0u32, 0u32]);
+            let $operand$15 = _mapping_contains(complex.aleo::arr_u32__, false) ? _mapping_get_or_use(complex.aleo::arr_u32__, false, [0u32; 3]) : none;
+            let a = _optional_unwrap_or($operand$15, [0u32, 0u32, 0u32]);
             assert(a[1] == 8u32);
-            let b = _optional_unwrap_or(_mapping_contains(complex.aleo::arr_bool__, false) ? _mapping_get_or_use(complex.aleo::arr_bool__, false, [false; 2]) : none, [false, false]);
+            let $operand$16 = _mapping_contains(complex.aleo::arr_bool__, false) ? _mapping_get_or_use(complex.aleo::arr_bool__, false, [false; 2]) : none;
+            let b = _optional_unwrap_or($operand$16, [false, false]);
             assert(b[0] == true);
-            let n = _optional_unwrap_or(_mapping_contains(complex.aleo::nested__, false) ? _mapping_get_or_use(complex.aleo::nested__, false, [[0u8; 2]; 2]) : none, [[0u8, 0u8], [0u8, 0u8]]);
+            let $operand$17 = _mapping_contains(complex.aleo::nested__, false) ? _mapping_get_or_use(complex.aleo::nested__, false, [[0u8; 2]; 2]) : none;
+            let n = _optional_unwrap_or($operand$17, [[0u8, 0u8], [0u8, 0u8]]);
             assert(n[1][1] == 4u8);
         };
     }

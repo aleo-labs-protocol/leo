@@ -10,9 +10,9 @@ PROG="test_devnode_view.aleo"
 
 # Deploy the program carrying the `view fn` to the framework-managed devnode and
 # block until it is confirmed on-chain.
-$LEO_BIN deploy -y --disable-update-check --broadcast --network testnet \
+$LEO_BIN deploy -y --broadcast --network testnet \
     --endpoint $ENDPOINT --private-key $PRIVATE_KEY \
-    --consensus-heights 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17 >/dev/null 2>&1
+    --consensus-heights 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21 >/dev/null 2>&1
 
 # `get_balance` reads an empty mapping, so it returns the `0u64` default.
 echo "--- view at latest height ---"
@@ -45,9 +45,14 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
     "${ENDPOINT}/v2/testnet/program/${PROG}/view/does_not_exist" \
     -H 'Content-Type: application/json' -d "[\"${ADDR}\"]"
 
-echo "--- view before deployment height is rejected (400) ---"
+echo "--- historical view is rejected (400) ---"
 curl -s -o /dev/null -w "%{http_code}\n" -X POST \
     "${ENDPOINT}/v2/testnet/program/${PROG}/view/get_balance/1" \
+    -H 'Content-Type: application/json' -d "[\"${ADDR}\"]"
+
+echo "--- future view is rejected (400) ---"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+    "${ENDPOINT}/v2/testnet/program/${PROG}/view/get_balance/4294967295" \
     -H 'Content-Type: application/json' -d "[\"${ADDR}\"]"
 
 exit 0

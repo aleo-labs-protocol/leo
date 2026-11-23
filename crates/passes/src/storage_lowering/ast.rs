@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the Leo library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::StorageLoweringVisitor;
-use crate::expression_can_be_discarded;
+use super::{StorageLoweringVisitor, visitor::can_discard};
 
 use leo_ast::*;
 use leo_span::{Span, Symbol, sym};
@@ -29,34 +28,80 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
     }
 
     /* Types */
-    fn reconstruct_array_type(&mut self, input: ArrayType) -> (TypeKind, Self::AdditionalOutput) {
-        let (length, stmts) = self.reconstruct_expression(*input.length, &());
-        (
-            TypeKind::Array(ArrayType {
-                element_type: Box::new(self.reconstruct_type(*input.element_type).0),
-                length: Box::new(length),
-            }),
-            stmts,
-        )
-    }
-
-    fn reconstruct_composite_type(&mut self, input: CompositeType) -> (TypeKind, Self::AdditionalOutput) {
-        let mut statements = Vec::new();
-
-        let const_arguments = input
-            .const_arguments
-            .into_iter()
-            .map(|arg| {
-                let (expr, stmts) = self.reconstruct_expression(arg, &Default::default());
-                statements.extend(stmts);
-                expr
-            })
-            .collect();
-
-        (TypeKind::Composite(CompositeType { const_arguments, ..input }), statements)
+    fn reconstruct_type(&mut self, input: TypeKind) -> (TypeKind, Self::AdditionalOutput) {
+        // Type expressions are compile-time values and cannot contain storage operations.
+        (input, vec![])
     }
 
     /* Expressions */
+    fn reconstruct_expression(&mut self, input: Expression, additional: &()) -> (Expression, Self::AdditionalOutput) {
+        let span = input.span();
+        let must_evaluate = !matches!(&input, Expression::Async(_))
+            && !can_discard(&input, self.state, &mut self.source_discardability);
+        let original_type = must_evaluate.then(|| {
+            self.state.type_table.get(&input.id()).expect("Type checking assigns a type to effectful expressions.")
+        });
+
+        let (expression, mut statements) = self.default_reconstruct_expression(input, additional);
+
+        let Some(type_) = original_type else {
+            return (expression, statements);
+        };
+        self.state.type_table.insert(expression.id(), type_);
+        if can_discard(&expression, self.state, &mut self.lowered_discardability) {
+            return (expression, statements);
+        }
+        let type_kind = self.state.types.resolve(type_);
+
+        if matches!(&type_kind, TypeKind::Unit) {
+            if matches!(&expression, Expression::Call(_) | Expression::DynamicOp(_) | Expression::Intrinsic(_)) {
+                statements.push(ExpressionStatement { expression, span, id: self.state.node_builder.next_id() }.into());
+            }
+            let unit = UnitExpression { span, id: self.state.node_builder.next_id() };
+            self.state.type_table.insert(unit.id, type_);
+            return (unit.into(), statements);
+        }
+
+        // Future bindings are tracked individually and cannot acquire an extra alias.
+        let contains_future = matches!(&type_kind, TypeKind::Future(_))
+            || matches!(&type_kind, TypeKind::Tuple(tuple) if tuple.elements().iter().any(|ty| matches!(ty, TypeKind::Future(_))));
+        if contains_future || matches!(&type_kind, TypeKind::Mapping(_) | TypeKind::Vector(_) | TypeKind::Err) {
+            return (expression, statements);
+        }
+
+        // Complete this operand before a later operand can emit statements that change storage.
+        let name = self.state.assigner.unique_symbol("$operand", "$");
+        let identifier = Identifier { name, span, id: self.state.node_builder.next_id() };
+        self.state.type_table.insert(identifier.id, type_);
+        // Dynamic record fields require an expected type when type checking runs again.
+        let needs_expected_type = matches!(&expression, Expression::MemberAccess(access)
+            if self.state.type_table.get(&access.inner.id())
+                .is_some_and(|ty| matches!(self.state.types.resolve(ty), TypeKind::DynRecord)));
+        let expression = if needs_expected_type {
+            let cast = CastExpression {
+                expression,
+                type_: TypeNode::new(&self.state.types, type_kind, span),
+                span,
+                id: self.state.node_builder.next_id(),
+            };
+            self.state.type_table.insert(cast.id, type_);
+            cast.into()
+        } else {
+            expression
+        };
+        statements.push(
+            DefinitionStatement {
+                place: DefinitionPlace::Single(identifier),
+                type_: None,
+                value: expression,
+                span,
+                id: self.state.node_builder.next_id(),
+            }
+            .into(),
+        );
+        (Path::from(identifier).to_local().into(), statements)
+    }
+
     fn reconstruct_array_access(
         &mut self,
         mut input: ArrayAccess,
@@ -95,43 +140,7 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
                     panic!("Vector::push can only be called with `Expression::Path`");
                 };
 
-                let value_type = self
-                    .state
-                    .type_table
-                    .get(&value_expr.id())
-                    .expect("type checking should assign a type to the pushed value");
-                let value_must_be_evaluated_first = !expression_can_be_discarded(value_expr, self.state);
-                let (value, mut stmts) = self.reconstruct_expression(value_expr.clone(), &());
-                self.state.type_table.insert(value.id(), value_type);
-
-                // Input:
-                //   Vector::push(v, value)
-                //
-                // Lowered reconstruction:
-                //   let $push_value = value; // if the value cannot be discarded
-                //   let $len_var = Mapping::get_or_use(len_map, false, 0u32);
-                //   Mapping::set(len_map, false, $len_var + 1);
-                //   Mapping::set(vec_map, $len_var, value or $push_value);
-                //
-                // If the pushed value cannot be discarded, bind it before mutating
-                // vector length so source argument evaluation order is preserved.
-                let value = if value_must_be_evaluated_first {
-                    let value_var_sym = self.state.assigner.unique_symbol("$push_value", "$");
-                    let value_var_ident = Identifier {
-                        name: value_var_sym,
-                        span: Default::default(),
-                        id: self.state.node_builder.next_id(),
-                    };
-                    self.state.type_table.insert(value_var_ident.id, value_type);
-                    stmts.push(self.state.assigner.simple_definition(
-                        value_var_ident,
-                        value,
-                        self.state.node_builder.next_id(),
-                    ));
-                    value_var_ident.into()
-                } else {
-                    value
-                };
+                let (value, stmts) = self.reconstruct_expression(std::mem::take(value_expr), &());
 
                 // Reconstruct the backing mappings.
                 let (vec_path_expr, len_path_expr) = self.generate_vector_mapping_exprs(path_to_vector);
@@ -306,32 +315,7 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
                 };
 
                 // Reconstruct key/index.
-                let key_type = self
-                    .state
-                    .type_table
-                    .get(&key_expr.id())
-                    .expect("type checking should assign a type to the vector index");
-                let key_must_be_evaluated_once = !expression_can_be_discarded(key_expr, self.state);
-                let (reconstructed_key_expr, mut key_stmts) =
-                    self.reconstruct_expression(key_expr.clone(), &Default::default());
-                self.state.type_table.insert(reconstructed_key_expr.id(), key_type);
-                let reconstructed_key_expr = if key_must_be_evaluated_once {
-                    let key_var_sym = self.state.assigner.unique_symbol("$index", "$");
-                    let key_var_ident = Identifier {
-                        name: key_var_sym,
-                        span: Default::default(),
-                        id: self.state.node_builder.next_id(),
-                    };
-                    self.state.type_table.insert(key_var_ident.id, key_type);
-                    key_stmts.push(self.state.assigner.simple_definition(
-                        key_var_ident,
-                        reconstructed_key_expr,
-                        self.state.node_builder.next_id(),
-                    ));
-                    key_var_ident.into()
-                } else {
-                    reconstructed_key_expr
-                };
+                let (reconstructed_key_expr, key_stmts) = self.reconstruct_expression(std::mem::take(key_expr), &());
 
                 // Input:
                 //   Get(v, index)
@@ -392,34 +376,9 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
                 };
 
                 // Reconstruct key/index.
-                let key_type = self
-                    .state
-                    .type_table
-                    .get(&index_expr.id())
-                    .expect("type checking should assign a type to the vector index");
-                let key_must_be_evaluated_once = !expression_can_be_discarded(index_expr, self.state);
-                let (reconstructed_key_expr, mut key_stmts) =
-                    self.reconstruct_expression(index_expr.clone(), &Default::default());
-                self.state.type_table.insert(reconstructed_key_expr.id(), key_type);
-                let reconstructed_key_expr = if key_must_be_evaluated_once {
-                    let key_var_sym = self.state.assigner.unique_symbol("$index", "$");
-                    let key_var_ident = Identifier {
-                        name: key_var_sym,
-                        span: Default::default(),
-                        id: self.state.node_builder.next_id(),
-                    };
-                    self.state.type_table.insert(key_var_ident.id, key_type);
-                    key_stmts.push(self.state.assigner.simple_definition(
-                        key_var_ident,
-                        reconstructed_key_expr,
-                        self.state.node_builder.next_id(),
-                    ));
-                    key_var_ident.into()
-                } else {
-                    reconstructed_key_expr
-                };
+                let (reconstructed_key_expr, key_stmts) = self.reconstruct_expression(std::mem::take(index_expr), &());
                 let (reconstructed_value_expr, value_stmts) =
-                    self.reconstruct_expression(value_expr.clone(), &Default::default());
+                    self.reconstruct_expression(std::mem::take(value_expr), &());
 
                 // Input:
                 //   Set(v, index, value)
@@ -520,32 +479,8 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
                 };
 
                 // Reconstruct index.
-                let index_type = self
-                    .state
-                    .type_table
-                    .get(&index_expr.id())
-                    .expect("type checking should assign a type to the vector index");
-                let index_must_be_evaluated_once = !expression_can_be_discarded(index_expr, self.state);
-                let (reconstructed_index_expr, mut index_stmts) =
-                    self.reconstruct_expression(index_expr.clone(), &Default::default());
-                self.state.type_table.insert(reconstructed_index_expr.id(), index_type);
-                let reconstructed_index_expr = if index_must_be_evaluated_once {
-                    let index_var_sym = self.state.assigner.unique_symbol("$index", "$");
-                    let index_var_ident = Identifier {
-                        name: index_var_sym,
-                        span: Default::default(),
-                        id: self.state.node_builder.next_id(),
-                    };
-                    self.state.type_table.insert(index_var_ident.id, index_type);
-                    index_stmts.push(self.state.assigner.simple_definition(
-                        index_var_ident,
-                        reconstructed_index_expr,
-                        self.state.node_builder.next_id(),
-                    ));
-                    index_var_ident.into()
-                } else {
-                    reconstructed_index_expr
-                };
+                let (reconstructed_index_expr, index_stmts) =
+                    self.reconstruct_expression(std::mem::take(index_expr), &());
 
                 // Input:
                 //   Vector::swap_remove(v, index)
@@ -736,6 +671,12 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
         // Merge side effects
         stmts_left.append(&mut stmts_right);
 
+        if matches!((&input.left, &input.right), (Expression::Unit(_), Expression::Unit(_)))
+            && matches!(input.op, BinaryOperation::Eq | BinaryOperation::Neq)
+        {
+            return (Literal::boolean(input.op == BinaryOperation::Eq, input.span, input.id).into(), stmts_left);
+        }
+
         (input.into(), stmts_left)
     }
 
@@ -884,37 +825,23 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
     ) -> (Expression, Self::AdditionalOutput) {
         let (condition, mut statements) = self.reconstruct_expression(input.condition, &());
 
-        // Mutation guards may clone only atoms. Defer a local binding for every
-        // other condition, and emit it only if an arm contains a lowered pop.
-        let condition_is_atom = matches!(condition, Expression::Path(_) | Expression::Literal(_));
-        let (guard_condition, guarded_condition, condition_binding) = if condition_is_atom {
-            (condition.clone(), condition.clone(), None)
-        } else {
-            let identifier = Identifier {
-                name: self.state.assigner.unique_symbol("$ternary_condition", "$"),
-                span: condition.span(),
-                id: self.state.node_builder.next_id(),
-            };
-            let path: Expression = identifier.into();
-            let binding =
-                self.state.assigner.simple_definition(identifier, condition.clone(), self.state.node_builder.next_id());
-            (path.clone(), path, Some(binding))
-        };
-
-        self.ternary_guards.push(super::TernaryGuard { condition: guard_condition, selects_true: true, used: false });
+        self.ternary_guards.push(super::TernaryGuard { condition, selects_true: true, binding: None });
         let (if_true, true_statements) = self.reconstruct_expression(input.if_true, &());
 
         self.ternary_guards.last_mut().expect("the current ternary guard must exist").selects_true = false;
         let (if_false, false_statements) = self.reconstruct_expression(input.if_false, &());
 
         let guard = self.ternary_guards.pop().expect("the current ternary guard must exist");
-        let condition = if guard.used {
-            if let Some(binding) = condition_binding {
-                statements.push(binding);
-            }
-            guarded_condition
+        // Evaluate a shared condition before either arm can change storage.
+        let condition = if let Some(identifier) = guard.binding {
+            statements.push(self.state.assigner.simple_definition(
+                identifier,
+                guard.condition,
+                self.state.node_builder.next_id(),
+            ));
+            identifier.into()
         } else {
-            condition
+            guard.condition
         };
 
         statements.extend(true_statements);
@@ -1091,9 +1018,15 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
         let (then, statements2) = self.reconstruct_block(input.then);
         statements.extend(statements2);
         let otherwise = input.otherwise.map(|oth| {
-            let (expr, statements3) = self.reconstruct_statement(*oth);
-            statements.extend(statements3);
-            Box::new(expr)
+            let (stmt, mut statements3) = self.reconstruct_statement(*oth);
+            if statements3.is_empty() {
+                Box::new(stmt)
+            } else {
+                // Else-if condition statements must stay inside the outer else branch.
+                let span = statements3[0].span() + stmt.span();
+                statements3.push(stmt);
+                Box::new(Block { statements: statements3, span, id: self.state.node_builder.next_id() }.into())
+            }
         });
         (ConditionalStatement { condition, then, otherwise, ..input }.into(), statements)
     }
@@ -1119,11 +1052,11 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
     }
 
     fn reconstruct_expression_statement(&mut self, input: ExpressionStatement) -> (Statement, Self::AdditionalOutput) {
-        let keep_expression = !expression_can_be_discarded(&input.expression, self.state);
+        let keep_expression = !can_discard(&input.expression, self.state, &mut self.source_discardability);
         let (reconstructed_expression, statements) = self.reconstruct_expression(input.expression, &Default::default());
         let legal_expression_statement = matches!(
             reconstructed_expression,
-            Expression::Call(_) | Expression::DynamicOp(_) | Expression::Intrinsic(_)
+            Expression::Call(_) | Expression::DynamicOp(_) | Expression::Intrinsic(_) | Expression::Unit(_)
         );
         if !legal_expression_statement && !keep_expression {
             (

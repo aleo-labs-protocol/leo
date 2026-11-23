@@ -9,7 +9,7 @@ toc_max_heading_level: 3
 snarkVM imposes the following limits on Aleo programs:
 
 - the maximum size of the compiled program is **2048 KB** by character count. This limit is raised by consensus version: 100 KB (V1), 512 KB (V14), and 2048 KB (V16).
-- the maximum number of mappings is **31**. Each `storage` singleton uses one mapping slot, and each `storage` vector uses two. Storage declarations share this limit with explicit `mapping` declarations.
+- the maximum number of mappings is **128** from consensus version V22. The limit is **31** for earlier consensus versions. Each `storage` singleton uses one mapping slot, and each `storage` vector uses two. Storage declarations share this limit with explicit `mapping` declarations.
 - the maximum number of imports is **64**.
 - the maximum length of a program name is **30 characters** (excluding the `.aleo` suffix). Identifiers (including struct, record, mapping, and function names) are limited to **31 ASCII alphanumeric or underscore characters** by the Aleo identifier rules.
 - the maximum import depth is **64**.

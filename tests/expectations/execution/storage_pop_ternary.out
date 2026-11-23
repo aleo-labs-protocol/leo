@@ -323,6 +323,17 @@ finalize nested_unselected:
     get.or_use nested__len__[false] 0u32 into r22;
     is.eq r22 1u32 into r23;
     assert.eq r23 true;
+    get.or_use nested__len__[false] 0u32 into r24;
+    gt r24 0u32 into r25;
+    sub.w r24 1u32 into r26;
+    ternary r25 r26 r24 into r27;
+    set r27 into nested__len__[false];
+    get.or_use nested__[r26] 0u32 into r28;
+    ternary r25 r28 0u32 into r29;
+    cast r25 r29 into r30 as Optional__JzunLORyB8U;
+    assert.eq r30.is_some true;
+    is.eq r30.val 5u32 into r31;
+    assert.eq r31 true;
 
 function nested_selected:
     input r0 as boolean.public;
@@ -471,28 +482,28 @@ finalize both_arms_true:
     branch.eq true true to end_otherwise_0_1;
     position end_then_0_0;
     position end_otherwise_0_1;
-    get.or_use both_true_values__len__[false] 0u32 into r9;
-    not r0 into r10;
-    branch.eq r10 false to end_then_0_2;
-    gt r9 0u32 into r11;
-    sub.w r9 1u32 into r12;
-    ternary r11 r12 r9 into r13;
-    set r13 into both_true_values__len__[false];
+    gt r5 0u32 into r9;
+    sub.w r5 1u32 into r10;
+    get.or_use both_true_values__[r10] 0u32 into r11;
+    ternary r9 r11 0u32 into r12;
+    cast r9 r12 into r13 as Optional__JzunLORyB8U;
+    get.or_use both_true_values__len__[false] 0u32 into r14;
+    not r0 into r15;
+    branch.eq r15 false to end_then_0_2;
+    gt r14 0u32 into r16;
+    sub.w r14 1u32 into r17;
+    ternary r16 r17 r14 into r18;
+    set r18 into both_true_values__len__[false];
     branch.eq true true to end_otherwise_0_3;
     position end_then_0_2;
     position end_otherwise_0_3;
-    gt r5 0u32 into r14;
-    sub.w r5 1u32 into r15;
-    get.or_use both_true_values__[r15] 0u32 into r16;
-    ternary r14 r16 0u32 into r17;
-    cast r14 r17 into r18 as Optional__JzunLORyB8U;
-    gt r9 0u32 into r19;
-    sub.w r9 1u32 into r20;
+    gt r14 0u32 into r19;
+    sub.w r14 1u32 into r20;
     get.or_use both_true_values__[r20] 0u32 into r21;
     ternary r19 r21 0u32 into r22;
     cast r19 r22 into r23 as Optional__JzunLORyB8U;
-    ternary r0 r18.is_some r23.is_some into r24;
-    ternary r0 r18.val r23.val into r25;
+    ternary r0 r13.is_some r23.is_some into r24;
+    ternary r0 r13.val r23.val into r25;
     cast r24 r25 into r26 as Optional__JzunLORyB8U;
     cast false 0u32 into r27 as Optional__JzunLORyB8U;
     is.neq r26 r27 into r28;
@@ -528,28 +539,28 @@ finalize both_arms_false:
     branch.eq true true to end_otherwise_0_1;
     position end_then_0_0;
     position end_otherwise_0_1;
-    get.or_use both_false_values__len__[false] 0u32 into r9;
-    not r0 into r10;
-    branch.eq r10 false to end_then_0_2;
-    gt r9 0u32 into r11;
-    sub.w r9 1u32 into r12;
-    ternary r11 r12 r9 into r13;
-    set r13 into both_false_values__len__[false];
+    gt r5 0u32 into r9;
+    sub.w r5 1u32 into r10;
+    get.or_use both_false_values__[r10] 0u32 into r11;
+    ternary r9 r11 0u32 into r12;
+    cast r9 r12 into r13 as Optional__JzunLORyB8U;
+    get.or_use both_false_values__len__[false] 0u32 into r14;
+    not r0 into r15;
+    branch.eq r15 false to end_then_0_2;
+    gt r14 0u32 into r16;
+    sub.w r14 1u32 into r17;
+    ternary r16 r17 r14 into r18;
+    set r18 into both_false_values__len__[false];
     branch.eq true true to end_otherwise_0_3;
     position end_then_0_2;
     position end_otherwise_0_3;
-    gt r5 0u32 into r14;
-    sub.w r5 1u32 into r15;
-    get.or_use both_false_values__[r15] 0u32 into r16;
-    ternary r14 r16 0u32 into r17;
-    cast r14 r17 into r18 as Optional__JzunLORyB8U;
-    gt r9 0u32 into r19;
-    sub.w r9 1u32 into r20;
+    gt r14 0u32 into r19;
+    sub.w r14 1u32 into r20;
     get.or_use both_false_values__[r20] 0u32 into r21;
     ternary r19 r21 0u32 into r22;
     cast r19 r22 into r23 as Optional__JzunLORyB8U;
-    ternary r0 r18.is_some r23.is_some into r24;
-    ternary r0 r18.val r23.val into r25;
+    ternary r0 r13.is_some r23.is_some into r24;
+    ternary r0 r13.val r23.val into r25;
     cast r24 r25 into r26 as Optional__JzunLORyB8U;
     cast false 0u32 into r27 as Optional__JzunLORyB8U;
     is.neq r26 r27 into r28;
@@ -606,51 +617,21 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1vmmpnfjlku0vfp35lqkxjw7q796mfrrzj4lks2enwng7vgdztygstutq03",
+      "id": "au1c5em3gxvj30r0w0y292pc0kcjh33wf7ew083uaqk9xzl0fvrluysyfunvk",
       "program": "storage_pop_ternary.aleo",
       "function": "true_arm_unselected",
       "inputs": [
         {
           "type": "public",
-          "id": "3589673701555257345563095101997194284302629830078550798024968582699969569457field",
+          "id": "207268734276776659224749578018720584281386003840745082818925210716663679906field",
           "value": "false"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "7858674912787746794580598585678817390949957573141700820780522426386227494771field",
+          "id": "6880455336516465245210735331231614862822382685366272830373580565099379215450field",
           "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: true_arm_unselected,\n  arguments: [\n    false\n  ]\n}"
-        }
-      ],
-      "tpk": "932902105444239517980596565691908870668917795454138192289088332646102103453group",
-      "tcm": "4534045528378062984919568849257618109414740950022974037600860386185923697801field",
-      "scm": "919245366506739687912770902847963156737622134026017456623407014687413152843field"
-    }
-  ],
-  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
-}
-
-verified: true
-status: accepted
-{
-  "transitions": [
-    {
-      "id": "au1czsweqrhhhuy08pyc8054smye7wt8rmnmxkxscn6zljk2pa35czswslrp0",
-      "program": "storage_pop_ternary.aleo",
-      "function": "true_arm_selected",
-      "inputs": [
-        {
-          "type": "public",
-          "id": "7240746722439637678325687259139458182149195200370036847908961652073634973182field",
-          "value": "true"
-        }
-      ],
-      "outputs": [
-        {
-          "type": "future",
-          "id": "2422217080169170565804157381367661190879166742273698790085969644005155864245field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: true_arm_selected,\n  arguments: [\n    true\n  ]\n}"
         }
       ],
       "tpk": "4435182414136183130262225239916202916754973933386625330210643288715243337617group",
@@ -666,21 +647,21 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1t9cvjzuxfn9fsva7wu8tnw6apegklqwv2es9cup30r5s2rkw9ygs92qu5m",
+      "id": "au1232vuxthycy3a5aymk7x774m8tzchlzdfx75hxza5xpq3j0vau9s80v94s",
       "program": "storage_pop_ternary.aleo",
-      "function": "false_arm_unselected",
+      "function": "true_arm_selected",
       "inputs": [
         {
           "type": "public",
-          "id": "8301673178003353313050143590325888057179788235370688668260001619462089845972field",
+          "id": "3859386827006777932503620236693456720747134290124118486149587919538051880170field",
           "value": "true"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "6566413050416293332405783178557456795489656744511425437318701382219686867407field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: false_arm_unselected,\n  arguments: [\n    true\n  ]\n}"
+          "id": "1919570283394840974286610472625467565658147557412622153218119686340442431093field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: true_arm_selected,\n  arguments: [\n    true\n  ]\n}"
         }
       ],
       "tpk": "2522887999940374826698654126645535027810075514268095352773581615775304946572group",
@@ -696,21 +677,21 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1ewf45vj4ss8mhl2qchj23vmakdxs6dpl709l2cw4akucpzxftyrs6le3e5",
+      "id": "au1tldkvn6846wmvrf4gt5lewgau2w9f4dlxvc3uzx9hfw8t4pe4vgs9jy4n0",
       "program": "storage_pop_ternary.aleo",
-      "function": "false_arm_selected",
+      "function": "false_arm_unselected",
       "inputs": [
         {
           "type": "public",
-          "id": "7769214794172638524523449763060843239616594219938743394067388371073699284502field",
-          "value": "false"
+          "id": "7619854683174972939288504677476691293689845940388883733547040738492220786913field",
+          "value": "true"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "5078286307343463874498203806333315525215011796133927575956919017942454564848field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: false_arm_selected,\n  arguments: [\n    false\n  ]\n}"
+          "id": "2017318051177166806366899894297610854039508340596796211013202641991574726276field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: false_arm_unselected,\n  arguments: [\n    true\n  ]\n}"
         }
       ],
       "tpk": "6060197335674172363144850410502281312781694387277365216513387164100734934168group",
@@ -726,21 +707,21 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1mcns36wrurkx90npzewtuhs3cc3crwwnns0g8hchkds5pwvws5xsr34cj6",
+      "id": "au12mgsatlrmh2fntqqpscsjyasp69glfzp8tcwwxg4vs6338363cysq6l55s",
       "program": "storage_pop_ternary.aleo",
-      "function": "assigned_unselected",
+      "function": "false_arm_selected",
       "inputs": [
         {
           "type": "public",
-          "id": "1046242308658211179846110990966362565713999171878710476721347644821303849974field",
+          "id": "8731814182781347412117259065677923930414021497419728199039005057883424862field",
           "value": "false"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "1731041873872109596386232320528297383302413187409260253880114579188205296768field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: assigned_unselected,\n  arguments: [\n    false\n  ]\n}"
+          "id": "776440200240018745331055484955745822702112390772466605002807394319585147556field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: false_arm_selected,\n  arguments: [\n    false\n  ]\n}"
         }
       ],
       "tpk": "5501575527267754697309838948653136094413849704757357265871953615905434807714group",
@@ -756,26 +737,21 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1a06f2zhtmx8kyrn0m9a7ejwzhtyhqfmj32zt84tgk8qx39n755zss9ul6e",
+      "id": "au17mtrvxa5xfpppnj9l79uyuy7aa6s06vd2ll9dwh0a23c028cfy9s3nr8vr",
       "program": "storage_pop_ternary.aleo",
-      "function": "nested_unselected",
+      "function": "assigned_unselected",
       "inputs": [
         {
           "type": "public",
-          "id": "7944143169895638434603821106136339117669383291442608887271812097526599038962field",
-          "value": "true"
-        },
-        {
-          "type": "public",
-          "id": "7956636626366707118150781099993506336912487411487205000641594400004758037318field",
+          "id": "4041416165879622561075233566381083239950784424003026233271886052624915689823field",
           "value": "false"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "3500641953038135978508600489829023235881590803798231374385061628612696808294field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: nested_unselected,\n  arguments: [\n    true,\n    false\n  ]\n}"
+          "id": "1157122625680811305105731956892958164953259145251764029844291142345547652094field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: assigned_unselected,\n  arguments: [\n    false\n  ]\n}"
         }
       ],
       "tpk": "3532762458625321599141060623467596614319941243060133069432406976651174585051group",
@@ -791,26 +767,26 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1dxyj427xxu8mnhtz6juywcps7k2t2typjqdrkcmna7d23agk75rs8mlj9t",
+      "id": "au1fahvxerq60alga05xdragac66zgx9tuw3l7cz2tw60k3p0ljxuzs38n8lr",
       "program": "storage_pop_ternary.aleo",
-      "function": "nested_selected",
+      "function": "nested_unselected",
       "inputs": [
         {
           "type": "public",
-          "id": "4675369087834537129759943974103167828445966984058473324115280119411761884526field",
+          "id": "6661074591431028013726474553885948665670434729302497017338562663774890440783field",
           "value": "true"
         },
         {
           "type": "public",
-          "id": "2218634092514811300964807614203832934353921324421029632042034171170044972271field",
-          "value": "true"
+          "id": "4961355304038067423119859033974482328507259965686483832564602423352157227941field",
+          "value": "false"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "7137141536339459105402736669193180284588541795979506872839460032397063150204field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: nested_selected,\n  arguments: [\n    true,\n    true\n  ]\n}"
+          "id": "3494203232262951325803831304042903450227967227562737913998959956238960109119field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: nested_unselected,\n  arguments: [\n    true,\n    false\n  ]\n}"
         }
       ],
       "tpk": "2957572463448044047572302283090774174789875296427157043680251670334182136991group",
@@ -826,26 +802,26 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1q9x6c8se22rxcm80ntjc5r3jwwvlr9lau64sxyqyk4pdwcdzcqysh8rrpu",
+      "id": "au1yf6pkdjxalv4zkk5tr3svtj8htcpqdnr79cj9zhx2hpuhypr9srqldwcav",
       "program": "storage_pop_ternary.aleo",
-      "function": "compound_unselected",
+      "function": "nested_unselected",
       "inputs": [
         {
           "type": "public",
-          "id": "2226188877660109926672305397837630796777361484463708273122664619566603528088field",
-          "value": "true"
+          "id": "4890755779699862289477484217363397979179677207754130144725124352728818085068field",
+          "value": "false"
         },
         {
           "type": "public",
-          "id": "6892980900141757405166872885909237444097490568086996795380722481293470105307field",
-          "value": "false"
+          "id": "4146294153554431532968218415349729217691724544738059362173284087737763678080field",
+          "value": "true"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "6989212586630992641608643121216621513136614058530975701577475542710568676995field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: compound_unselected,\n  arguments: [\n    true,\n    false\n  ]\n}"
+          "id": "5476158455237608575399662092303659968430525180084211539114370297080695640437field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: nested_unselected,\n  arguments: [\n    false,\n    true\n  ]\n}"
         }
       ],
       "tpk": "618463892478179654488510729354955405387729702799953179470949795558026296286group",
@@ -861,26 +837,26 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au15qnlm7vsvaeg732n2mea7n0r5zk7uy3htsq8uxsnypw3nhagjqrqzsucrj",
+      "id": "au1c4dhzhkye0lmsg2qvu6kuprajanfpe3l6zaxapx266t97n85zcxqy8x6uu",
       "program": "storage_pop_ternary.aleo",
-      "function": "compound_selected",
+      "function": "nested_selected",
       "inputs": [
         {
           "type": "public",
-          "id": "5149378771811452198839315106420971094515357034700234562992206800524314909006field",
+          "id": "3845261378265014459669295291737693865400066432829443473632345300015981203387field",
           "value": "true"
         },
         {
           "type": "public",
-          "id": "4978000171508941130970730039179322913674931520583059104625417791318440565507field",
+          "id": "5704989594740677859368485125965309880816148483890435573929309131671316047885field",
           "value": "true"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "577068131236903044511719519289663572734141069547837141378598620723762316159field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: compound_selected,\n  arguments: [\n    true,\n    true\n  ]\n}"
+          "id": "2669333171884328413030716608043025922207307459281975413760982428448994292518field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: nested_selected,\n  arguments: [\n    true,\n    true\n  ]\n}"
         }
       ],
       "tpk": "815195102424593916417374359141594621217445601249218084764368770401727960483group",
@@ -896,21 +872,26 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au1mrv2yrhan44q9n747p62cxshkx7n53y9zq03d4el6knx5sv3d5qq9uqe08",
+      "id": "au1yc6lhnq26794jwsuc04dt2skd2039lstys0chcxesk9025wfdyqq255jm0",
       "program": "storage_pop_ternary.aleo",
-      "function": "both_arms_true",
+      "function": "compound_unselected",
       "inputs": [
         {
           "type": "public",
-          "id": "1688576455175431369665777655338052122220943076643162694146107613172119871520field",
+          "id": "224644888742213701668599533112242944008437718374230165991063846660114160732field",
           "value": "true"
+        },
+        {
+          "type": "public",
+          "id": "2804312832158064778248261590961490331065155640867368747790322529825898450993field",
+          "value": "false"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "1286090724686341388279527345350764943121834578559613047319847217889317310118field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: both_arms_true,\n  arguments: [\n    true\n  ]\n}"
+          "id": "342104603938729195980658727680311209886325989837538559980569317644466755546field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: compound_unselected,\n  arguments: [\n    true,\n    false\n  ]\n}"
         }
       ],
       "tpk": "1840734069774437336303859017107059874530126541826241844766981313183875927427group",
@@ -926,21 +907,26 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au16gpg3vd5506rjvq399ssaxmx6vmev6k4z8hjqavgsqy5rfqsuqqsgtxggs",
+      "id": "au1rwh60935sehn3a8jg4ncuykzpg767m7ufl6dh7y84qwylv6grq8q0tdp9z",
       "program": "storage_pop_ternary.aleo",
-      "function": "both_arms_false",
+      "function": "compound_selected",
       "inputs": [
         {
           "type": "public",
-          "id": "7015076428714669695065384475762665261507057768590564002744698905978857978539field",
-          "value": "false"
+          "id": "2368852607925405481884263906705884902380762943635544065262548611938128978146field",
+          "value": "true"
+        },
+        {
+          "type": "public",
+          "id": "6562279670455853620067646096257055657902831882239819839569377169190841522747field",
+          "value": "true"
         }
       ],
       "outputs": [
         {
           "type": "future",
-          "id": "3259910270499262006861132310611962617364713752107643913083047107618281869849field",
-          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: both_arms_false,\n  arguments: [\n    false\n  ]\n}"
+          "id": "243974056522584536414126272186639996102243893983343330781413366638540697571field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: compound_selected,\n  arguments: [\n    true,\n    true\n  ]\n}"
         }
       ],
       "tpk": "2440227808615340645458179933697758138179922691379505188448300109721058878490group",
@@ -956,20 +942,80 @@ status: accepted
 {
   "transitions": [
     {
-      "id": "au14sr0x7zpy6f3hs6megcwth0crl36vvprwjk3gdzenrrz7qqgxy9q87uzmy",
+      "id": "au1dtgg35973rpa95mqdzjg9rs6gnpck4w4k6mzg9nzjvwl4yeu05pqtj56sy",
+      "program": "storage_pop_ternary.aleo",
+      "function": "both_arms_true",
+      "inputs": [
+        {
+          "type": "public",
+          "id": "4632870607867096168321275855288148036068933926240458513959985810643295028062field",
+          "value": "true"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "1663843975185118551384999072436029069960467178742530700979212578087474935050field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: both_arms_true,\n  arguments: [\n    true\n  ]\n}"
+        }
+      ],
+      "tpk": "6822335999978356100096059160772378944179246039890542848433588542952823032899group",
+      "tcm": "225618476894668468352873883900864111981843674381294408154300483387859279595field",
+      "scm": "2867993782276871861185762922534819447091407417371492310490821659514729280356field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1ek0xwkr9srrzdk9c76mcxvxvrhln9mt4kff50ynca9gen2jdfggsgf4mpa",
+      "program": "storage_pop_ternary.aleo",
+      "function": "both_arms_false",
+      "inputs": [
+        {
+          "type": "public",
+          "id": "3004783454072456398275251316486507756691782856249906724473747531431962294689field",
+          "value": "false"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "future",
+          "id": "4080946583282443030965497841949776126011840928305371731279485637275712271720field",
+          "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: both_arms_false,\n  arguments: [\n    false\n  ]\n}"
+        }
+      ],
+      "tpk": "5076676692049719646314300039534293474564764806617591723378469916714630655755group",
+      "tcm": "310857540324787481132691748755511249980208485890316718067914150620572637233field",
+      "scm": "4194777983380521480064793184704845341456990467908419599636848539492635175161field"
+    }
+  ],
+  "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"
+}
+
+verified: true
+status: accepted
+{
+  "transitions": [
+    {
+      "id": "au1dy945j3pj6nreleppl955vms8fxf7ftlgywyytg6g2udykl0dvyqqvyc3j",
       "program": "storage_pop_ternary.aleo",
       "function": "condition_uses_pre_pop_len",
       "inputs": [],
       "outputs": [
         {
           "type": "future",
-          "id": "6831264164756006605650171707696388058653514971732163375605657430583847797181field",
+          "id": "5512597130022048386681111326293041077814493646435961643808723274038410969642field",
           "value": "{\n  program_id: storage_pop_ternary.aleo,\n  function_name: condition_uses_pre_pop_len,\n  arguments: []\n}"
         }
       ],
-      "tpk": "6822335999978356100096059160772378944179246039890542848433588542952823032899group",
-      "tcm": "225618476894668468352873883900864111981843674381294408154300483387859279595field",
-      "scm": "2867993782276871861185762922534819447091407417371492310490821659514729280356field"
+      "tpk": "6010375596767646673932747567595904581614950663192802276972813220764135503268group",
+      "tcm": "3334523337390873592620229641864396025742256285343573551448196946378196482991field",
+      "scm": "2816443339956465524454349154543318034754815403973917500457450987779091432868field"
     }
   ],
   "global_state_root": "sr1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gk0xu"

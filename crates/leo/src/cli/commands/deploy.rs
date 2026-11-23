@@ -39,11 +39,13 @@ use snarkvm::{
         ProgramID,
         ProgramOwner,
         Rng,
+        Stack,
         TestnetV0,
         ToBytes,
         Transaction,
         VM,
         VerifyingKey,
+        check_program_plaintext_sizes,
         deployment_cost,
         execution_cost_for_authorization,
         minimum_cost_in_microcredits_v1,
@@ -86,6 +88,12 @@ pub struct LeoDeploy {
     pub(crate) rename: Option<String>,
     #[clap(flatten)]
     pub(crate) build_options: BuildOptions,
+    #[clap(
+        long,
+        value_name = "DIR",
+        help = "Directory containing local .aleo imports when --path points to an Aleo bytecode file; other imports are fetched from the network"
+    )]
+    pub(crate) imports_dir: Option<PathBuf>,
     #[clap(long, help = "Use placeholder certificate and verifying keys during deployment.", default_value = "false")]
     pub(crate) skip_deploy_certificate: bool,
 }
@@ -129,6 +137,34 @@ impl Command for LeoDeploy {
     }
 
     fn prelude(&self, context: Context) -> Result<Self::Input> {
+        let path = context.dir()?;
+        if path.extension().and_then(|extension| extension.to_str()) == Some("aleo") {
+            if context.package_filter.is_some() {
+                return Err(crate::errors::custom("`--package` cannot be used with an Aleo bytecode file.").into());
+            }
+            if self.rename.is_some() {
+                return Err(crate::errors::custom("`--rename` is not supported when deploying Aleo bytecode.").into());
+            }
+            let home_path = context.home()?;
+            let network = get_network(&self.env_override.network)?;
+            let endpoint = get_endpoint(&self.env_override.endpoint)?;
+            return Package::from_aleo_file(
+                path,
+                home_path,
+                self.imports_dir.as_deref(),
+                true,
+                self.build_options.no_local,
+                Some(network),
+                Some(&endpoint),
+                self.env_override.network_retries,
+            );
+        }
+        if self.imports_dir.is_some() {
+            return Err(
+                crate::errors::custom("`--imports-dir` requires `--path` to point to an Aleo bytecode file.").into()
+            );
+        }
+
         LeoBuild {
             env_override: self.env_override.clone(),
             options: {
@@ -169,7 +205,15 @@ impl Command for LeoDeploy {
 
     fn execute(self, context: Context) -> Result<Self::Output> {
         // Intercept workspace mode before the default prelude+apply flow.
-        match context.resolve_targets()? {
+        let path = context.dir()?;
+        let is_aleo_file = path.extension().and_then(|extension| extension.to_str()) == Some("aleo");
+        if self.imports_dir.is_some() && !is_aleo_file {
+            return Err(
+                crate::errors::custom("`--imports-dir` requires `--path` to point to an Aleo bytecode file.").into()
+            );
+        }
+        let workspace_targets = if is_aleo_file { None } else { context.resolve_targets()? };
+        match workspace_targets {
             Some((_, targets)) if targets.len() > 1 => handle_workspace_deploy(self, context, targets),
             _ => {
                 // Single target or no workspace: use the standard flow.
@@ -367,6 +411,16 @@ fn generate_deploy_transactions<N: Network, A: Aleo<Network = N>>(
     for Task { id, program, edition, priority_fee, record, bytecode_size, .. } in local {
         // Deploy if not user-skipped and not already deployed by an earlier workspace member.
         if !skipped.contains(&id) && !already_deployed.contains(&id) {
+            // Check plaintext declarations before deployment synthesis.
+            if setup.consensus_version >= ConsensusVersion::V20 {
+                let max_bits = consensus_limit(
+                    &N::MAX_PLAINTEXT_TYPE_SIZE_IN_BITS,
+                    setup.consensus_version,
+                    N::LATEST_MAX_PLAINTEXT_TYPE_SIZE_IN_BITS(),
+                );
+                let stack = Stack::new(setup.vm.process(), &program)?;
+                check_program_plaintext_sizes(&program, &stack, max_bits)?;
+            }
             // If the program has a constructor, confirm with the user.
             if let Some(constructor) = program.constructor() {
                 println!(
@@ -435,7 +489,7 @@ Once it is deployed, it CANNOT be changed.
                 // Validate the deployment limits for the current transaction.
                 let (program_id, transaction) = transactions.last().expect("Transaction was just pushed");
                 let deployment = transaction.deployment().expect("Expected a deployment in the transaction");
-                validate_deployment_limits(deployment, program_id, &setup.network)?;
+                validate_deployment_limits(deployment, program_id, &setup.network, setup.consensus_version)?;
             }
         }
 
@@ -886,7 +940,11 @@ fn print_workspace_deployment_plan<N: Network>(
 ///
 /// Older networks (e.g. mainnet before V16) enforce smaller limits than the latest, so deploys must
 /// check against the version-specific value rather than `LATEST_*`.
-fn consensus_limit(table: &[(ConsensusVersion, usize)], consensus_version: ConsensusVersion, latest: usize) -> usize {
+pub(crate) fn consensus_limit(
+    table: &[(ConsensusVersion, usize)],
+    consensus_version: ConsensusVersion,
+    latest: usize,
+) -> usize {
     table
         .iter()
         .take_while(|(version, _)| *version <= consensus_version)
@@ -1008,29 +1066,32 @@ pub(crate) fn validate_deployment_limits<N: Network>(
     deployment: &Deployment<N>,
     program_id: &ProgramID<N>,
     network: &NetworkName,
+    consensus_version: ConsensusVersion,
 ) -> Result<()> {
+    let (max_variables, max_constraints) = if consensus_version >= ConsensusVersion::V19 {
+        (Some(N::MAX_DEPLOYMENT_VARIABLES_V2), Some(N::MAX_DEPLOYMENT_CONSTRAINTS_V2))
+    } else if consensus_version >= ConsensusVersion::V18 {
+        (None, None)
+    } else {
+        (Some(N::MAX_DEPLOYMENT_VARIABLES), Some(N::MAX_DEPLOYMENT_CONSTRAINTS))
+    };
+
     // Check if the number of variables is within the limits.
     let combined_variables = deployment.num_combined_variables()?;
-    if combined_variables > N::MAX_DEPLOYMENT_VARIABLES {
-        return Err(crate::errors::variable_limit_exceeded(
-            program_id,
-            combined_variables,
-            N::MAX_DEPLOYMENT_VARIABLES,
-            network,
-        )
-        .into());
+    if let Some(max_variables) = max_variables
+        && combined_variables > max_variables
+    {
+        return Err(
+            crate::errors::variable_limit_exceeded(program_id, combined_variables, max_variables, network).into()
+        );
     }
 
     // Check if the number of constraints is within the limits.
     let constraints = deployment.num_combined_constraints()?;
-    if constraints > N::MAX_DEPLOYMENT_CONSTRAINTS {
-        return Err(crate::errors::constraint_limit_exceeded(
-            program_id,
-            constraints,
-            N::MAX_DEPLOYMENT_CONSTRAINTS,
-            network,
-        )
-        .into());
+    if let Some(max_constraints) = max_constraints
+        && constraints > max_constraints
+    {
+        return Err(crate::errors::constraint_limit_exceeded(program_id, constraints, max_constraints, network).into());
     }
 
     Ok(())
@@ -1143,13 +1204,21 @@ pub(crate) fn compute_deployment_stats<N: Network, R: Rng + CryptoRng>(
 
     let function_costs = calculate_function_costs(vm, deployment, consensus_version, rng)?;
 
+    let (max_variables, max_constraints) = if consensus_version >= ConsensusVersion::V19 {
+        (Some(N::MAX_DEPLOYMENT_VARIABLES_V2), Some(N::MAX_DEPLOYMENT_CONSTRAINTS_V2))
+    } else if consensus_version >= ConsensusVersion::V18 {
+        (None, None)
+    } else {
+        (Some(N::MAX_DEPLOYMENT_VARIABLES), Some(N::MAX_DEPLOYMENT_CONSTRAINTS))
+    };
+
     Ok(DeploymentStats {
         program_size_bytes: bytecode_size,
         max_program_size_bytes: max_program_size_for_consensus_version::<N>(consensus_version),
         total_variables: Some(variables),
         total_constraints: Some(constraints),
-        max_variables: Some(N::MAX_DEPLOYMENT_VARIABLES),
-        max_constraints: Some(N::MAX_DEPLOYMENT_CONSTRAINTS),
+        max_variables,
+        max_constraints,
         storage_cost,
         synthesis_cost,
         namespace_cost,
@@ -1312,7 +1381,7 @@ pub(crate) fn calculate_function_costs<N: Network, R: Rng + CryptoRng>(
                     tracing::debug!("Could not estimate execution cost for '{name}': {e}");
                     // Fall back to static finalize cost analysis.
                     let static_finalize_cost = if consensus_version >= ConsensusVersion::V10 {
-                        minimum_cost_in_microcredits_v3(&stack, function_name)?
+                        minimum_cost_in_microcredits_v3(&stack, function_name, Some(consensus_version))?
                     } else if consensus_version >= ConsensusVersion::V2 {
                         minimum_cost_in_microcredits_v2(&stack, function_name)?
                     } else {
@@ -1392,6 +1461,60 @@ mod tests {
         ));
 
         enforce_local_deploy_constructor_requirements(&[task], &HashSet::new(), ConsensusVersion::V8).unwrap();
+    }
+
+    #[test]
+    fn plaintext_size_limit_tracks_deployment_consensus_version() -> Result<()> {
+        let command = LeoDeploy::try_parse_from(["deploy", "--yes", "--skip-deploy-certificate"])
+            .expect("Valid deployment options");
+        for (consensus_version, array_length, skip, rejected) in [
+            (ConsensusVersion::V19, 512, false, false),
+            (ConsensusVersion::V20, 512, false, true),
+            (ConsensusVersion::V21, 512, false, true),
+            (ConsensusVersion::V20, 511, false, false),
+            (ConsensusVersion::V20, 512, true, false),
+        ] {
+            // Length 512 exceeds the raw data limit by four bits; length 511 is within it.
+            let task = task_from_source(&format!(
+                "program plaintext_limit.aleo;\n\
+                 mapping values:\n\
+                     key as u8.public;\n\
+                     value as [[boolean; 2048u32]; {array_length}u32].public;\n\
+                 function main:\n\
+                     input r0 as u8.public;\n\
+                     output r0 as u8.public;\n\
+                 constructor:\n\
+                     assert.eq true true;\n",
+            ));
+            let skipped = if skip { HashSet::from([task.id]) } else { HashSet::new() };
+            let private_key = PrivateKey::<TestnetV0>::new(&mut rand::rng())?;
+            let vm = VM::from(ConsensusStore::<TestnetV0, ConsensusMemory<TestnetV0>>::open(StorageMode::Production)?)?;
+            let setup = DeploySetup {
+                address: Address::try_from(&private_key)?,
+                private_key,
+                endpoint: String::new(),
+                consensus_version,
+                network: NetworkName::TestnetV0,
+                query: SnarkVMQuery::from(vm.block_store()),
+                vm,
+            };
+            let result = generate_deploy_transactions::<TestnetV0, AleoTestnetV0>(
+                &command,
+                &setup,
+                vec![task],
+                &skipped,
+                &mut HashSet::new(),
+            );
+
+            if rejected {
+                let error = result.err().expect("V20 and later must reject oversized plaintext declarations");
+                assert!(error.to_string().contains("exceeds the maximum allowed size in bits"), "{error}");
+            } else {
+                let (transactions, _) = result?.expect("The deployment plan is confirmed by --yes");
+                assert_eq!(transactions.len(), usize::from(!skip));
+            }
+        }
+        Ok(())
     }
 
     #[test]

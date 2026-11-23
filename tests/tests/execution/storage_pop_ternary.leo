@@ -33,6 +33,11 @@ input = ["true", "false"]
 
 [case]
 program = "storage_pop_ternary.aleo"
+function = "nested_unselected"
+input = ["false", "true"]
+
+[case]
+program = "storage_pop_ternary.aleo"
 function = "nested_selected"
 input = ["true", "true"]
 
@@ -130,6 +135,7 @@ program storage_pop_ternary.aleo {
             let popped: u32? = outer ? (inner ? nested.pop() : none) : none;
             assert(popped == none);
             assert(nested.len() == 1u32);
+            assert(nested.pop().unwrap() == 5u32);
         };
     }
 

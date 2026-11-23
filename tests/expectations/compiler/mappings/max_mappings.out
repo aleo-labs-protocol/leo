@@ -124,6 +124,394 @@ mapping thirtyone:
     key as field.public;
     value as field.public;
 
+mapping slot32:
+    key as field.public;
+    value as field.public;
+
+mapping slot33:
+    key as field.public;
+    value as field.public;
+
+mapping slot34:
+    key as field.public;
+    value as field.public;
+
+mapping slot35:
+    key as field.public;
+    value as field.public;
+
+mapping slot36:
+    key as field.public;
+    value as field.public;
+
+mapping slot37:
+    key as field.public;
+    value as field.public;
+
+mapping slot38:
+    key as field.public;
+    value as field.public;
+
+mapping slot39:
+    key as field.public;
+    value as field.public;
+
+mapping slot40:
+    key as field.public;
+    value as field.public;
+
+mapping slot41:
+    key as field.public;
+    value as field.public;
+
+mapping slot42:
+    key as field.public;
+    value as field.public;
+
+mapping slot43:
+    key as field.public;
+    value as field.public;
+
+mapping slot44:
+    key as field.public;
+    value as field.public;
+
+mapping slot45:
+    key as field.public;
+    value as field.public;
+
+mapping slot46:
+    key as field.public;
+    value as field.public;
+
+mapping slot47:
+    key as field.public;
+    value as field.public;
+
+mapping slot48:
+    key as field.public;
+    value as field.public;
+
+mapping slot49:
+    key as field.public;
+    value as field.public;
+
+mapping slot50:
+    key as field.public;
+    value as field.public;
+
+mapping slot51:
+    key as field.public;
+    value as field.public;
+
+mapping slot52:
+    key as field.public;
+    value as field.public;
+
+mapping slot53:
+    key as field.public;
+    value as field.public;
+
+mapping slot54:
+    key as field.public;
+    value as field.public;
+
+mapping slot55:
+    key as field.public;
+    value as field.public;
+
+mapping slot56:
+    key as field.public;
+    value as field.public;
+
+mapping slot57:
+    key as field.public;
+    value as field.public;
+
+mapping slot58:
+    key as field.public;
+    value as field.public;
+
+mapping slot59:
+    key as field.public;
+    value as field.public;
+
+mapping slot60:
+    key as field.public;
+    value as field.public;
+
+mapping slot61:
+    key as field.public;
+    value as field.public;
+
+mapping slot62:
+    key as field.public;
+    value as field.public;
+
+mapping slot63:
+    key as field.public;
+    value as field.public;
+
+mapping slot64:
+    key as field.public;
+    value as field.public;
+
+mapping slot65:
+    key as field.public;
+    value as field.public;
+
+mapping slot66:
+    key as field.public;
+    value as field.public;
+
+mapping slot67:
+    key as field.public;
+    value as field.public;
+
+mapping slot68:
+    key as field.public;
+    value as field.public;
+
+mapping slot69:
+    key as field.public;
+    value as field.public;
+
+mapping slot70:
+    key as field.public;
+    value as field.public;
+
+mapping slot71:
+    key as field.public;
+    value as field.public;
+
+mapping slot72:
+    key as field.public;
+    value as field.public;
+
+mapping slot73:
+    key as field.public;
+    value as field.public;
+
+mapping slot74:
+    key as field.public;
+    value as field.public;
+
+mapping slot75:
+    key as field.public;
+    value as field.public;
+
+mapping slot76:
+    key as field.public;
+    value as field.public;
+
+mapping slot77:
+    key as field.public;
+    value as field.public;
+
+mapping slot78:
+    key as field.public;
+    value as field.public;
+
+mapping slot79:
+    key as field.public;
+    value as field.public;
+
+mapping slot80:
+    key as field.public;
+    value as field.public;
+
+mapping slot81:
+    key as field.public;
+    value as field.public;
+
+mapping slot82:
+    key as field.public;
+    value as field.public;
+
+mapping slot83:
+    key as field.public;
+    value as field.public;
+
+mapping slot84:
+    key as field.public;
+    value as field.public;
+
+mapping slot85:
+    key as field.public;
+    value as field.public;
+
+mapping slot86:
+    key as field.public;
+    value as field.public;
+
+mapping slot87:
+    key as field.public;
+    value as field.public;
+
+mapping slot88:
+    key as field.public;
+    value as field.public;
+
+mapping slot89:
+    key as field.public;
+    value as field.public;
+
+mapping slot90:
+    key as field.public;
+    value as field.public;
+
+mapping slot91:
+    key as field.public;
+    value as field.public;
+
+mapping slot92:
+    key as field.public;
+    value as field.public;
+
+mapping slot93:
+    key as field.public;
+    value as field.public;
+
+mapping slot94:
+    key as field.public;
+    value as field.public;
+
+mapping slot95:
+    key as field.public;
+    value as field.public;
+
+mapping slot96:
+    key as field.public;
+    value as field.public;
+
+mapping slot97:
+    key as field.public;
+    value as field.public;
+
+mapping slot98:
+    key as field.public;
+    value as field.public;
+
+mapping slot99:
+    key as field.public;
+    value as field.public;
+
+mapping slot100:
+    key as field.public;
+    value as field.public;
+
+mapping slot101:
+    key as field.public;
+    value as field.public;
+
+mapping slot102:
+    key as field.public;
+    value as field.public;
+
+mapping slot103:
+    key as field.public;
+    value as field.public;
+
+mapping slot104:
+    key as field.public;
+    value as field.public;
+
+mapping slot105:
+    key as field.public;
+    value as field.public;
+
+mapping slot106:
+    key as field.public;
+    value as field.public;
+
+mapping slot107:
+    key as field.public;
+    value as field.public;
+
+mapping slot108:
+    key as field.public;
+    value as field.public;
+
+mapping slot109:
+    key as field.public;
+    value as field.public;
+
+mapping slot110:
+    key as field.public;
+    value as field.public;
+
+mapping slot111:
+    key as field.public;
+    value as field.public;
+
+mapping slot112:
+    key as field.public;
+    value as field.public;
+
+mapping slot113:
+    key as field.public;
+    value as field.public;
+
+mapping slot114:
+    key as field.public;
+    value as field.public;
+
+mapping slot115:
+    key as field.public;
+    value as field.public;
+
+mapping slot116:
+    key as field.public;
+    value as field.public;
+
+mapping slot117:
+    key as field.public;
+    value as field.public;
+
+mapping slot118:
+    key as field.public;
+    value as field.public;
+
+mapping slot119:
+    key as field.public;
+    value as field.public;
+
+mapping slot120:
+    key as field.public;
+    value as field.public;
+
+mapping slot121:
+    key as field.public;
+    value as field.public;
+
+mapping slot122:
+    key as field.public;
+    value as field.public;
+
+mapping slot123:
+    key as field.public;
+    value as field.public;
+
+mapping slot124:
+    key as field.public;
+    value as field.public;
+
+mapping slot125:
+    key as field.public;
+    value as field.public;
+
+mapping slot126:
+    key as field.public;
+    value as field.public;
+
+mapping slot127:
+    key as field.public;
+    value as field.public;
+
+mapping slot128:
+    key as field.public;
+    value as field.public;
+
 function foo:
     output 2u8 as u8.private;
 

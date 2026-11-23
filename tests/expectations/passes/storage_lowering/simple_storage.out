@@ -24,18 +24,30 @@ program test.aleo {
     }
     fn check1() -> Final<Fn()> {
         return async {
-            assert(_optional_unwrap(_mapping_contains(test.aleo::flag__, false) ? _mapping_get_or_use(test.aleo::flag__, false, false) : none) == true);
-            assert(_optional_unwrap(_mapping_contains(test.aleo::scalar_val__, false) ? _mapping_get_or_use(test.aleo::scalar_val__, false, 0scalar) : none) == 1);
-            assert(_optional_unwrap(_mapping_contains(test.aleo::field_val__, false) ? _mapping_get_or_use(test.aleo::field_val__, false, 0field) : none) == 42);
-            assert(_optional_unwrap(_mapping_contains(test.aleo::group_val__, false) ? _mapping_get_or_use(test.aleo::group_val__, false, 0group) : none) == 0);
+            let $operand$0 = _mapping_contains(test.aleo::flag__, false) ? _mapping_get_or_use(test.aleo::flag__, false, false) : none;
+            let $operand$1 = _optional_unwrap($operand$0);
+            assert($operand$1 == true);
+            let $operand$2 = _mapping_contains(test.aleo::scalar_val__, false) ? _mapping_get_or_use(test.aleo::scalar_val__, false, 0scalar) : none;
+            let $operand$3 = _optional_unwrap($operand$2);
+            assert($operand$3 == 1);
+            let $operand$4 = _mapping_contains(test.aleo::field_val__, false) ? _mapping_get_or_use(test.aleo::field_val__, false, 0field) : none;
+            let $operand$5 = _optional_unwrap($operand$4);
+            assert($operand$5 == 42);
+            let $operand$6 = _mapping_contains(test.aleo::group_val__, false) ? _mapping_get_or_use(test.aleo::group_val__, false, 0group) : none;
+            let $operand$7 = _optional_unwrap($operand$6);
+            assert($operand$7 == 0);
         };
     }
     fn check2() -> Final<Fn()> {
         return async {
-            assert(_optional_unwrap_or(_mapping_contains(test.aleo::flag__, false) ? _mapping_get_or_use(test.aleo::flag__, false, false) : none, false) == true);
-            assert(_optional_unwrap_or(_mapping_contains(test.aleo::scalar_val__, false) ? _mapping_get_or_use(test.aleo::scalar_val__, false, 0scalar) : none, 0) == 1);
-            assert(_optional_unwrap_or(_mapping_contains(test.aleo::field_val__, false) ? _mapping_get_or_use(test.aleo::field_val__, false, 0field) : none, 0) == 42);
-            assert(_optional_unwrap_or(_mapping_contains(test.aleo::group_val__, false) ? _mapping_get_or_use(test.aleo::group_val__, false, 0group) : none, 0) == 0);
+            let $operand$8 = _mapping_contains(test.aleo::flag__, false) ? _mapping_get_or_use(test.aleo::flag__, false, false) : none;
+            assert(_optional_unwrap_or($operand$8, false) == true);
+            let $operand$9 = _mapping_contains(test.aleo::scalar_val__, false) ? _mapping_get_or_use(test.aleo::scalar_val__, false, 0scalar) : none;
+            assert(_optional_unwrap_or($operand$9, 0) == 1);
+            let $operand$10 = _mapping_contains(test.aleo::field_val__, false) ? _mapping_get_or_use(test.aleo::field_val__, false, 0field) : none;
+            assert(_optional_unwrap_or($operand$10, 0) == 42);
+            let $operand$11 = _mapping_contains(test.aleo::group_val__, false) ? _mapping_get_or_use(test.aleo::group_val__, false, 0group) : none;
+            assert(_optional_unwrap_or($operand$11, 0) == 0);
         };
     }
 }

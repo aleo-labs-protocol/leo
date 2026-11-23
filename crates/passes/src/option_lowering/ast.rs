@@ -434,6 +434,7 @@ impl leo_ast::AstReconstructor for OptionLoweringVisitor<'_> {
         let (expr, stmts) = self.reconstruct_expression(input.expression, &None);
 
         input.expression = expr;
+        input.type_ = self.reconstruct_type_node(input.type_).0;
 
         (input.into(), stmts)
     }
