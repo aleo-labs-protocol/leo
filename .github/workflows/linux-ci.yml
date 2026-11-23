@@ -19,7 +19,7 @@ jobs:
   linux-tests:
     name: linux-workspace-tests
     if: inputs.suite == 'workspace'
-    # The runner group admits this workflow on protected master. Check the original event here.
+    # The runner group restricts access to an approved commit. Select the runner from the original event.
     runs-on: &linux-runner >-
       ${{ fromJSON(
       github.repository == 'aleo-labs-protocol/leo' &&
