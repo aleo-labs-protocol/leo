@@ -113,15 +113,10 @@ impl Command for LeoAbi {
         // Satisfies mode: check the input's interface against a JSON ABI standard rather than printing its ABI.
         if let Some(standard) = &self.satisfies {
             let mut standard_abi = load_standard_abi(standard)?;
-            // Handwritten and bytecode-derived standards already use Aleo identifiers.
-            let mut problems = leo_abi::compatibility::check_compatibility(&main_abi, &standard_abi);
-            match lower_composite_layouts(&mut standard_abi) {
-                Ok(true) if !problems.is_empty() => {
-                    problems = leo_abi::compatibility::check_compatibility(&main_abi, &standard_abi);
-                }
-                Err(problem) => problems.push(problem),
-                _ => {}
-            }
+            let problems = match lower_composite_layouts(&mut standard_abi) {
+                Ok(()) => leo_abi::compatibility::check_compatibility(&main_abi, &standard_abi),
+                Err(problem) => vec![problem],
+            };
             return report_compatibility(&problems, &main_abi.program, &standard_abi.program, self.output.as_deref());
         }
 
@@ -138,21 +133,18 @@ impl Command for LeoAbi {
 }
 
 /// Converts source struct paths and composite fields to their bytecode representation.
-fn lower_composite_layouts(standard: &mut leo_abi::Program) -> Result<bool, String> {
+fn lower_composite_layouts(standard: &mut leo_abi::Program) -> Result<(), String> {
     use leo_abi::{FunctionInput, FunctionOutput, Plaintext, StorageType};
 
-    fn lower_path(path: &mut leo_abi::Path, owner: &str) -> bool {
+    fn lower_path(path: &mut leo_abi::Path, owner: &str) {
         if let Some(name) = leo_compiler::abi_struct_identifier(owner, path)
             && (path.len() != 1 || path[0] != name)
         {
             *path = vec![name];
-            true
-        } else {
-            false
         }
     }
 
-    let mut changed = leo_abi::compatibility::omit_empty_fields(standard);
+    leo_abi::compatibility::omit_empty_fields(standard);
     let holder = &standard.program;
     let definitions: std::collections::HashSet<_> = standard.structs.iter().map(|s| s.path.clone()).collect();
     let lower_type = |mut ty: &mut Plaintext| loop {
@@ -176,32 +168,36 @@ fn lower_composite_layouts(standard: &mut leo_abi::Program) -> Result<bool, Stri
                         reference.path.join("::")
                     ));
                 }
-                let changed = lower_path(&mut reference.path, owner);
-                if changed && is_library {
+                lower_path(&mut reference.path, owner);
+                if is_library {
                     reference.program = None;
                 }
-                break Ok(changed);
+                break Ok(());
             }
             Plaintext::Array(array) => ty = &mut array.element,
             Plaintext::Optional(optional) => ty = &mut optional.0,
-            Plaintext::Primitive(_) => break Ok(false),
+            Plaintext::Primitive(_) => break Ok(()),
         }
     };
 
     for s in &mut standard.structs {
-        changed |= lower_path(&mut s.path, holder);
+        lower_path(&mut s.path, holder);
         for field in &mut s.fields {
-            changed |= lower_type(&mut field.ty)?;
+            lower_type(&mut field.ty)?;
         }
     }
     for r in &mut standard.records {
+        // Bytecode places the owner first and preserves the order of the remaining fields.
+        if let Some(index) = r.fields.iter().position(|field| field.name == "owner") {
+            r.fields[..=index].rotate_right(1);
+        }
         for field in &mut r.fields {
-            changed |= lower_type(&mut field.ty)?;
+            lower_type(&mut field.ty)?;
         }
     }
     for m in &mut standard.mappings {
-        changed |= lower_type(&mut m.key)?;
-        changed |= lower_type(&mut m.value)?;
+        lower_type(&mut m.key)?;
+        lower_type(&mut m.value)?;
     }
     for variable in &mut standard.storage_variables {
         let mut ty = &mut variable.ty;
@@ -209,7 +205,7 @@ fn lower_composite_layouts(standard: &mut leo_abi::Program) -> Result<bool, Stri
             match ty {
                 StorageType::Vector(inner) => ty = inner,
                 StorageType::Plaintext(plaintext) => {
-                    changed |= lower_type(plaintext)?;
+                    lower_type(plaintext)?;
                     break;
                 }
             }
@@ -218,16 +214,16 @@ fn lower_composite_layouts(standard: &mut leo_abi::Program) -> Result<bool, Stri
     for f in standard.functions.iter_mut().chain(&mut standard.views) {
         for input in &mut f.inputs {
             if let FunctionInput::Plaintext { ty, .. } = input {
-                changed |= lower_type(ty)?;
+                lower_type(ty)?;
             }
         }
         for output in &mut f.outputs {
             if let FunctionOutput::Plaintext { ty, .. } = output {
-                changed |= lower_type(ty)?;
+                lower_type(ty)?;
             }
         }
     }
-    Ok(changed)
+    Ok(())
 }
 
 /// Loads the ABI of an interface standard for the satisfies check from a JSON file (any `.json`

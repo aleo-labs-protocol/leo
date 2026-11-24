@@ -63,3 +63,33 @@ if "$LEO_BIN" abi "$bytecode" --satisfies "$standalone" --output wrong-report.js
 fi
 cat wrong-report.json
 echo
+
+# The implementing program must use the library's struct, even when a local struct has identical fields.
+cat > my_lib/src/lib.leo <<'LEO'
+export struct Metadata { amount: u8 }
+export interface Identity {
+    record Token { amount: Metadata, owner: address, .. }
+    fn describe(input: Metadata) -> Metadata;
+    fn consume(input: Token) -> Token;
+}
+LEO
+cat > my_program/src/main.leo <<'LEO'
+program my_program.aleo : my_lib::Identity {
+    record Token { amount: my_lib::Metadata, owner: address }
+    fn describe(input: my_lib::Metadata) -> my_lib::Metadata { return input; }
+    fn consume(input: Token) -> Token { return input; }
+    @noupgrade
+    constructor() {}
+}
+LEO
+"$LEO_BIN" build --path my_lib >/dev/null
+"$LEO_BIN" build --path my_program >/dev/null
+identity=my_lib/build/my_lib/interfaces/Identity.json
+"$LEO_BIN" abi "$bytecode" --satisfies "$identity" --output result.json >/dev/null
+# Compare the same layout with an unqualified local struct in bytecode.
+sed -E 's/Metadata__[[:alnum:]_]+/Metadata/g' "$bytecode" > local.aleo
+mv local.aleo "$bytecode"
+"$LEO_BIN" abi "$bytecode" >/dev/null
+if "$LEO_BIN" abi "$bytecode" --satisfies "$identity" >/dev/null 2>&1; then
+    exit 1
+fi
