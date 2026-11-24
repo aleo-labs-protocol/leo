@@ -47,12 +47,10 @@ use snarkvm::{
         FromBytes,
         Identifier,
         Ledger,
-        Metadata,
         Network,
         PrivateKey,
         ProgramID,
         ProgramOwner,
-        Ratify,
         TestnetV0,
         ToBytes,
         Transaction,
@@ -198,14 +196,17 @@ pub struct ExecutionOutcome {
     pub status: ExecutionStatus,
 }
 
-/// Convert a snarkVM output to Leo's network-independent test output value.
-///
-/// `leo_ast::const_eval::Value` stores snarkVM values for the test network type, so generic
-/// network runners convert through the display representation. This preserves the existing
-/// output API while allowing the VM and circuit to use the selected network.
-fn output_value(value: impl fmt::Display) -> Value {
-    let value = value.to_string();
-    value.parse().unwrap_or_else(|_| Value::make_string(value))
+/// Preserves typed VM outputs in the test result, whose AST values use the testnet representation.
+fn output_values<N: Network>(outputs: &[SvmValue<N>]) -> anyhow::Result<Value> {
+    let convert = |value: &SvmValue<N>| -> anyhow::Result<Value> {
+        let bytes = value.to_bytes_le()?;
+        Ok(SvmValue::<TestnetV0>::from_bytes_le(&bytes)?.into())
+    };
+    match outputs {
+        [] => Ok(Value::make_unit()),
+        [value] => convert(value),
+        _ => Ok(Value::make_tuple(outputs.iter().map(convert).collect::<anyhow::Result<Vec<_>>>()?)),
+    }
 }
 
 impl ExecutionOutcome {
@@ -489,10 +490,9 @@ fn handle_view<A: Aleo>(
         Ok(Err(e)) => return failed(format!("{e}")),
         Err(e) => return failed(format!("{e:?}")),
     };
-    let output = match response.len() {
-        0 => Value::make_unit(),
-        1 => output_value(&response[0]),
-        _ => Value::make_tuple(response.iter().map(|x| output_value(x))),
+    let output = match output_values(&response) {
+        Ok(output) => output,
+        Err(e) => return failed(format!("Failed to extract output: {e}")),
     };
     EvaluationOutcome {
         outcome: Outcome { program_name: case.program_name.clone(), function: case.function.clone(), output },
@@ -528,10 +528,9 @@ fn handle_transition<A: Aleo>(
     };
 
     let outputs = response.outputs();
-    let output = match outputs.len() {
-        0 => Value::make_unit(),
-        1 => output_value(&outputs[0]),
-        _ => Value::make_tuple(outputs.iter().map(|x| output_value(x))),
+    let output = match output_values(outputs) {
+        Ok(output) => output,
+        Err(e) => return failed(format!("Failed to extract output: {e}")),
     };
 
     EvaluationOutcome {
@@ -552,99 +551,19 @@ fn failed_evaluation_outcome(case: &Case, e: String) -> EvaluationOutcome {
     }
 }
 
-/// Load the deterministic development genesis block for any supported network.
-///
-/// The checked-in block carries testnet metadata and a 40-member development committee. For
-/// mainnet and canary, reuse its balances and transactions while rebuilding the network-specific
-/// genesis header and trimming the committee to the selected network's genesis limit.
-fn load_genesis_block<A: Aleo>(
-    private_key: &PrivateKey<A::Network>,
-    rng: &mut ChaCha20Rng,
-) -> anyhow::Result<Block<A::Network>> {
-    if A::Network::ID == TestnetV0::ID {
-        return Ok(Block::from_bytes_le(include_bytes!("resources/genesis_8d710d7e2_40val_snarkos_dev_network.bin"))?);
-    }
-
-    let source =
-        Block::<TestnetV0>::from_bytes_le(include_bytes!("resources/genesis_8d710d7e2_40val_snarkos_dev_network.bin"))?;
-    let metadata = Metadata::<A::Network>::genesis()?;
-    let source_ratifications =
-        snarkvm::prelude::Ratifications::<A::Network>::from_bytes_le_unchecked(&source.ratifications().to_bytes_le()?)?;
-    // The first consensus version applies at genesis.
-    let max_committee_size = A::Network::MAX_CERTIFICATES[0].1 as usize;
-    let ratifications = snarkvm::prelude::Ratifications::<A::Network>::try_from_iter(
-        source_ratifications
-            .iter()
-            .cloned()
-            .map(|ratification| match ratification {
-                Ratify::Genesis(committee, mut public_balances, mut bonded_balances) => {
-                    let members = committee
-                        .members()
-                        .iter()
-                        .take(max_committee_size)
-                        .map(|(address, stake)| (*address, *stake))
-                        .collect();
-                    let committee = snarkvm::ledger::committee::Committee::new_genesis(members)?;
-                    public_balances.retain(|address, _| committee.is_committee_member(*address));
-                    bonded_balances.retain(|address, (validator, _, _)| {
-                        committee.is_committee_member(*address) && committee.is_committee_member(*validator)
-                    });
-                    Ok(Ratify::Genesis(Box::new(committee), public_balances, bonded_balances))
-                }
-                other => Ok(other),
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?,
-    )?;
-    let ratifications_root = ratifications.to_ratifications_root()?;
-    let source_header = source.header();
-    let header = snarkvm::prelude::Header::<A::Network>::from(
-        Default::default(),
-        snarkvm::prelude::Field::<A::Network>::from_bytes_le(&source_header.transactions_root().to_bytes_le()?)?,
-        snarkvm::prelude::Field::<A::Network>::from_bytes_le(&source_header.finalize_root().to_bytes_le()?)?,
-        ratifications_root,
-        snarkvm::prelude::Field::<A::Network>::from_bytes_le(&source_header.solutions_root().to_bytes_le()?)?,
-        snarkvm::prelude::Field::<A::Network>::from_bytes_le(&source_header.subdag_root().to_bytes_le()?)?,
-        metadata,
-    )?;
-    let solutions =
-        snarkvm::prelude::Solutions::<A::Network>::from_bytes_le_unchecked(&source.solutions().to_bytes_le()?)?;
-    let transactions =
-        snarkvm::prelude::Transactions::<A::Network>::from_bytes_le_unchecked(&source.transactions().to_bytes_le()?)?;
-    let aborted_solution_ids = source
-        .aborted_solution_ids()
-        .iter()
-        .map(|id| {
-            id.to_bytes_le()
-                .and_then(|bytes| snarkvm::ledger::puzzle::SolutionID::<A::Network>::from_bytes_le_unchecked(&bytes))
-        })
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    let aborted_transaction_ids = source
-        .aborted_transaction_ids()
-        .iter()
-        .map(|id| {
-            id.to_bytes_le().and_then(|bytes| <A::Network as Network>::TransactionID::from_bytes_le_unchecked(&bytes))
-        })
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    Block::new_beacon(
-        private_key,
-        Default::default(),
-        header,
-        ratifications,
-        solutions,
-        aborted_solution_ids,
-        transactions,
-        aborted_transaction_ids,
-        rng,
-    )
-}
+const TESTNET_GENESIS: &[u8] = include_bytes!("resources/genesis_8d710d7e2_40val_snarkos_dev_network.bin");
+// snarkVM 4.13.1 generated each development block with VM::genesis_beacon, TEST_PRIVATE_KEY,
+// and ChaCha20Rng::seed_from_u64(0) on its respective network.
+const MAINNET_GENESIS: &[u8] = include_bytes!("resources/genesis_mainnet.bin");
+const CANARY_GENESIS: &[u8] = include_bytes!("resources/genesis_canary.bin");
 
 /// Runs each case set on its own ledger and reports each set's outcomes in input order.
 pub fn run_with_ledger(
     config: &Config,
     case_sets: &[Vec<Case>],
-    on_case_set_done: impl FnMut(usize, &[ExecutionOutcome]),
+    mut on_case_set_done: impl FnMut(usize, &[ExecutionOutcome]),
 ) -> Result<Vec<Vec<ExecutionOutcome>>> {
-    run_with_ledger_for::<AleoTestnetV0>(config, case_sets, on_case_set_done)
+    run_with_ledger_for::<AleoTestnetV0>(TESTNET_GENESIS, config, case_sets, &mut on_case_set_done)
 }
 
 /// Runs cases using the ledger, VM, and circuit types for `network`.
@@ -652,19 +571,24 @@ pub fn run_with_ledger_for_network(
     network: NetworkName,
     config: &Config,
     case_sets: &[Vec<Case>],
-    on_case_set_done: impl FnMut(usize, &[ExecutionOutcome]),
+    mut on_case_set_done: impl FnMut(usize, &[ExecutionOutcome]),
 ) -> Result<Vec<Vec<ExecutionOutcome>>> {
     match network {
-        NetworkName::MainnetV0 => run_with_ledger_for::<AleoV0>(config, case_sets, on_case_set_done),
-        NetworkName::TestnetV0 => run_with_ledger_for::<AleoTestnetV0>(config, case_sets, on_case_set_done),
-        NetworkName::CanaryV0 => run_with_ledger_for::<AleoCanaryV0>(config, case_sets, on_case_set_done),
+        NetworkName::MainnetV0 => {
+            run_with_ledger_for::<AleoV0>(MAINNET_GENESIS, config, case_sets, &mut on_case_set_done)
+        }
+        NetworkName::TestnetV0 => run_with_ledger(config, case_sets, on_case_set_done),
+        NetworkName::CanaryV0 => {
+            run_with_ledger_for::<AleoCanaryV0>(CANARY_GENESIS, config, case_sets, &mut on_case_set_done)
+        }
     }
 }
 
 fn run_with_ledger_for<A: Aleo>(
+    genesis: &[u8],
     config: &Config,
     case_sets: &[Vec<Case>],
-    mut on_case_set_done: impl FnMut(usize, &[ExecutionOutcome]),
+    on_case_set_done: &mut dyn FnMut(usize, &[ExecutionOutcome]),
 ) -> Result<Vec<Vec<ExecutionOutcome>>> {
     if case_sets.is_empty() {
         return Ok(Vec::new());
@@ -674,23 +598,22 @@ fn run_with_ledger_for<A: Aleo>(
     let mut rng = ChaCha20Rng::seed_from_u64(config.seed);
 
     // Initialize a genesis private key.
-    let genesis_private_key = PrivateKey::<A::Network>::from_str(TEST_PRIVATE_KEY).unwrap();
+    let genesis_private_key = PrivateKey::<A::Network>::from_str(TEST_PRIVATE_KEY)?;
 
     // Store all of the non-genesis blocks created during set up.
     let mut blocks = Vec::new();
 
     // Load the genesis block.
-    let genesis_block = load_genesis_block::<A>(&genesis_private_key, &mut rng)?;
-
-    // Initialize a `Ledger`. This should always succeed.
-    // Use `new_test` to avoid spurious block-tree persistence errors on drop.
+    let genesis_block = Block::from_bytes_le(genesis)?;
     let ledger =
-        Ledger::<A::Network, ConsensusMemory<A::Network>>::load(genesis_block.clone(), StorageMode::new_test(None))
-            .unwrap();
+        Ledger::<A::Network, ConsensusMemory<A::Network>>::load(genesis_block.clone(), StorageMode::new_test(None))?;
 
     // Advance the `VM` to the start height, defaulting to the height for the latest consensus version.
     let latest_consensus_version = ConsensusVersion::latest();
-    let start_height = config.start_height.unwrap_or(A::Network::CONSENSUS_HEIGHT(latest_consensus_version).unwrap());
+    let start_height = match config.start_height {
+        Some(height) => height,
+        None => A::Network::CONSENSUS_HEIGHT(latest_consensus_version)?,
+    };
     while ledger.latest_height() < start_height {
         let block = ledger
             .prepare_advance_to_next_beacon_block(&genesis_private_key, vec![], vec![], vec![], &mut rng)
@@ -936,14 +859,7 @@ fn run_with_ledger_for<A: Aleo>(
                 });
 
                 let output = match result {
-                    Ok(response) => {
-                        let outputs = response.outputs();
-                        match outputs.len() {
-                            0 => Value::make_unit(),
-                            1 => output_value(&outputs[0]),
-                            _ => Value::make_tuple(outputs.iter().map(|x| output_value(x))),
-                        }
-                    }
+                    Ok(response) => output_values(response.outputs())?,
                     Err(e) => Value::make_string(format!("Failed to extract output: {e}")),
                 };
 
@@ -972,48 +888,4 @@ fn run_with_ledger_for<A: Aleo>(
             Ok(case_outcomes)
         })
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const NETWORK_ID_PROGRAM: &str = r#"program test.aleo;
-
-function dummy:
-    input r0 as u32.private;
-    output r0 as u32.private;
-
-view read_network:
-    output network.id as u16.public;
-
-constructor:
-    assert.eq edition 0u16;
-"#;
-
-    #[test]
-    fn evaluation_runner_uses_selected_network() {
-        for (network, network_id) in
-            [(NetworkName::MainnetV0, 0), (NetworkName::TestnetV0, 1), (NetworkName::CanaryV0, 2)]
-        {
-            let config = Config {
-                seed: 0,
-                start_height: Some(0),
-                programs: vec![Program { bytecode: NETWORK_ID_PROGRAM.to_string(), name: "test.aleo".to_string() }],
-                skip_proving: true,
-            };
-            let case = Case {
-                program_name: "test.aleo".to_string(),
-                function: "read_network".to_string(),
-                private_key: None,
-                input: Vec::new(),
-                seed_mapping: Vec::new(),
-            };
-
-            let outcomes =
-                run_without_ledger_for_network(network, &config, &[case]).expect("network test runner should execute");
-            assert!(matches!(outcomes[0].status, EvaluationStatus::Success), "network {network:?}");
-            assert_eq!(outcomes[0].output().to_string(), format!("{network_id}u16"));
-        }
-    }
 }

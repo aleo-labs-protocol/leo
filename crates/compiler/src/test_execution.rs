@@ -41,6 +41,7 @@ impl Default for Config {
 
 fn execution_run_test(
     config: &Config,
+    network: leo_ast::NetworkName,
     cases: &[run::Case],
     handler: &Handler,
     node_builder: &Rc<NodeBuilder>,
@@ -112,7 +113,7 @@ fn execution_run_test(
 
     if requires_ledger {
         // Note: We wrap cases in a slice to run them all in one ledger instance.
-        let outcomes = run::run_with_ledger(&ledger_config, &[cases.to_vec()], |_, _| {})?
+        let outcomes = run::run_with_ledger_for_network(network, &ledger_config, &[cases.to_vec()], |_, _| {})?
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
@@ -124,7 +125,7 @@ fn execution_run_test(
             writeln!(result, "{}\n", outcome.execution).unwrap();
         }
     } else {
-        let outcomes = run::run_without_ledger(&ledger_config, cases)?;
+        let outcomes = run::run_without_ledger_for_network(network, &ledger_config, cases)?;
         assert_eq!(outcomes.len(), cases.len());
 
         for outcome in outcomes {
@@ -141,6 +142,7 @@ fn execution_runner(source: &str) -> String {
     let node_builder = Rc::new(NodeBuilder::default());
 
     let mut config = Config::default();
+    let mut networks = Vec::<leo_ast::NetworkName>::new();
     let mut cases = Vec::<run::Case>::new();
 
     // Captures quote-delimited strings.
@@ -165,6 +167,8 @@ fn execution_runner(source: &str) -> String {
             assert_eq!(parts.len(), 3, "seed_mapping expects 3 quote-delimited strings: mapping, key, value");
             let [mapping, key, value]: [String; 3] = parts.try_into().unwrap();
             cases.last_mut().unwrap().seed_mapping.push(crate::run::SeedMapping { mapping, key, value });
+        } else if let Some(rest) = line.strip_prefix("execution_networks = ") {
+            networks.extend(re_input.captures_iter(rest).map(|s| s[1].parse::<leo_ast::NetworkName>().unwrap()));
         } else if let Some(rest) = line.strip_prefix("seed = ") {
             config.seed = rest.parse::<u64>().unwrap();
         } else if let Some(rest) = line.strip_prefix("start_height = ") {
@@ -175,12 +179,19 @@ fn execution_runner(source: &str) -> String {
     // Split the sources and add them to the config.
     config.sources = source.split(super::test_utils::PROGRAM_DELIMITER).map(|s| s.trim().to_string()).collect();
 
-    create_session_if_not_set_then(|_| match execution_run_test(&config, &cases, &handler, &node_builder) {
-        Ok(s) => s,
-        Err(e) => {
-            format!("Error while running execution tests:\n{e}\n\nErrors:\n{}", buf.extract_errs())
-        }
-    })
+    let run = |network| {
+        create_session_if_not_set_then(|_| {
+            match execution_run_test(&config, network, &cases, &handler, &node_builder) {
+                Ok(s) => s,
+                Err(e) => format!("Error while running execution tests:\n{e}\n\nErrors:\n{}", buf.extract_errs()),
+            }
+        })
+    };
+    if networks.is_empty() {
+        run(leo_ast::NetworkName::TestnetV0)
+    } else {
+        networks.into_iter().map(|network| format!("{network}:\n{}", run(network))).join("\n")
+    }
 }
 
 #[cfg(test)]

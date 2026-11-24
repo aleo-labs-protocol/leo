@@ -202,7 +202,11 @@ fn handle_test(command: LeoTest, package: Package) -> Result<TestOutput> {
         return Err(crate::errors::custom("`leo test` is not supported for library packages.").into());
     }
 
-    let network = command.env_override.network.unwrap_or(NetworkName::TestnetV0);
+    let network = get_network(&command.env_override.network).unwrap_or(NetworkName::TestnetV0);
+    #[cfg(feature = "only_testnet")]
+    if network != NetworkName::TestnetV0 {
+        return Err(crate::errors::custom("This build of leo test supports only testnet.").into());
+    }
     let test_functions = discover_test_functions(&package, &command.test_name, network)?;
 
     let credits = Symbol::intern("credits.aleo");
@@ -268,35 +272,35 @@ fn handle_test(command: LeoTest, package: Package) -> Result<TestOutput> {
     let mut failures: Vec<(usize, String)> = Vec::new();
 
     // Debug logs make an in-place `RUNNING` status unreliable, so print each result after completion.
-    run::run_with_ledger_for_network(
-        network,
-        &run::Config { seed: 0, start_height: None, programs, skip_proving: !command.prove },
-        &cases,
-        |index, outcomes| {
-            let outcome = &outcomes[0];
-            let (should_fail, display, qualified_name) = &test_metadata[index];
+    let config = run::Config { seed: 0, start_height: None, programs, skip_proving: !command.prove };
+    let report = |index: usize, outcomes: &[run::ExecutionOutcome]| {
+        let outcome = &outcomes[0];
+        let (should_fail, display, qualified_name) = &test_metadata[index];
 
-            let message = match (&outcome.status, *should_fail) {
-                (run::ExecutionStatus::Accepted, false) => None,
-                (run::ExecutionStatus::Accepted, true) => Some("test succeeded when failure was expected".to_string()),
-                (_, true) => None,
-                (_, false) => Some(format!("{} -- {}", outcome.status, outcome.outcome.output)),
-            };
+        let message = match (&outcome.status, *should_fail) {
+            (run::ExecutionStatus::Accepted, false) => None,
+            (run::ExecutionStatus::Accepted, true) => Some("test succeeded when failure was expected".to_string()),
+            (_, true) => None,
+            (_, false) => Some(format!("{} -- {}", outcome.status, outcome.outcome.output)),
+        };
 
-            match message {
-                Some(err) => {
-                    println!("{} {display}", gutter("FAIL").red().bold());
-                    failures.push((index, err.clone()));
-                    tests.push(TestResult { name: qualified_name.clone(), passed: false, error: Some(err) });
-                }
-                None => {
-                    passed += 1;
-                    println!("{} {display}", gutter("PASS").green().bold());
-                    tests.push(TestResult { name: qualified_name.clone(), passed: true, error: None });
-                }
+        match message {
+            Some(err) => {
+                println!("{} {display}", gutter("FAIL").red().bold());
+                failures.push((index, err.clone()));
+                tests.push(TestResult { name: qualified_name.clone(), passed: false, error: Some(err) });
             }
-        },
-    )?;
+            None => {
+                passed += 1;
+                println!("{} {display}", gutter("PASS").green().bold());
+                tests.push(TestResult { name: qualified_name.clone(), passed: true, error: None });
+            }
+        }
+    };
+    #[cfg(feature = "only_testnet")]
+    run::run_with_ledger(&config, &cases, report)?;
+    #[cfg(not(feature = "only_testnet"))]
+    run::run_with_ledger_for_network(network, &config, &cases, report)?;
 
     let failed = total - passed;
     println!("{}", "─".repeat(24).dimmed());
