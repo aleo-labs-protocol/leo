@@ -268,15 +268,15 @@ fn deploy_without_proof<A: Aleo>(
 }
 
 /// Execute a transition without generating proofs. Returns (Transaction, Response).
-fn execute_without_proof<A: Aleo>(
-    vm: &VM<A::Network, ConsensusMemory<A::Network>>,
-    private_key: &PrivateKey<A::Network>,
+fn execute_without_proof<A: Aleo<Network = N>, N: Network>(
+    vm: &VM<N, ConsensusMemory<N>>,
+    private_key: &PrivateKey<N>,
     program_id: &str,
     function_name: &str,
-    inputs: impl ExactSizeIterator<Item = impl TryInto<SvmValue<A::Network>>>,
+    inputs: impl ExactSizeIterator<Item = impl TryInto<SvmValue<N>>>,
     consensus_version: ConsensusVersion,
     rng: &mut ChaCha20Rng,
-) -> anyhow::Result<(Transaction<A::Network>, snarkvm::prelude::Response<A::Network>)> {
+) -> anyhow::Result<(Transaction<N>, snarkvm::prelude::Response<N>)> {
     // Authorize the execution (fast, no proving).
     let authorization = vm.authorize(private_key, program_id, function_name, inputs, rng)?;
 
@@ -552,8 +552,9 @@ fn failed_evaluation_outcome(case: &Case, e: String) -> EvaluationOutcome {
 }
 
 const TESTNET_GENESIS: &[u8] = include_bytes!("resources/genesis_8d710d7e2_40val_snarkos_dev_network.bin");
-// snarkVM 4.13.1 generated each development block with VM::genesis_beacon, TEST_PRIVATE_KEY,
-// and ChaCha20Rng::seed_from_u64(0) on its respective network.
+// Generate these fixtures with snarkVM 4.13.1's VM::genesis_beacon and TEST_PRIVATE_KEY.
+// Use ChaCha20Rng::seed_from_u64(0) and set_stream(1) to keep genesis transactions separate
+// from test transactions, which use the default stream (0).
 const MAINNET_GENESIS: &[u8] = include_bytes!("resources/genesis_mainnet.bin");
 const CANARY_GENESIS: &[u8] = include_bytes!("resources/genesis_canary.bin");
 
@@ -712,7 +713,7 @@ fn run_with_ledger_for<A: Aleo>(
                     let address = Address::try_from(private_key).expect("Failed to convert private key to address.");
                     // Generate the transaction.
                     if skip_proving {
-                        let (tx, _) = execute_without_proof::<A>(
+                        let (tx, _) = execute_without_proof::<A, _>(
                             ledger.vm(),
                             &genesis_private_key,
                             "credits.aleo",
@@ -785,7 +786,7 @@ fn run_with_ledger_for<A: Aleo>(
                     let previous = expected.replace(true);
                     let result = catch_unwind(AssertUnwindSafe(|| {
                         if skip_proving {
-                            execute_without_proof::<A>(
+                            execute_without_proof::<A, _>(
                                 ledger.vm(),
                                 &private_key,
                                 &case.program_name,
