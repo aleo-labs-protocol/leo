@@ -38,6 +38,14 @@ cmp "$standalone" "$imported"
 cat report.json
 echo
 
+# A program ABI can name a library type without providing its fields.
+program_abi=my_program/build/my_program/abi.json
+if "$LEO_BIN" abi "$bytecode" --satisfies "$program_abi" --output incomplete.json >/dev/null 2>&1; then
+    exit 1
+fi
+cat incomplete.json
+echo
+
 # A standard can also require a struct independently of its function signatures.
 sed 's/"structs": \[/"structs": [{"path":["Required"],"fields":[]},/' "$standalone" > extra.json
 if "$LEO_BIN" abi "$bytecode" --satisfies extra.json --output extra-report.json >/dev/null 2>&1; then

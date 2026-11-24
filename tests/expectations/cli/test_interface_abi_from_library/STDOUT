@@ -373,6 +373,14 @@ build exit code: 0
 {
   "satisfied": false,
   "problems": [
+    "function `packet` differs",
+    "function `encode` differs",
+    "standard lacks the definition of library struct `my_lib::Packet::[3u32]`"
+  ]
+}
+{
+  "satisfied": false,
+  "problems": [
     "missing struct `Required__HD94UxupNDX`"
   ]
 }
