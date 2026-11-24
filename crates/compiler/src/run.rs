@@ -64,6 +64,7 @@ use snarkvm::{
     synthesizer::program::{FinalizeStoreTrait, ProgramCore, StackTrait},
 };
 use std::{
+    any::Any,
     cell::Cell,
     fmt,
     panic::{AssertUnwindSafe, catch_unwind},
@@ -199,6 +200,9 @@ pub struct ExecutionOutcome {
 /// Preserves typed VM outputs in the test result, whose AST values use the testnet representation.
 fn output_values<N: Network>(outputs: &[SvmValue<N>]) -> anyhow::Result<Value> {
     let convert = |value: &SvmValue<N>| -> anyhow::Result<Value> {
+        if let Some(testnet_value) = (value as &dyn Any).downcast_ref::<SvmValue<TestnetV0>>() {
+            return Ok(testnet_value.clone().into());
+        }
         let bytes = value.to_bytes_le()?;
         Ok(SvmValue::<TestnetV0>::from_bytes_le(&bytes)?.into())
     };
