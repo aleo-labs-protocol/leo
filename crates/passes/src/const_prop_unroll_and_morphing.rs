@@ -45,6 +45,10 @@ impl Pass for ConstPropUnrollAndMorphing {
     fn do_pass(input: Self::Input, state: &mut CompilerState) -> Result<Self::Output> {
         const LARGE_LOOP_BOUND: usize = 1024usize;
 
+        state.interface_only_structs.clear();
+        state.legacy_interface_types.clear();
+        state.legacy_storage_options.clear();
+        state.dynamic_storage_values.clear();
         let mut legacy_interface_structs = indexmap::IndexSet::new();
         for _ in 0..LARGE_LOOP_BOUND {
             let loop_unroll_output = Unrolling::do_pass((), state)?;

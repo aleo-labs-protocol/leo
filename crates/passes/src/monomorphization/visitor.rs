@@ -111,6 +111,8 @@ impl MonomorphizationVisitor<'_> {
         path_segs.extend_from_slice(&original_loc.path[..original_loc.path.len() - 1]);
         path_segs.push(monomorphized_name);
         let storage_loc = Location::new(original_loc.program, path_segs);
+        // An independent instantiation keeps the definition in the historical bytecode schema.
+        self.state.interface_only_structs.swap_remove(&storage_loc);
 
         // Build the new path pointing directly to the storage location.
         let new_composite_path =

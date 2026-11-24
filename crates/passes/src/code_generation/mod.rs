@@ -102,6 +102,7 @@ impl Pass for CodeGenerating {
             current_function: None,
             variable_mapping: Default::default(),
             composite_mapping: Default::default(),
+            interface_type_uses: Default::default(),
             global_mapping: Default::default(),
             variant: None,
             program: match &state.ast {

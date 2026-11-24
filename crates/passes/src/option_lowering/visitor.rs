@@ -69,7 +69,7 @@ impl OptionLoweringVisitor<'_> {
         let lowered_inner_type = self.reconstruct_type(ty).0;
 
         // Create or get an optional wrapper struct for `lowered_inner_type`
-        let struct_name = self.insert_optional_wrapper_struct(&lowered_inner_type);
+        let struct_name = self.insert_optional_wrapper_struct(&lowered_inner_type, Some(expr.id()));
 
         let struct_expr = CompositeExpression {
             path: Path::from(Identifier::new(struct_name, self.state.node_builder.next_id()))
@@ -110,7 +110,7 @@ impl OptionLoweringVisitor<'_> {
     ///
     /// # Returns
     /// - An `Expression` representing the constructed `Optional<T>` struct instance with `None`.
-    pub fn wrap_none(&mut self, inner_ty: &TypeKind) -> Expression {
+    pub fn wrap_none(&mut self, inner_ty: &TypeKind, source: NodeID) -> Expression {
         let is_some_expr = Expression::Literal(Literal {
             span: Span::default(),
             id: self.state.node_builder.next_id(),
@@ -147,7 +147,7 @@ impl OptionLoweringVisitor<'_> {
                 .expect("this must work if type checking was successful");
 
         // Create or get an optional wrapper struct for `lowered_inner_type`
-        let struct_name = self.insert_optional_wrapper_struct(&lowered_inner_type);
+        let struct_name = self.insert_optional_wrapper_struct(&lowered_inner_type, Some(source));
 
         let struct_expr = CompositeExpression {
             path: Path::from(Identifier::new(struct_name, self.state.node_builder.next_id()))
@@ -192,10 +192,16 @@ impl OptionLoweringVisitor<'_> {
     ///
     /// If the struct for this type already exists, it’s reused; otherwise, a new one is created.
     /// Returns the `Symbol` for the struct name.
-    pub fn insert_optional_wrapper_struct(&mut self, ty: &TypeKind) -> Symbol {
+    pub fn insert_optional_wrapper_struct(&mut self, ty: &TypeKind, source: Option<NodeID>) -> Symbol {
         let struct_name = crate::make_optional_struct_symbol(ty);
+        let location = Location::new(self.program, vec![struct_name]);
+        if let Some((_, _, _, used_independently)) = self.state.legacy_storage_options.get_mut(&location)
+            && source.is_none_or(|id| !self.state.dynamic_storage_values.contains(&id))
+        {
+            *used_independently = true;
+        }
 
-        self.composites.entry(Location::new(self.program, vec![struct_name])).or_insert_with(|| Composite {
+        self.composites.entry(location).or_insert_with(|| Composite {
             is_exported: None,
             identifier: Identifier::new(struct_name, self.state.node_builder.next_id()),
             const_parameters: vec![], // this is not a generic struct

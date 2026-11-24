@@ -38,6 +38,8 @@ pub struct CodeGeneratingVisitor<'a> {
     /// Mapping of composites to a Boolean indicate whether the composite is a record or not.
     /// A composite here is identified by its `Location`.
     pub composite_mapping: IndexMap<Location, bool>,
+    /// Interface specializations referenced by the bytecode currently being generated.
+    pub interface_type_uses: IndexSet<Location>,
     /// Mapping of global identifiers to their associated names.
     pub global_mapping: IndexMap<Location, String>,
     /// The variant of the function we are currently traversing.
@@ -139,8 +141,27 @@ impl CodeGeneratingVisitor<'_> {
     /// For library composites the library name is prepended so that the resulting
     /// identifier is unique and cannot collide with a local type of the same base
     /// name (e.g. `[math_lib, Foo]` → `"Foo__<hash>"`).
-    pub(crate) fn legalize_composite_name(&self, loc: &Location) -> String {
-        if self.state.symbol_table.is_library(loc.program) {
+    pub(crate) fn legalize_composite_name(&mut self, loc: &Location) -> String {
+        if self.state.interface_only_structs.contains(loc) || self.state.legacy_storage_options.contains_key(loc) {
+            self.interface_type_uses.insert(loc.clone());
+        }
+        Self::composite_name(self.state, self.bytecode_location(loc))
+    }
+
+    pub(super) fn bytecode_location<'a>(&'a self, loc: &'a Location) -> &'a Location {
+        if self.state.interface_only_structs.contains(loc) {
+            self.state.legacy_interface_types.get(loc).map_or(loc, |ty| ty.path.expect_global_location())
+        } else if let Some((old, value, _, _)) = self.state.legacy_storage_options.get(loc)
+            && self.state.interface_only_structs.contains(value)
+        {
+            old
+        } else {
+            loc
+        }
+    }
+
+    pub(super) fn composite_name(state: &CompilerState, loc: &Location) -> String {
+        if state.symbol_table.is_library(loc.program) {
             let full_path: Vec<Symbol> = std::iter::once(loc.program).chain(loc.path.iter().copied()).collect();
             Self::legalize_path(&full_path)
                 .unwrap_or_else(|| panic!("path format cannot be legalized at this point: {}", loc))

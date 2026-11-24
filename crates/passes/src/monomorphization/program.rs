@@ -189,9 +189,15 @@ impl UnitReconstructor for MonomorphizationVisitor<'_> {
         for stub in input.stubs.values_mut() {
             if let Stub::FromLibrary { library, .. } = stub {
                 self.program = library.name;
+                // Distinguish types introduced by these prototypes from types already required by
+                // program code or other declarations. Prototypes still need every type for their ABI.
+                let mut interface_only = std::mem::take(&mut self.state.interface_only_structs);
+                let before = self.reconstructed_composites.len();
                 self.in_library_root_interface = true;
                 self.reconstruct_interfaces(&mut library.interfaces);
                 self.in_library_root_interface = false;
+                interface_only.extend(self.reconstructed_composites[before..].keys().cloned());
+                self.state.interface_only_structs = interface_only;
                 for module in library.modules.values_mut() {
                     self.program = module.unit_name;
                     self.reconstruct_interfaces(&mut module.interfaces);

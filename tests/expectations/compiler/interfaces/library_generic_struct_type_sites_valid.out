@@ -8,6 +8,13 @@ record Token:
     slot as Slot__E5tgmziTR6y.private;
     padding as [u8; 4u32].private;
 
+struct Slot__7TplVV5Wf75:
+    amount as u32;
+
+struct Optional__La7VnyGROeg:
+    is_some as boolean;
+    val as Slot__7TplVV5Wf75;
+
 struct Array__Bry8D6lySMW:
     values as [u8; 5u32];
 
@@ -17,14 +24,15 @@ struct Boxed__C9XlnD6VR9Q:
 struct Outer__LNZLLWSZbA1:
     item as Boxed__C9XlnD6VR9Q;
 
-struct Legacy__2qwxLATwbuO:
-    amount as u32;
-
 struct Legacy__AsqpfBm92Jz:
     amount as u32;
 
 struct Slot__ucXcNuRp6A:
     amount as u32;
+
+struct Optional__IobrJNQXwCV:
+    is_some as boolean;
+    val as Slot__ucXcNuRp6A;
 
 mapping slots:
     key as address.public;
@@ -45,13 +53,44 @@ function read_item:
 
 function read_root:
     input r0 as identifier.private;
-    call.dynamic r0 'aleo' 'root' into r1 (as Legacy__2qwxLATwbuO.private);
+    call.dynamic r0 'aleo' 'root' into r1 (as Legacy__AsqpfBm92Jz.private);
     output r1.amount as u32.private;
 
 function read_nested:
     input r0 as identifier.private;
     call.dynamic r0 'aleo' 'nested' into r1 (as Array__Bry8D6lySMW.private);
     output r1.values[0u32] as u8.private;
+
+function check_current:
+    input r0 as identifier.private;
+    async check_current r0 into r1;
+    output r1 as consumer.aleo/check_current.future;
+
+finalize check_current:
+    input r0 as identifier.public;
+    contains.dynamic r0 'aleo' 'current__'[false] into r1;
+    cast 0u32 into r2 as Slot__E5tgmziTR6y;
+    get.or_use.dynamic r0 'aleo' 'current__'[false] r2 into r3 as Slot__E5tgmziTR6y;
+    cast 0u32 into r4 as Slot__E5tgmziTR6y;
+    ternary r1 r3.amount r4.amount into r5;
+    cast r5 into r6 as Slot__E5tgmziTR6y;
+    assert.eq r1 true;
+    assert.eq r6.amount 8u32;
+    contains.dynamic r0 'aleo' 'entry__'[false] into r7;
+    cast 0u32 into r8 as Slot__7TplVV5Wf75;
+    get.or_use.dynamic r0 'aleo' 'entry__'[false] r8 into r9 as Slot__7TplVV5Wf75;
+    cast 0u32 into r10 as Slot__7TplVV5Wf75;
+    ternary r7 r9.amount r10.amount into r11;
+    cast r11 into r12 as Slot__7TplVV5Wf75;
+    cast r7 r12 into r13 as Optional__La7VnyGROeg;
+    contains.dynamic r0 'aleo' 'entry__'[false] into r14;
+    cast 0u32 into r15 as Slot__7TplVV5Wf75;
+    get.or_use.dynamic r0 'aleo' 'entry__'[false] r15 into r16 as Slot__7TplVV5Wf75;
+    cast 0u32 into r17 as Slot__7TplVV5Wf75;
+    ternary r14 r16.amount r17.amount into r18;
+    cast r18 into r19 as Slot__7TplVV5Wf75;
+    cast r14 r19 into r20 as Optional__La7VnyGROeg;
+    assert.eq r13 r20;
 
 constructor:
     assert.eq edition 0u16;

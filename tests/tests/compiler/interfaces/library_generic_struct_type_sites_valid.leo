@@ -8,6 +8,9 @@ export struct Array::[N: u32] {
     values: [u8; N],
 }
 
+export struct Slot::[N: u32] { amount: u32 }
+export interface Read { storage entry: Slot::[2u32]; }
+
 // --- Next Program --- //
 
 // --- library: inventory --- //
@@ -47,6 +50,12 @@ export struct Legacy::[N: u32] {
 }
 
 // These specializations occur only in interface prototypes.
+// The consumer does not call this member, so its specialization is ABI-only.
+export interface Unused {
+    fn unused() -> Legacy::[23u32];
+    fn unused_array() -> shapes::Array::[29u32];
+}
+
 export interface RootOnly {
     fn root() -> Legacy::[13u32];
 }
@@ -88,6 +97,15 @@ program consumer.aleo: generic_shapes::Storer {
         return generic_shapes::nested::ModuleOnly@(target)::nested().values[0u32];
     }
 
+    fn check_current(target: identifier) -> Final {
+        return final { check_storage(target); };
+    }
+
     @noupgrade
     constructor() {}
+}
+
+export final fn check_storage(target: identifier) {
+    assert_eq((generic_shapes::Storer@(target)::current).unwrap().amount, 8u32);
+    assert_eq(shapes::Read@(target)::entry, shapes::Read@(target)::entry);
 }
