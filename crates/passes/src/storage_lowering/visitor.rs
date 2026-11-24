@@ -226,6 +226,51 @@ impl StorageLoweringVisitor<'_> {
         BinaryExpression { op, left, right, span: Span::default(), id: self.state.node_builder.next_id() }.into()
     }
 
+    /// Records the wrapper name emitted by older compilers for a dynamic read of root library storage.
+    pub fn record_legacy_storage_option(&mut self, interface: &TypeKind, inner: &TypeKind, read: &Expression) {
+        let TypeKind::Composite(interface) = interface else { return };
+        let owner = interface.path.expect_global_location();
+        if owner.path.len() != 1 || !self.state.symbol_table.is_library(owner.program) {
+            return;
+        }
+
+        fn legacy_inner(state: &CompilerState, ty: &TypeKind) -> Option<(Location, TypeKind)> {
+            match ty {
+                TypeKind::Array(array) => {
+                    let (value, element) = legacy_inner(state, array.element_type())?;
+                    let mut array = array.clone();
+                    array.element_type = Box::new(element);
+                    Some((value, TypeKind::Array(array)))
+                }
+                TypeKind::Composite(value) => {
+                    let location = value.path.expect_global_location();
+                    let template = state.legacy_interface_types.get(location)?;
+                    Some((location.clone(), TypeKind::Composite(template.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        if let Some((value, legacy)) = legacy_inner(self.state, inner) {
+            let Expression::Ternary(ternary) = read else { unreachable!("a lowered storage read is a ternary") };
+            self.state.dynamic_storage_values.extend([ternary.if_true.id(), ternary.if_false.id()]);
+            let old = Location::new(self.program, vec![crate::make_optional_struct_symbol(&legacy)]);
+            // Historical wrapper names omit the library owner. Keep the first owner's definition
+            // and use the specialized wrapper for any other owner's nominally distinct type.
+            let templates = &self.state.legacy_interface_types;
+            if self.state.legacy_storage_options.values().any(|(claimed, prior, _, _)| {
+                *claimed == old
+                    && templates[prior].path.expect_global_location() != templates[&value].path.expect_global_location()
+            }) {
+                return;
+            }
+            let new = crate::make_optional_struct_symbol(inner);
+            self.state
+                .legacy_storage_options
+                .insert(Location::new(self.program, vec![new]), (old, value, legacy, false));
+        }
+    }
+
     /// Lowers `Interface@(target)::storage` (singleton bare read) to a ternary
     /// `contains.dynamic ? get_or_use.dynamic(..) : None` producing `Option<T>`.
     pub fn lower_dynamic_read(
@@ -270,6 +315,7 @@ impl StorageLoweringVisitor<'_> {
 
         let none_expr: Expression = Literal::none(Span::default(), self.state.node_builder.next_id()).into();
         let ternary = self.ternary_expr(contains_expr, get_or_use_expr, none_expr, span);
+        self.record_legacy_storage_option(&interface_ty, storage_proto.type_.kind(), &ternary);
 
         let mut stmts = prog_stmts;
         stmts.extend(net_stmts);

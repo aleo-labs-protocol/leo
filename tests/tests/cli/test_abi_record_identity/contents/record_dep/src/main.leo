@@ -7,6 +7,7 @@ program record_dep.aleo : types::ModuleRecords {
     record ModuleRecord {
         owner: address,
         amount: u32,
+        empty: [u8; 0u32],
     }
 
     fn echo_module_record(value: ModuleRecord) -> ModuleRecord {

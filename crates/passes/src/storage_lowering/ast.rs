@@ -697,7 +697,7 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
                         unreachable!("filtered above");
                     };
                     if op.name == sym::get {
-                        return self.lower_dynamic_vector_get(
+                        let read = self.lower_dynamic_vector_get(
                             input.target_program,
                             input.network,
                             member,
@@ -705,6 +705,8 @@ impl leo_ast::AstReconstructor for StorageLoweringVisitor<'_> {
                             arguments,
                             input.span,
                         );
+                        self.record_legacy_storage_option(&input.interface, element_type, &read.0);
+                        return read;
                     }
                     debug_assert_eq!(op.name, sym::len, "type checking guarantees vector ops are `get` or `len`");
                     return self.lower_dynamic_vector_len(input.target_program, input.network, member, input.span);

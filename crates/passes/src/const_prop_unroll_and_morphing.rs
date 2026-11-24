@@ -45,6 +45,11 @@ impl Pass for ConstPropUnrollAndMorphing {
     fn do_pass(input: Self::Input, state: &mut CompilerState) -> Result<Self::Output> {
         const LARGE_LOOP_BOUND: usize = 1024usize;
 
+        state.interface_only_structs.clear();
+        state.legacy_interface_types.clear();
+        state.legacy_storage_options.clear();
+        state.dynamic_storage_values.clear();
+        let mut legacy_interface_structs = indexmap::IndexSet::new();
         for _ in 0..LARGE_LOOP_BOUND {
             let loop_unroll_output = Unrolling::do_pass((), state)?;
 
@@ -53,6 +58,7 @@ impl Pass for ConstPropUnrollAndMorphing {
             let remove_unreachable_output = RemoveUnreachable::do_pass((), state)?;
 
             let monomorphization_output = Monomorphization::do_pass((), state)?;
+            legacy_interface_structs.extend(monomorphization_output.legacy_interface_structs);
 
             // Clear the symbol table and create it again. This is important because after all the passes above run, the
             // program may have changed significantly (new functions may have been added, some functions may have been
@@ -138,6 +144,8 @@ impl Pass for ConstPropUnrollAndMorphing {
                     return Err(compiler_error_fns::loop_bounds_not_evaluated(not_unrolled_span).into());
                 }
 
+                // Keep historical bytecode declarations only after generic argument resolution is complete.
+                state.legacy_interface_structs = legacy_interface_structs;
                 return Ok(());
             }
         }

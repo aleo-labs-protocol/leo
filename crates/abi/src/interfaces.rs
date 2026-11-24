@@ -51,12 +51,14 @@ use std::collections::HashSet;
 // ------------------------------------------------------------------------- //
 
 /// A generated interface ABI together with its ownership information.
+#[derive(Clone)]
 pub struct CompiledInterface {
     pub owner: InterfaceOwner,
     pub abi: abi::Interface,
 }
 
 /// Where the interface is defined relative to the unit being built.
+#[derive(Clone)]
 pub enum InterfaceOwner {
     /// Defined in the primary program/library being built.
     /// Written to `build/interfaces/<module_path>/<Name>.json`.
@@ -168,7 +170,7 @@ pub fn generate_program_interfaces(ast: &ast::Program) -> Vec<CompiledInterface>
 /// Emits interface ABIs for every interface locally defined in the library
 /// (top-level + modules).
 pub fn generate_library_interfaces(library: &ast::Library) -> Vec<CompiledInterface> {
-    let cs = CompositeSource::Library { library, stubs: &library.stubs };
+    let cs = CompositeSource::Library { library, stubs: &library.stubs, standalone: true };
     let mut result = Vec::new();
 
     for (_, iface) in &library.interfaces {
@@ -199,6 +201,8 @@ enum CompositeSource<'a> {
     },
     Library {
         library: &'a ast::Library,
+        // A caller can supply an unspecialized library AST whose prototypes still name templates.
+        standalone: bool,
         stubs: &'a IndexMap<Symbol, ast::Stub>,
     },
 }
@@ -211,35 +215,28 @@ impl<'a> CompositeSource<'a> {
             CompositeSource::Program { scope, modules, stubs } => {
                 find_composite_at_location(location, scope.program_id.as_symbol(), &scope.composites, modules, stubs)
             }
-            CompositeSource::Library { library, stubs } => {
+            CompositeSource::Library { library, stubs, .. } => {
                 find_composite_at_location(location, library.name, &library.structs, &library.modules, stubs)
             }
         };
         composite.is_some_and(|composite| composite.is_record)
     }
 
-    /// Collects all struct (non-record) composites as ABI structs.
+    /// Collects the struct definitions available at this stage of compilation.
     fn all_structs(&self) -> Vec<abi::Struct> {
-        let mut out = Vec::new();
-        match self {
-            CompositeSource::Program { scope, modules, .. } => {
-                out.extend(scope.composites.iter().filter(|(_, c)| !c.is_record).map(|(_, c)| convert_struct(c, &[])));
-                for (mp, module) in *modules {
-                    out.extend(
-                        module.composites.iter().filter(|(_, c)| !c.is_record).map(|(_, c)| convert_struct(c, mp)),
-                    );
-                }
-            }
-            CompositeSource::Library { library, .. } => {
-                out.extend(library.structs.iter().filter(|(_, c)| !c.is_record).map(|(_, c)| convert_struct(c, &[])));
-                for (mp, module) in &library.modules {
-                    out.extend(
-                        module.composites.iter().filter(|(_, c)| !c.is_record).map(|(_, c)| convert_struct(c, mp)),
-                    );
-                }
-            }
-        }
-        out
+        let (root, modules, include_templates) = match self {
+            CompositeSource::Program { scope, modules, .. } => (&scope.composites, *modules, false),
+            CompositeSource::Library { library, standalone, .. } => (&library.structs, &library.modules, *standalone),
+        };
+        std::iter::once((&[][..], root))
+            .chain(modules.iter().map(|(path, module)| (path.as_slice(), &module.composites)))
+            .flat_map(|(path, composites)| {
+                composites
+                    .iter()
+                    .filter(move |(_, c)| !c.is_record && (include_templates || c.const_parameters.is_empty()))
+                    .map(move |(_, c)| convert_struct(c, path))
+            })
+            .collect()
     }
 
     /// Collects all record composites as ABI records.
@@ -280,7 +277,9 @@ fn composite_source_for_stub<'a>(
             let scope = program.program_scopes.values().next().unwrap();
             CompositeSource::Program { scope, modules: &program.modules, stubs: reachable_stubs }
         }
-        ast::Stub::FromLibrary { library, .. } => CompositeSource::Library { library, stubs: reachable_stubs },
+        ast::Stub::FromLibrary { library, .. } => {
+            CompositeSource::Library { library, stubs: reachable_stubs, standalone: false }
+        }
         ast::Stub::FromAleo { .. } => {
             // Aleo stubs can't define interfaces, so this shouldn't be reached.
             // Use an empty library as a placeholder.
@@ -547,5 +546,10 @@ fn collect_interface_structs<'a>(
     collect_transitive_from_structs(&all_structs, program_name, &mut used_types);
     collect_transitive_from_records(&all_records, program_name, &mut used_types);
 
-    all_structs.into_iter().filter(|s| used_types.contains(&s.path)).collect()
+    let mut structs: Vec<_> = all_structs.into_iter().filter(|s| used_types.contains(&s.path)).collect();
+    // A consumer can instantiate generic structs in a different order from the interface prototypes.
+    if structs.iter().any(|s| s.path.last().is_some_and(|name| name.contains("::["))) {
+        structs.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+    }
+    structs
 }

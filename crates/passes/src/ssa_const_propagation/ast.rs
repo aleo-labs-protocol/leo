@@ -74,7 +74,7 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
 
         if let Expression::Path(path) = &input.inner
             && let Some(name) = path.try_local_symbol()
-            && let Some(fields) = self.atom_fielded_composites.get(&name)
+            && let Some((fields, _)) = self.atom_fielded_composites.get(&name)
             && let Some(atom) = fields.get(&input.name.name)
         {
             self.changed = true;
@@ -578,8 +578,17 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
                 true
             });
             if all_atoms {
-                self.atom_fielded_composites.insert(identifier.name, fields);
+                let storage_option =
+                    self.state.legacy_storage_options.contains_key(composite.path.expect_global_location());
+                self.atom_fielded_composites.insert(identifier.name, (fields, storage_option));
             }
+        } else if let (DefinitionPlace::Single(identifier), Expression::Path(path)) = (&input.place, &new_value)
+            && let Some(source) = path.try_local_symbol()
+            && let Some((fields, true)) = self.atom_fielded_composites.get(&source)
+        {
+            // Preserve the projections through SSA copies of a dynamic storage read. If the wrapper
+            // never escapes, DCE can remove its cast while its value keeps the concrete mapping type.
+            self.atom_fielded_composites.insert(identifier.name, (fields.clone(), true));
         }
 
         input.value = new_value;

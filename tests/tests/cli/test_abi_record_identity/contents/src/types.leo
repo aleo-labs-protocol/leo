@@ -14,6 +14,7 @@ export interface ModuleRecords {
     record ModuleRecord {
         owner: address,
         amount: u32,
+        empty: [u8; 0u32],
         ..
     }
 
