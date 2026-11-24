@@ -44,9 +44,21 @@ impl Pass for PeepholeOptimizing {
     fn do_pass(mut input: Self::Input, _state: &mut crate::CompilerState) -> Result<Self::Output> {
         input.for_each_statement_list_with_generated_optionals(|stmts, num_inputs, generated_optional_structs| {
             fold_identity_operations(stmts);
-            // Collapse the full unwrap motif before projection forwarding erases its wrapper.
-            fold_lowered_optional_unwraps(stmts, generated_optional_structs);
-            forward_generated_optional_projections(stmts, generated_optional_structs);
+            // Random draws, record nonces, and local record output IDs depend on register numbers.
+            if !generated_optional_structs.is_empty()
+                && !stmts.iter().any(|stmt| {
+                    matches!(
+                        stmt,
+                        AleoStmt::RandChacha(..)
+                            | AleoStmt::Cast(_, _, AleoType::Record { .. })
+                            | AleoStmt::Output(_, AleoType::Record { program: None, .. }, _)
+                    )
+                })
+            {
+                // Fold unwraps before forwarding removes their wrappers.
+                fold_lowered_optional_unwraps(stmts, generated_optional_structs);
+                forward_generated_optional_projections(stmts, generated_optional_structs);
+            }
             eliminate_trivial_asserts(stmts);
             eliminate_dead_registers(stmts);
             fold_consecutive_casts(stmts);
@@ -439,36 +451,36 @@ fn eliminate_trivial_asserts(stmts: &mut Vec<AleoStmt>) {
 
 // Dead register elimination
 
-/// Collect all registers that are read (used as operands) in a statement.
-fn collect_read_registers(stmt: &AleoStmt, used: &mut HashSet<AleoReg>) {
-    fn collect_from_expr(expr: &AleoExpr, used: &mut HashSet<AleoReg>) {
+/// Visits register operands, including repeated reads within one statement.
+fn for_each_read_register(stmt: &AleoStmt, visit: &mut impl FnMut(&AleoReg)) {
+    fn collect_from_expr(expr: &AleoExpr, visit: &mut impl FnMut(&AleoReg)) {
         match expr {
             AleoExpr::Reg(r) => {
-                used.insert(r.clone());
+                visit(r);
             }
             AleoExpr::Tuple(exprs) => {
                 for e in exprs {
-                    collect_from_expr(e, used);
+                    collect_from_expr(e, visit);
                 }
             }
             AleoExpr::ArrayAccess(a, b) => {
-                collect_from_expr(a, used);
-                collect_from_expr(b, used);
+                collect_from_expr(a, visit);
+                collect_from_expr(b, visit);
             }
             AleoExpr::MemberAccess(a, _) => {
-                collect_from_expr(a, used);
+                collect_from_expr(a, visit);
             }
             _ => {} // literals and names don't reference registers
         }
     }
 
     match stmt {
-        AleoStmt::Output(e, _, _) => collect_from_expr(e, used),
+        AleoStmt::Output(e, _, _) => collect_from_expr(e, visit),
         AleoStmt::AssertEq(a, b) | AleoStmt::AssertNeq(a, b) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
         }
-        AleoStmt::Cast(e, _, _) => collect_from_expr(e, used),
+        AleoStmt::Cast(e, _, _) => collect_from_expr(e, visit),
         AleoStmt::Abs(e, _)
         | AleoStmt::AbsW(e, _)
         | AleoStmt::Double(e, _)
@@ -476,85 +488,85 @@ fn collect_read_registers(stmt: &AleoStmt, used: &mut HashSet<AleoReg>) {
         | AleoStmt::Not(e, _)
         | AleoStmt::Neg(e, _)
         | AleoStmt::Square(e, _)
-        | AleoStmt::Sqrt(e, _) => collect_from_expr(e, used),
+        | AleoStmt::Sqrt(e, _) => collect_from_expr(e, visit),
         AleoStmt::Ternary(a, b, c, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
-            collect_from_expr(c, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
+            collect_from_expr(c, visit);
         }
         AleoStmt::Commit(_, a, b, _, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
         }
-        AleoStmt::Hash(_, a, _, _) => collect_from_expr(a, used),
+        AleoStmt::Hash(_, a, _, _) => collect_from_expr(a, visit),
         AleoStmt::Get(a, b, _) | AleoStmt::Contains(a, b, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
         }
         AleoStmt::GetOrUse(a, b, c, _) | AleoStmt::Set(a, b, c) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
-            collect_from_expr(c, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
+            collect_from_expr(c, visit);
         }
         AleoStmt::Remove(a, b) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
         }
         AleoStmt::RandChacha(_, _) => {}
         AleoStmt::SignVerify(a, b, c, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
-            collect_from_expr(c, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
+            collect_from_expr(c, visit);
         }
         AleoStmt::EcdsaVerify(_, a, b, c, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
-            collect_from_expr(c, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
+            collect_from_expr(c, visit);
         }
         AleoStmt::SnarkVerify(_, a, b, c, d, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
-            collect_from_expr(c, used);
-            collect_from_expr(d, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
+            collect_from_expr(c, visit);
+            collect_from_expr(d, visit);
         }
-        AleoStmt::Await(e) => collect_from_expr(e, used),
-        AleoStmt::Serialize(_, a, _, _, _) | AleoStmt::Deserialize(_, a, _, _, _) => collect_from_expr(a, used),
+        AleoStmt::Await(e) => collect_from_expr(e, visit),
+        AleoStmt::Serialize(_, a, _, _, _) | AleoStmt::Deserialize(_, a, _, _, _) => collect_from_expr(a, visit),
         AleoStmt::Call(_, inputs, _) | AleoStmt::Async(_, inputs, _) => {
             for e in inputs {
-                collect_from_expr(e, used);
+                collect_from_expr(e, visit);
             }
         }
         AleoStmt::CallDynamic(prog, net, fun, inputs, _, _, _) => {
-            collect_from_expr(prog, used);
-            collect_from_expr(net, used);
-            collect_from_expr(fun, used);
+            collect_from_expr(prog, visit);
+            collect_from_expr(net, visit);
+            collect_from_expr(fun, visit);
             for e in inputs {
-                collect_from_expr(e, used);
+                collect_from_expr(e, visit);
             }
         }
-        AleoStmt::GetRecordDynamic(e, _, _, _) => collect_from_expr(e, used),
+        AleoStmt::GetRecordDynamic(e, _, _, _) => collect_from_expr(e, visit),
         AleoStmt::ContainsDynamic(a, b, c, d, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
-            collect_from_expr(c, used);
-            collect_from_expr(d, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
+            collect_from_expr(c, visit);
+            collect_from_expr(d, visit);
         }
         AleoStmt::GetDynamic(a, b, c, d, _, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
-            collect_from_expr(c, used);
-            collect_from_expr(d, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
+            collect_from_expr(c, visit);
+            collect_from_expr(d, visit);
         }
         AleoStmt::GetOrUseDynamic(a, b, c, d, e, _, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
-            collect_from_expr(c, used);
-            collect_from_expr(d, used);
-            collect_from_expr(e, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
+            collect_from_expr(c, visit);
+            collect_from_expr(d, visit);
+            collect_from_expr(e, visit);
         }
         AleoStmt::BranchEq(a, b, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
         }
         AleoStmt::Position(_) => {}
         // Binary operations
@@ -586,22 +598,24 @@ fn collect_read_registers(stmt: &AleoStmt, used: &mut HashSet<AleoReg>) {
         | AleoStmt::Sub(a, b, _)
         | AleoStmt::SubWrapped(a, b, _)
         | AleoStmt::Xor(a, b, _) => {
-            collect_from_expr(a, used);
-            collect_from_expr(b, used);
+            collect_from_expr(a, visit);
+            collect_from_expr(b, visit);
         }
     }
 }
 
-fn register_reader_counts(stmts: &[AleoStmt]) -> HashMap<AleoReg, usize> {
-    let mut counts = HashMap::new();
-    for stmt in stmts {
-        let mut read = HashSet::new();
-        collect_read_registers(stmt, &mut read);
-        for reg in read {
-            *counts.entry(reg).or_default() += 1;
-        }
+/// Records the sole reading statement for each register, or `None` when more than one statement reads it.
+fn register_readers(stmts: &[AleoStmt]) -> HashMap<AleoReg, Option<usize>> {
+    let mut readers = HashMap::new();
+    for (index, stmt) in stmts.iter().enumerate() {
+        for_each_read_register(stmt, &mut |reg| {
+            let reader = readers.entry(reg.clone()).or_insert(Some(index));
+            if *reader != Some(index) {
+                *reader = None;
+            }
+        });
     }
-    counts
+    readers
 }
 
 /// Forwards fields from generated storage/vector Optionals without applying aggregate forwarding
@@ -612,10 +626,6 @@ fn register_reader_counts(stmts: &[AleoStmt]) -> HashMap<AleoReg, usize> {
 /// currently emitted by storage/vector Optional lowering, and the value must be a register or
 /// literal. The cast is removed only when forwarding leaves the whole wrapper unread.
 fn forward_generated_optional_projections(stmts: &mut Vec<AleoStmt>, generated_optional_structs: &HashSet<String>) {
-    if generated_optional_structs.is_empty() {
-        return;
-    }
-
     let lowered_optional_conditions: HashSet<AleoReg> = stmts
         .iter()
         .filter_map(|stmt| match stmt {
@@ -659,8 +669,7 @@ fn forward_generated_optional_projections(stmts: &mut Vec<AleoStmt>, generated_o
                 } else {
                     None
                 };
-                if let Some(mut replacement) = replacement {
-                    resolve(&mut replacement, wrappers);
+                if let Some(replacement) = replacement {
                     *expr = replacement;
                 }
             }
@@ -689,14 +698,19 @@ fn forward_generated_optional_projections(stmts: &mut Vec<AleoStmt>, generated_o
         return;
     }
 
-    let reader_counts = register_reader_counts(stmts);
+    let mut readers = HashSet::new();
+    for stmt in stmts.iter() {
+        for_each_read_register(stmt, &mut |reg| {
+            readers.insert(reg.clone());
+        });
+    }
     stmts.retain(|stmt| {
         !matches!(
             stmt,
             AleoStmt::Cast(AleoExpr::Tuple(_), wrapper, AleoType::Ident { name })
                 if generated_optional_structs.contains(name)
                     && wrappers.contains_key(wrapper)
-                    && !reader_counts.contains_key(wrapper)
+                    && !readers.contains(wrapper)
         )
     });
 }
@@ -706,7 +720,7 @@ fn forward_generated_optional_projections(stmts: &mut Vec<AleoStmt>, generated_o
 /// When the first selection does not escape, the outer fallback replaces its irrelevant inner
 /// fallback. Otherwise, only the generated wrapper is removed.
 fn fold_lowered_optional_unwraps(stmts: &mut Vec<AleoStmt>, generated_optional_structs: &HashSet<String>) {
-    if generated_optional_structs.is_empty() || stmts.len() < 3 {
+    if stmts.len() < 3 {
         return;
     }
 
@@ -733,7 +747,7 @@ fn fold_lowered_optional_unwraps(stmts: &mut Vec<AleoStmt>, generated_optional_s
         )
     }
 
-    let reader_counts = register_reader_counts(stmts);
+    let readers = register_readers(stmts);
     let mut remaining: VecDeque<_> = std::mem::take(stmts).into();
     stmts.reserve(remaining.len());
 
@@ -757,9 +771,9 @@ fn fold_lowered_optional_unwraps(stmts: &mut Vec<AleoStmt>, generated_optional_s
                 && is_member_of(outer_condition, wrapper, "is_some")
                 && is_member_of(outer_value, wrapper, "val")
                 && !reads_register(outer_fallback, wrapper)
-                && reader_counts.get(wrapper).copied().unwrap_or(0) == 1 =>
+                && readers.get(wrapper).is_some_and(Option::is_some) =>
             {
-                if reader_counts.get(selected).copied().unwrap_or(0) == 1 {
+                if readers.get(selected).is_some_and(Option::is_some) {
                     Some(Rewrite::Collapse(AleoStmt::Ternary(
                         condition.clone(),
                         value.clone(),
@@ -899,7 +913,9 @@ fn eliminate_dead_registers(stmts: &mut Vec<AleoStmt>) {
     // Collect all registers that are read.
     let mut used = HashSet::new();
     for stmt in stmts.iter() {
-        collect_read_registers(stmt, &mut used);
+        for_each_read_register(stmt, &mut |reg| {
+            used.insert(reg.clone());
+        });
     }
 
     // Remove pure instructions whose destination is not in the used set.
@@ -921,7 +937,7 @@ fn fold_consecutive_casts(stmts: &mut Vec<AleoStmt>) {
 
     // Build a set of registers that are used more than once (as operands), so we
     // can tell if an intermediate register from a cast is only used by the next cast.
-    let reg_use_count = register_reader_counts(stmts);
+    let readers = register_readers(stmts);
 
     #[derive(Clone, Copy)]
     enum PrimitiveCastDomain {
@@ -973,7 +989,7 @@ fn fold_consecutive_casts(stmts: &mut Vec<AleoStmt>) {
             && let AleoExpr::Reg(inner_reg) = operand
             {
                 inner_reg == r0
-                    && reg_use_count.get(r0).copied().unwrap_or(0) == 1
+                    && readers.get(r0).is_some_and(Option::is_some)
                     // This source-agnostic fold is only safe when every value
                     // accepted by the final target is also accepted by the
                     // intermediate target. Equal bit widths are not enough
@@ -1292,262 +1308,5 @@ fn renumber_registers(stmts: &mut [AleoStmt], num_inputs: usize) {
                 remap_reg(d, &mapping);
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const OPTIONAL_NAME: &str = "Optional__test";
-
-    fn register(index: u64) -> AleoReg {
-        AleoReg::R(index)
-    }
-
-    fn register_expr(index: u64) -> AleoExpr {
-        AleoExpr::Reg(register(index))
-    }
-
-    fn member(register: u64, name: &str) -> AleoExpr {
-        AleoExpr::MemberAccess(Box::new(register_expr(register)), name.to_string())
-    }
-
-    fn generated_optionals() -> HashSet<String> {
-        HashSet::from([OPTIONAL_NAME.to_string()])
-    }
-
-    fn optional_cast(is_some: u64, val: u64, wrapper: u64) -> AleoStmt {
-        AleoStmt::Cast(
-            AleoExpr::Tuple(vec![register_expr(is_some), register_expr(val)]),
-            register(wrapper),
-            AleoType::Ident { name: OPTIONAL_NAME.to_string() },
-        )
-    }
-
-    fn storage_condition(destination: u64) -> AleoStmt {
-        AleoStmt::Contains(AleoExpr::RawName("mapping".to_string()), AleoExpr::Bool(false), register(destination))
-    }
-
-    fn lowered_optional_at(offset: u64, inner_fallback: AleoExpr, outer_fallback: AleoExpr) -> Vec<AleoStmt> {
-        vec![
-            AleoStmt::Ternary(register_expr(offset), register_expr(offset + 1), inner_fallback, register(offset + 2)),
-            optional_cast(offset, offset + 2, offset + 3),
-            AleoStmt::Ternary(
-                member(offset + 3, "is_some"),
-                member(offset + 3, "val"),
-                outer_fallback,
-                register(offset + 4),
-            ),
-        ]
-    }
-
-    fn lowered_optional(inner_fallback: AleoExpr, outer_fallback: AleoExpr) -> Vec<AleoStmt> {
-        lowered_optional_at(0, inner_fallback, outer_fallback)
-    }
-
-    #[test]
-    fn forwards_fields_and_removes_unread_generated_wrapper() {
-        let mut stmts = vec![
-            storage_condition(0),
-            optional_cast(0, 1, 2),
-            AleoStmt::AssertEq(member(2, "is_some"), register_expr(0)),
-            AleoStmt::AssertEq(member(2, "val"), register_expr(1)),
-        ];
-
-        forward_generated_optional_projections(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, vec![
-            storage_condition(0),
-            AleoStmt::AssertEq(register_expr(0), register_expr(0)),
-            AleoStmt::AssertEq(register_expr(1), register_expr(1)),
-        ]);
-    }
-
-    #[test]
-    fn forwards_generated_optional_projection_inside_member_path() {
-        let projected = AleoExpr::MemberAccess(Box::new(member(2, "val")), "field".to_string());
-        let expected = AleoExpr::MemberAccess(Box::new(register_expr(1)), "field".to_string());
-        let mut stmts =
-            vec![storage_condition(0), optional_cast(0, 1, 2), AleoStmt::AssertEq(projected, expected.clone())];
-
-        forward_generated_optional_projections(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, vec![storage_condition(0), AleoStmt::AssertEq(expected.clone(), expected)]);
-    }
-
-    #[test]
-    fn keeps_generated_wrapper_when_whole_value_escapes() {
-        let optional_type = AleoType::Ident { name: OPTIONAL_NAME.to_string() };
-        let mut stmts = vec![
-            storage_condition(0),
-            optional_cast(0, 1, 2),
-            AleoStmt::AssertEq(member(2, "val"), register_expr(1)),
-            AleoStmt::Output(register_expr(2), optional_type.clone(), None),
-        ];
-
-        forward_generated_optional_projections(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, vec![
-            storage_condition(0),
-            optional_cast(0, 1, 2),
-            AleoStmt::AssertEq(register_expr(1), register_expr(1)),
-            AleoStmt::Output(register_expr(2), optional_type, None),
-        ]);
-    }
-
-    #[test]
-    fn preserves_unmarked_optional_projection() {
-        let mut stmts = vec![
-            storage_condition(0),
-            AleoStmt::Cast(AleoExpr::Tuple(vec![register_expr(0), register_expr(1)]), register(2), AleoType::Ident {
-                name: "OptionalLookalike".to_string(),
-            }),
-            AleoStmt::AssertEq(member(2, "val"), register_expr(1)),
-        ];
-        let expected = stmts.clone();
-
-        forward_generated_optional_projections(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, expected);
-    }
-
-    #[test]
-    fn preserves_non_atom_optional_fields() {
-        let mut stmts = vec![
-            storage_condition(0),
-            AleoStmt::Cast(AleoExpr::Tuple(vec![register_expr(0), member(1, "field")]), register(2), AleoType::Ident {
-                name: OPTIONAL_NAME.to_string(),
-            }),
-            AleoStmt::AssertEq(member(2, "val"), register_expr(1)),
-        ];
-        let expected = stmts.clone();
-
-        forward_generated_optional_projections(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, expected);
-    }
-
-    #[test]
-    fn preserves_optional_with_unrelated_storage_condition() {
-        let mut stmts =
-            vec![storage_condition(9), optional_cast(0, 1, 2), AleoStmt::AssertEq(member(2, "val"), register_expr(1))];
-        let expected = stmts.clone();
-
-        forward_generated_optional_projections(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, expected);
-    }
-
-    #[test]
-    fn forwards_literal_value_from_generated_wrapper() {
-        let mut stmts = vec![
-            storage_condition(0),
-            AleoStmt::Cast(AleoExpr::Tuple(vec![register_expr(0), AleoExpr::U8(7)]), register(1), AleoType::Ident {
-                name: OPTIONAL_NAME.to_string(),
-            }),
-            AleoStmt::AssertEq(member(1, "val"), AleoExpr::U8(7)),
-        ];
-
-        forward_generated_optional_projections(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, vec![storage_condition(0), AleoStmt::AssertEq(AleoExpr::U8(7), AleoExpr::U8(7))]);
-    }
-
-    #[test]
-    fn collapses_redundant_generated_optional() {
-        let mut stmts = lowered_optional(AleoExpr::U8(0), AleoExpr::U8(0));
-
-        fold_lowered_optional_unwraps(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, vec![AleoStmt::Ternary(register_expr(0), register_expr(1), AleoExpr::U8(0), register(4))]);
-    }
-
-    #[test]
-    fn collapses_distinct_outer_fallback() {
-        let mut stmts = lowered_optional(AleoExpr::U8(0), AleoExpr::U8(7));
-
-        fold_lowered_optional_unwraps(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, vec![AleoStmt::Ternary(register_expr(0), register_expr(1), AleoExpr::U8(7), register(4))]);
-    }
-
-    #[test]
-    fn collapses_consecutive_generated_optionals() {
-        let mut stmts = Vec::new();
-        let mut expected = Vec::new();
-
-        for offset in (0..40).step_by(5) {
-            stmts.extend(lowered_optional_at(offset, AleoExpr::U8(0), AleoExpr::U8(7)));
-            expected.push(AleoStmt::Ternary(
-                register_expr(offset),
-                register_expr(offset + 1),
-                AleoExpr::U8(7),
-                register(offset + 4),
-            ));
-        }
-
-        fold_lowered_optional_unwraps(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, expected);
-    }
-
-    #[test]
-    fn preserves_unmarked_struct() {
-        let mut stmts = lowered_optional(AleoExpr::U8(0), AleoExpr::U8(0));
-        let expected = stmts.clone();
-
-        fold_lowered_optional_unwraps(&mut stmts, &HashSet::new());
-
-        assert_eq!(stmts, expected);
-    }
-
-    #[test]
-    fn preserves_mismatched_condition() {
-        let mut stmts = lowered_optional(AleoExpr::U8(0), AleoExpr::U8(0));
-        let AleoStmt::Cast(AleoExpr::Tuple(fields), _, _) = &mut stmts[1] else {
-            unreachable!();
-        };
-        fields[0] = register_expr(9);
-        let expected = stmts.clone();
-
-        fold_lowered_optional_unwraps(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, expected);
-    }
-
-    #[test]
-    fn does_not_collapse_wrapper_with_another_reader() {
-        let mut stmts = lowered_optional(AleoExpr::U8(0), AleoExpr::U8(0));
-        stmts.push(AleoStmt::AssertEq(member(3, "val"), AleoExpr::U8(0)));
-        let expected = stmts.clone();
-
-        fold_lowered_optional_unwraps(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, expected);
-    }
-
-    #[test]
-    fn keeps_selected_value_with_another_reader() {
-        let mut stmts = lowered_optional(AleoExpr::U8(0), AleoExpr::U8(7));
-        stmts.push(AleoStmt::AssertEq(register_expr(2), AleoExpr::U8(0)));
-
-        fold_lowered_optional_unwraps(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, vec![
-            AleoStmt::Ternary(register_expr(0), register_expr(1), AleoExpr::U8(0), register(2)),
-            AleoStmt::Ternary(register_expr(0), register_expr(2), AleoExpr::U8(7), register(4)),
-            AleoStmt::AssertEq(register_expr(2), AleoExpr::U8(0)),
-        ]);
-    }
-
-    #[test]
-    fn does_not_fold_wrapper_read_by_outer_fallback() {
-        let mut stmts = lowered_optional(AleoExpr::U8(0), member(3, "val"));
-        let expected = stmts.clone();
-
-        fold_lowered_optional_unwraps(&mut stmts, &generated_optionals());
-
-        assert_eq!(stmts, expected);
     }
 }

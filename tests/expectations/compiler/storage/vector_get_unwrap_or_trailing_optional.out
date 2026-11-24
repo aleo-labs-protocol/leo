@@ -1,5 +1,9 @@
 program test.aleo;
 
+record Receipt:
+    owner as address.private;
+    amount as u8.private;
+
 struct OptionalLookalike:
     is_some as boolean;
     val as u8;
@@ -75,6 +79,33 @@ finalize dynamic_output_key:
     get.or_use data__[r0] 0u8 into r4;
     ternary r3 r4 0u8 into r5;
     set r5 into result[r1];
+
+function random_after_read:
+    input r0 as u32.private;
+    async random_after_read r0 into r1;
+    output r1 as test.aleo/random_after_read.future;
+
+finalize random_after_read:
+    input r0 as u32.public;
+    get.or_use data__len__[false] 0u32 into r1;
+    lt r0 r1 into r2;
+    get.or_use data__[r0] 0u8 into r3;
+    ternary r2 r3 0u8 into r4;
+    cast r2 r4 into r5 as Optional__3aph2JMPtnA;
+    ternary r5.is_some r5.val 7u8 into r6;
+    set r6 into result[4u32];
+    rand.chacha into r7 as u8;
+    set r7 into result[5u32];
+
+function optional_receipt:
+    input r0 as u8.private;
+    input r1 as u8.private;
+    lt r0 r1 into r2;
+    ternary r2 r0 0u8 into r3;
+    cast r2 r3 into r4 as Optional__3aph2JMPtnA;
+    ternary r4.is_some r4.val 7u8 into r5;
+    cast self.signer r5 into r6 as Receipt.record;
+    output r6 as Receipt.record;
 
 function structural_lookalike:
     input r0 as boolean.private;

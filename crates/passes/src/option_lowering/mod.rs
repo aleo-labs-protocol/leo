@@ -126,8 +126,9 @@ impl Pass for OptionLowering {
     }
 }
 
-fn try_make_optional_struct_symbol(ty: &TypeKind) -> Option<Symbol> {
-    fn display_type(ty: &TypeKind) -> Option<String> {
+pub fn make_optional_struct_symbol(ty: &TypeKind) -> Symbol {
+    // Step 1: Extract a usable type name
+    fn display_type(ty: &TypeKind) -> String {
         match ty {
             TypeKind::Address
             | TypeKind::Field
@@ -135,13 +136,14 @@ fn try_make_optional_struct_symbol(ty: &TypeKind) -> Option<Symbol> {
             | TypeKind::Scalar
             | TypeKind::Signature
             | TypeKind::Boolean
-            | TypeKind::Integer(..) => Some(format!("{ty}")),
+            | TypeKind::Integer(..) => format!("{ty}"),
             TypeKind::Array(ArrayType { element_type, length }) => {
-                Some(format!("[{}; {length}]", display_type(element_type)?))
+                format!("[{}; {length}]", display_type(element_type))
             }
             TypeKind::Composite(CompositeType { path, .. }) => {
-                Some(format!("::{}", path.try_global_location()?.path.iter().format("::")))
+                format!("::{}", path.expect_global_location().path.iter().format("::"))
             }
+
             TypeKind::Tuple(_)
             | TypeKind::Optional(_)
             | TypeKind::Mapping(_)
@@ -153,27 +155,25 @@ fn try_make_optional_struct_symbol(ty: &TypeKind) -> Option<Symbol> {
             | TypeKind::Identifier
             | TypeKind::DynRecord
             | TypeKind::Err
-            | TypeKind::Unit => None,
+            | TypeKind::Unit => {
+                panic!("unexpected inner type in optional struct name")
+            }
         }
     }
 
-    Some(Symbol::intern(&format!("{}?", display_type(ty)?)))
+    // Step 3: Build symbol that ends with `?`.
+    Symbol::intern(&format!("{}?", display_type(ty)))
 }
 
-/// Recognizes the reserved name and field layout emitted by Optional lowering.
-/// The `?`-suffixed raw name cannot originate from a Leo source identifier.
+/// Only Optional lowering can produce a raw struct identifier ending in `?`.
+/// A dependency's bytecode contains the legalized identifier instead.
 pub(crate) fn is_generated_optional_struct(composite: &Composite) -> bool {
-    let [is_some, val] = composite.members.as_slice() else {
+    let [tag, value] = composite.members.as_slice() else {
         return false;
     };
-
     !composite.is_record
-        && is_some.identifier.name == Symbol::intern("is_some")
-        && is_some.type_.kind() == &TypeKind::Boolean
-        && val.identifier.name == Symbol::intern("val")
-        && try_make_optional_struct_symbol(val.type_.kind()) == Some(composite.identifier.name)
-}
-
-pub fn make_optional_struct_symbol(ty: &TypeKind) -> Symbol {
-    try_make_optional_struct_symbol(ty).expect("unexpected inner type in optional struct name")
+        && tag.identifier.name == Symbol::intern("is_some")
+        && tag.type_.kind() == &TypeKind::Boolean
+        && value.identifier.name == Symbol::intern("val")
+        && leo_span::with_session_globals(|sg| composite.identifier.name.as_str(sg, |name| name.ends_with('?')))
 }
