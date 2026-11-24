@@ -112,8 +112,12 @@ impl Command for LeoAbi {
 
         // Satisfies mode: check the input's interface against a JSON ABI standard rather than printing its ABI.
         if let Some(standard) = &self.satisfies {
-            let standard_abi = load_standard_abi(standard)?;
-            let problems = leo_abi::compatibility::check_compatibility(&main_abi, &standard_abi);
+            let mut standard_abi = load_standard_abi(standard)?;
+            // Handwritten and bytecode-derived standards already use Aleo identifiers.
+            let mut problems = leo_abi::compatibility::check_compatibility(&main_abi, &standard_abi);
+            if !problems.is_empty() && lower_struct_paths(&mut standard_abi) {
+                problems = leo_abi::compatibility::check_compatibility(&main_abi, &standard_abi);
+            }
             return report_compatibility(&problems, &main_abi.program, &standard_abi.program, self.output.as_deref());
         }
 
@@ -127,6 +131,91 @@ impl Command for LeoAbi {
 
         Ok(())
     }
+}
+
+/// Translates source struct paths in a Leo standard into the names and owners used by Aleo bytecode.
+fn lower_struct_paths(standard: &mut leo_abi::Program) -> bool {
+    use leo_abi::{FunctionInput, FunctionOutput, Plaintext, StorageType};
+
+    fn lower_path(path: &mut leo_abi::Path, owner: &str) -> bool {
+        if let Some(name) = leo_compiler::abi_struct_identifier(owner, path)
+            && (path.len() != 1 || path[0] != name)
+        {
+            *path = vec![name];
+            true
+        } else {
+            false
+        }
+    }
+
+    let holder = &standard.program;
+    let definitions: std::collections::HashSet<_> = standard.structs.iter().map(|s| s.path.clone()).collect();
+    let lower_type = |mut ty: &mut Plaintext| loop {
+        match ty {
+            Plaintext::Struct(reference) => {
+                let owner = reference.program.as_deref().unwrap_or(holder);
+                // Qualified library references can include the owner in both the path and the program field.
+                // A local declaration's path is relative, even for a module named after its library.
+                if !owner.ends_with(".aleo")
+                    && reference.path.len() > 1
+                    && reference.path[0] == owner
+                    && (owner != holder || !definitions.contains(&reference.path))
+                {
+                    reference.path.remove(0);
+                }
+                let changed = lower_path(&mut reference.path, owner);
+                if changed && !owner.ends_with(".aleo") {
+                    reference.program = None;
+                }
+                break changed;
+            }
+            Plaintext::Array(array) => ty = &mut array.element,
+            Plaintext::Optional(optional) => ty = &mut optional.0,
+            Plaintext::Primitive(_) => break false,
+        }
+    };
+
+    let mut changed = false;
+    for s in &mut standard.structs {
+        changed |= lower_path(&mut s.path, holder);
+        for field in &mut s.fields {
+            changed |= lower_type(&mut field.ty);
+        }
+    }
+    for r in &mut standard.records {
+        for field in &mut r.fields {
+            changed |= lower_type(&mut field.ty);
+        }
+    }
+    for m in &mut standard.mappings {
+        changed |= lower_type(&mut m.key);
+        changed |= lower_type(&mut m.value);
+    }
+    for variable in &mut standard.storage_variables {
+        let mut ty = &mut variable.ty;
+        loop {
+            match ty {
+                StorageType::Vector(inner) => ty = inner,
+                StorageType::Plaintext(plaintext) => {
+                    changed |= lower_type(plaintext);
+                    break;
+                }
+            }
+        }
+    }
+    for f in standard.functions.iter_mut().chain(&mut standard.views) {
+        for input in &mut f.inputs {
+            if let FunctionInput::Plaintext { ty, .. } = input {
+                changed |= lower_type(ty);
+            }
+        }
+        for output in &mut f.outputs {
+            if let FunctionOutput::Plaintext { ty, .. } = output {
+                changed |= lower_type(ty);
+            }
+        }
+    }
+    changed
 }
 
 /// Loads the ABI of an interface standard for the satisfies check from a JSON file (any `.json`

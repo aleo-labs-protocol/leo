@@ -69,6 +69,12 @@ impl Pass for LibraryPruning {
         let Ast::Program(program) = &mut state.ast else { unreachable!("checked above") };
         for stub in program.stubs.values_mut() {
             if let Stub::FromLibrary { library, .. } = stub {
+                // A standalone ABI has no executable roots. Its interface types only need declarations.
+                if !program.program_scopes.is_empty()
+                    && (!library.consts.is_empty() || library.modules.values().any(|m| !m.consts.is_empty()))
+                {
+                    continue;
+                }
                 prune_library(library, &reachable);
             }
         }
@@ -80,11 +86,6 @@ impl Pass for LibraryPruning {
 /// Removes functions not in `reachable` from `library` and its submodules. Structs, consts, and
 /// interfaces are kept for now.
 fn prune_library(library: &mut Library, reachable: &IndexSet<Location>) {
-    let declares_const = !library.consts.is_empty() || library.modules.values().any(|module| !module.consts.is_empty());
-    if declares_const {
-        return;
-    }
-
     let name = library.name;
     library.functions.retain(|(symbol, _)| reachable.contains(&Location::new(name, vec![*symbol])));
 

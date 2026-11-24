@@ -92,8 +92,10 @@ impl UnitReconstructor for MonomorphizationVisitor<'_> {
         // entry points then monomorphizes all of them in one pass; cross-program edges in the
         // call graph make recursive per-stub passes unnecessary. Current-program inserts come
         // last so they override any stub placeholders for overlapping keys.
-        self.program =
-            *input.program_scopes.first().expect("a program must have a single program scope at this stage").0;
+        // Standalone interface ABI generation visits library stubs without a primary program.
+        if let Some((name, _)) = input.program_scopes.first() {
+            self.program = *name;
+        }
 
         for (_, stub) in &input.stubs {
             for (loc, f) in stub_functions(stub) {

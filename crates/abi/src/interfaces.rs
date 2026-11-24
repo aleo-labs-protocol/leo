@@ -51,12 +51,14 @@ use std::collections::HashSet;
 // ------------------------------------------------------------------------- //
 
 /// A generated interface ABI together with its ownership information.
+#[derive(Clone)]
 pub struct CompiledInterface {
     pub owner: InterfaceOwner,
     pub abi: abi::Interface,
 }
 
 /// Where the interface is defined relative to the unit being built.
+#[derive(Clone)]
 pub enum InterfaceOwner {
     /// Defined in the primary program/library being built.
     /// Written to `build/interfaces/<module_path>/<Name>.json`.
@@ -199,7 +201,7 @@ enum CompositeSource<'a> {
     },
     Library {
         library: &'a ast::Library,
-        // Standalone libraries emit ABIs before monomorphization. Their prototypes still name templates.
+        // A caller can supply an unspecialized library AST whose prototypes still name templates.
         standalone: bool,
         stubs: &'a IndexMap<Symbol, ast::Stub>,
     },
@@ -544,5 +546,10 @@ fn collect_interface_structs<'a>(
     collect_transitive_from_structs(&all_structs, program_name, &mut used_types);
     collect_transitive_from_records(&all_records, program_name, &mut used_types);
 
-    all_structs.into_iter().filter(|s| used_types.contains(&s.path)).collect()
+    let mut structs: Vec<_> = all_structs.into_iter().filter(|s| used_types.contains(&s.path)).collect();
+    // A consumer can instantiate generic structs in a different order from the interface prototypes.
+    if structs.iter().any(|s| s.path.last().is_some_and(|name| name.contains("::["))) {
+        structs.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+    }
+    structs
 }

@@ -168,7 +168,7 @@ impl CodeGeneratingVisitor<'_> {
     /// # Returns
     /// - `Some(String)`: A valid Leo identifier.
     /// - `None`: If the path is invalid or cannot be legalized.
-    pub(crate) fn legalize_path(path: &[Symbol]) -> Option<String> {
+    pub(crate) fn legalize_path(path: &[impl std::fmt::Display]) -> Option<String> {
         /// Checks if a string is a legal Leo identifier: [a-zA-Z][a-zA-Z0-9_]*
         fn is_legal_identifier(s: &str) -> bool {
             let mut chars = s.chars();
@@ -178,7 +178,7 @@ impl CodeGeneratingVisitor<'_> {
         }
 
         /// Generates a hashed Leo identifier from the full path, using the given base segment.
-        fn generate_hashed_name(path: &[Symbol], base: &str) -> String {
+        fn generate_hashed_name(path: &[impl std::fmt::Display], base: &str) -> String {
             use base62::encode;
             use sha2::{Digest, Sha256};
             use std::fmt::Write;
@@ -230,7 +230,7 @@ impl CodeGeneratingVisitor<'_> {
             // "some_very_long_storage_variable__len__"
             //  - Keep at most 13 chars from the prefix
             //  - Produces something like: "some_very_lon__len__CpUbpLTf1Ow"
-            let truncated_prefix = &prefix[..13.min(prefix.len())];
+            let truncated_prefix = prefix.get(..13.min(prefix.len()))?;
             return Some(generate_hashed_name(path, &(truncated_prefix.to_owned() + "__len")));
         }
 
@@ -238,7 +238,7 @@ impl CodeGeneratingVisitor<'_> {
             // "some_very_long_storage_variable__"
             //  - Keep at most 18 chars from the prefix
             //  - Produces something like: "some_very_long_sto__Hn1pThQeV3"
-            let truncated_prefix = &prefix[..18.min(prefix.len())];
+            let truncated_prefix = prefix.get(..18.min(prefix.len()))?;
             return Some(generate_hashed_name(path, &(truncated_prefix.to_owned() + "__")));
         }
 
