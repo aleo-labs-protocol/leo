@@ -5,7 +5,7 @@
 ⚠️ No endpoint specified, defaulting to 'https://api.explorer.provable.com/v1'.
 
        Leo 🔨 Compiling 'my_program.aleo'
-       Leo     Program size: 0.72 KB / 2000.00 KB
+       Leo     Program size: 0.83 KB / 2000.00 KB
        Leo ✅ Compiled 'my_program.aleo' into Aleo instructions.
        Leo ✅ Generated ABI for program 'my_program.aleo'.
        Leo ✅ Generated 1 interface ABI(s).
@@ -230,6 +230,71 @@ build exit code: 0
               "length": 3
             }
           }
+        },
+        {
+          "name": "empty",
+          "ty": {
+            "Array": {
+              "element": {
+                "Array": {
+                  "element": {
+                    "Primitive": {
+                      "UInt": "U8"
+                    }
+                  },
+                  "length": 3
+                }
+              },
+              "length": 0
+            }
+          }
+        },
+        {
+          "name": "wrappers",
+          "ty": {
+            "Array": {
+              "element": {
+                "Struct": {
+                  "path": [
+                    "Wrapper"
+                  ],
+                  "program": "my_lib"
+                }
+              },
+              "length": 0
+            }
+          }
+        },
+        {
+          "name": "tags",
+          "ty": {
+            "Array": {
+              "element": {
+                "Struct": {
+                  "path": [
+                    "Tag::[3u32]"
+                  ],
+                  "program": "my_lib"
+                }
+              },
+              "length": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "Hidden"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          }
         }
       ]
     },
@@ -280,12 +345,36 @@ build exit code: 0
           }
         }
       ]
+    },
+    {
+      "path": [
+        "Wrapper"
+      ],
+      "fields": [
+        {
+          "name": "hidden",
+          "ty": {
+            "Struct": {
+              "path": [
+                "Hidden"
+              ],
+              "program": "my_lib"
+            }
+          }
+        }
+      ]
     }
   ]
 }
 {
   "satisfied": true,
   "problems": []
+}
+{
+  "satisfied": false,
+  "problems": [
+    "missing struct `Required__HD94UxupNDX`"
+  ]
 }
 {
   "satisfied": false,

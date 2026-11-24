@@ -23,6 +23,47 @@
 
 use leo_abi_types as abi;
 
+/// Removes fields whose outer array has length zero, as in bytecode generation.
+pub fn omit_empty_fields(standard: &mut abi::Program) -> bool {
+    use crate::{collect_from_plaintext, collect_public_type_references, collect_transitive_from_structs};
+    use std::collections::HashSet;
+
+    let mut removed = HashSet::new();
+    let mut changed = false;
+    let mut keep_field = |ty: &abi::Plaintext| {
+        if matches!(ty, abi::Plaintext::Array(array) if array.length == 0) {
+            collect_from_plaintext(ty, &standard.program, &mut removed);
+            changed = true;
+            false
+        } else {
+            true
+        }
+    };
+    for s in &mut standard.structs {
+        s.fields.retain(|field| keep_field(&field.ty));
+    }
+    for r in &mut standard.records {
+        r.fields.retain(|field| keep_field(&field.ty));
+    }
+    if removed.is_empty() {
+        return changed;
+    }
+
+    // Drop structs that appeared only in omitted fields. Keep independently required definitions.
+    collect_transitive_from_structs(&standard.structs, &standard.program, &mut removed);
+    let mut required: HashSet<_> =
+        standard.structs.iter().filter(|s| !removed.contains(&s.path)).map(|s| s.path.clone()).collect();
+    collect_public_type_references(standard, &mut required);
+    for r in &standard.records {
+        for field in &r.fields {
+            collect_from_plaintext(&field.ty, &standard.program, &mut required);
+        }
+    }
+    collect_transitive_from_structs(&standard.structs, &standard.program, &mut required);
+    standard.structs.retain(|s| required.contains(&s.path));
+    changed
+}
+
 /// Returns the list of reasons `candidate` is not compatible with the interface standard
 /// `standard`. An empty list means the candidate is compatible. Each item the standard declares
 /// must appear in the candidate (by name, or by path for records and structs) with a matching

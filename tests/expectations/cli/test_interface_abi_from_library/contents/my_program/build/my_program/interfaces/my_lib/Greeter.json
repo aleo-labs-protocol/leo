@@ -116,6 +116,71 @@
               "length": 3
             }
           }
+        },
+        {
+          "name": "empty",
+          "ty": {
+            "Array": {
+              "element": {
+                "Array": {
+                  "element": {
+                    "Primitive": {
+                      "UInt": "U8"
+                    }
+                  },
+                  "length": 3
+                }
+              },
+              "length": 0
+            }
+          }
+        },
+        {
+          "name": "wrappers",
+          "ty": {
+            "Array": {
+              "element": {
+                "Struct": {
+                  "path": [
+                    "Wrapper"
+                  ],
+                  "program": "my_lib"
+                }
+              },
+              "length": 0
+            }
+          }
+        },
+        {
+          "name": "tags",
+          "ty": {
+            "Array": {
+              "element": {
+                "Struct": {
+                  "path": [
+                    "Tag::[3u32]"
+                  ],
+                  "program": "my_lib"
+                }
+              },
+              "length": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "Hidden"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          }
         }
       ]
     },
@@ -162,6 +227,24 @@
           "ty": {
             "Primitive": {
               "UInt": "U8"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "Wrapper"
+      ],
+      "fields": [
+        {
+          "name": "hidden",
+          "ty": {
+            "Struct": {
+              "path": [
+                "Hidden"
+              ],
+              "program": "my_lib"
             }
           }
         }

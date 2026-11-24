@@ -1,5 +1,14 @@
 program my_program.aleo;
 
+struct Hidden__HoBtjedDg7O:
+    amount as u32;
+
+struct Wrapper__9MFGKXwdD3G:
+    hidden as Hidden__HoBtjedDg7O;
+
+struct Tag__3ZEPyZe9LaE:
+    amount as u8;
+
 struct Bytes__FrRQui86N3b:
     data as [u8; 3u32];
 
@@ -7,9 +16,6 @@ struct Packet__6UJa9lioecI:
     bytes as Bytes__FrRQui86N3b;
 
 struct Tag__FprkXI3s1ZN:
-    amount as u8;
-
-struct Tag__3ZEPyZe9LaE:
     amount as u8;
 
 struct Tag__5DdftQQkmaw:

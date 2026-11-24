@@ -700,6 +700,20 @@ build/foo/interfaces/types/ModuleRecords.json
             }
           },
           "mode": "Private"
+        },
+        {
+          "name": "empty",
+          "ty": {
+            "Array": {
+              "element": {
+                "Primitive": {
+                  "UInt": "U8"
+                }
+              },
+              "length": 0
+            }
+          },
+          "mode": "Private"
         }
       ]
     }

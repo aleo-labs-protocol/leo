@@ -363,35 +363,38 @@ fn convert_integer(int_ty: ast::IntegerType) -> abi::Primitive {
 pub fn prune_non_interface_types(program: &mut abi::Program) {
     let mut used_types: HashSet<abi::Path> = HashSet::new();
 
-    // Extract program name without .aleo suffix for comparison
+    let program_name = &program.program;
+    collect_public_type_references(program, &mut used_types);
+
+    // Collect transitive dependencies from structs and records.
+    collect_transitive_from_structs(&program.structs, program_name, &mut used_types);
+    collect_transitive_from_records(&program.records, program_name, &mut used_types);
+
+    program.structs.retain(|s| used_types.contains(&s.path));
+    program.records.retain(|r| used_types.contains(&r.path));
+}
+
+/// Collects the type references from function signatures, mappings, and storage.
+fn collect_public_type_references(program: &abi::Program, used_types: &mut HashSet<abi::Path>) {
     let program_name = &program.program;
 
-    // Phase 1: Collect from interface items
     for function in program.functions.iter().chain(program.views.iter()) {
         for input in &function.inputs {
-            collect_from_function_input(input, program_name, &mut used_types);
+            collect_from_function_input(input, program_name, used_types);
         }
         for output in &function.outputs {
-            collect_from_function_output(output, program_name, &mut used_types);
+            collect_from_function_output(output, program_name, used_types);
         }
     }
 
     for mapping in &program.mappings {
-        collect_from_plaintext(&mapping.key, program_name, &mut used_types);
-        collect_from_plaintext(&mapping.value, program_name, &mut used_types);
+        collect_from_plaintext(&mapping.key, program_name, used_types);
+        collect_from_plaintext(&mapping.value, program_name, used_types);
     }
 
     for storage_var in &program.storage_variables {
-        collect_from_abi_storage_type(&storage_var.ty, program_name, &mut used_types);
+        collect_from_abi_storage_type(&storage_var.ty, program_name, used_types);
     }
-
-    // Phase 2: Collect transitive dependencies from structs and records
-    collect_transitive_from_structs(&program.structs, program_name, &mut used_types);
-    collect_transitive_from_records(&program.records, program_name, &mut used_types);
-
-    // Phase 3: Prune
-    program.structs.retain(|s| used_types.contains(&s.path));
-    program.records.retain(|r| used_types.contains(&r.path));
 }
 
 /// Checks if a type reference is local to the current program.

@@ -115,7 +115,7 @@ impl Command for LeoAbi {
             let mut standard_abi = load_standard_abi(standard)?;
             // Handwritten and bytecode-derived standards already use Aleo identifiers.
             let mut problems = leo_abi::compatibility::check_compatibility(&main_abi, &standard_abi);
-            if !problems.is_empty() && lower_struct_paths(&mut standard_abi) {
+            if !problems.is_empty() && lower_composite_layouts(&mut standard_abi) {
                 problems = leo_abi::compatibility::check_compatibility(&main_abi, &standard_abi);
             }
             return report_compatibility(&problems, &main_abi.program, &standard_abi.program, self.output.as_deref());
@@ -133,8 +133,8 @@ impl Command for LeoAbi {
     }
 }
 
-/// Translates source struct paths in a Leo standard into the names and owners used by Aleo bytecode.
-fn lower_struct_paths(standard: &mut leo_abi::Program) -> bool {
+/// Converts source struct paths and composite fields to their bytecode representation.
+fn lower_composite_layouts(standard: &mut leo_abi::Program) -> bool {
     use leo_abi::{FunctionInput, FunctionOutput, Plaintext, StorageType};
 
     fn lower_path(path: &mut leo_abi::Path, owner: &str) -> bool {
@@ -148,6 +148,7 @@ fn lower_struct_paths(standard: &mut leo_abi::Program) -> bool {
         }
     }
 
+    let mut changed = leo_abi::compatibility::omit_empty_fields(standard);
     let holder = &standard.program;
     let definitions: std::collections::HashSet<_> = standard.structs.iter().map(|s| s.path.clone()).collect();
     let lower_type = |mut ty: &mut Plaintext| loop {
@@ -175,7 +176,6 @@ fn lower_struct_paths(standard: &mut leo_abi::Program) -> bool {
         }
     };
 
-    let mut changed = false;
     for s in &mut standard.structs {
         changed |= lower_path(&mut s.path, holder);
         for field in &mut s.fields {

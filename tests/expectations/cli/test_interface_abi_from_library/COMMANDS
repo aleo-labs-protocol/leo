@@ -38,6 +38,14 @@ cmp "$standalone" "$imported"
 cat report.json
 echo
 
+# A standard can also require a struct independently of its function signatures.
+sed 's/"structs": \[/"structs": [{"path":["Required"],"fields":[]},/' "$standalone" > extra.json
+if "$LEO_BIN" abi "$bytecode" --satisfies extra.json --output extra-report.json >/dev/null 2>&1; then
+    exit 1
+fi
+cat extra-report.json
+echo
+
 # Change the input to a different specialization with the same fields.
 sed -e 's/: my_lib::Greeter {/{/' -e 's/Tag::\[2u32\]/Tag::[4u32]/g' my_program/src/main.leo > wrong.leo
 cp wrong.leo my_program/src/main.leo
