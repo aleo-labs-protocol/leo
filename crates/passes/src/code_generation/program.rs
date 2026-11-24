@@ -184,7 +184,8 @@ impl<'a> CodeGeneratingVisitor<'a> {
                     ("is_some".to_owned(), AleoType::Boolean),
                     ("val".to_owned(), self.visit_type(original_inner)),
                 ];
-                data_types.insert(old.clone(), AleoDatatype::Struct(AleoStruct { name, fields }));
+                let wrapper = AleoStruct { name, fields, is_generated_optional: true };
+                data_types.insert(old.clone(), AleoDatatype::Struct(wrapper));
             }
         }
         let data_types = if state.legacy_interface_types.is_empty() {
@@ -252,7 +253,7 @@ impl<'a> CodeGeneratingVisitor<'a> {
             })
             .collect();
 
-        AleoStruct { name, fields }
+        AleoStruct { name, fields, is_generated_optional: crate::is_generated_optional_struct(struct_) }
     }
 
     fn visit_record(&mut self, record: &'a Composite, loc: &Location) -> AleoRecord {

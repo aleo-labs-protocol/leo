@@ -67,7 +67,7 @@ use crate::{
     TypeCheckingInput,
 };
 
-use leo_ast::{ArrayType, Ast, CompositeType, TypeKind, UnitReconstructor as _};
+use leo_ast::{ArrayType, Ast, Composite, CompositeType, TypeKind, UnitReconstructor as _};
 use leo_errors::Result;
 use leo_span::Symbol;
 
@@ -163,4 +163,17 @@ pub fn make_optional_struct_symbol(ty: &TypeKind) -> Symbol {
 
     // Step 3: Build symbol that ends with `?`.
     Symbol::intern(&format!("{}?", display_type(ty)))
+}
+
+/// Only Optional lowering can produce a raw struct identifier ending in `?`.
+/// A dependency's bytecode contains the legalized identifier instead.
+pub(crate) fn is_generated_optional_struct(composite: &Composite) -> bool {
+    let [tag, value] = composite.members.as_slice() else {
+        return false;
+    };
+    !composite.is_record
+        && tag.identifier.name == Symbol::intern("is_some")
+        && tag.type_.kind() == &TypeKind::Boolean
+        && value.identifier.name == Symbol::intern("val")
+        && leo_span::with_session_globals(|sg| composite.identifier.name.as_str(sg, |name| name.ends_with('?')))
 }

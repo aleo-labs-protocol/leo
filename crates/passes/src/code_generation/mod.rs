@@ -20,7 +20,7 @@ use itertools::Itertools;
 use leo_ast::{Ast, Mode, ProgramId};
 use leo_errors::Result;
 
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 mod expression;
 
@@ -63,13 +63,25 @@ impl GeneratedPrograms {
         CompiledPrograms { primary_bytecode, import_bytecodes }
     }
 
-    /// Returns mutable references to all statement lists across all functions/closures/finalizes/constructors.
+    /// Visits the statement lists of all functions, closures, finalizes, views, and constructors.
     pub fn for_each_statement_list(&mut self, mut f: impl FnMut(&mut Vec<AleoStmt>, usize)) {
         for (_, program) in &mut self.imports {
             program.for_each_statement_list(&mut f);
         }
         if let Some(primary) = &mut self.primary {
             primary.for_each_statement_list(&mut f);
+        }
+    }
+
+    pub(crate) fn for_each_statement_list_with_generated_optionals(
+        &mut self,
+        mut f: impl FnMut(&mut Vec<AleoStmt>, usize, &HashSet<String>),
+    ) {
+        for (_, program) in &mut self.imports {
+            program.for_each_statement_list_with_generated_optionals(&mut f);
+        }
+        if let Some(primary) = &mut self.primary {
+            primary.for_each_statement_list_with_generated_optionals(&mut f);
         }
     }
 }
@@ -133,7 +145,7 @@ pub struct AleoProgram {
 }
 
 impl AleoProgram {
-    /// Calls `f` for each statement list in the program (closures, functions, finalizes, constructor).
+    /// Calls `f` for each statement list in the program (closures, functions, finalizes, views, and constructor).
     /// The second argument to `f` is the number of input registers for that function.
     pub fn for_each_statement_list(&mut self, f: &mut impl FnMut(&mut Vec<AleoStmt>, usize)) {
         for functional in &mut self.functions {
@@ -158,6 +170,22 @@ impl AleoProgram {
         if let Some(constructor) = &mut self.constructor {
             f(&mut constructor.statements, 0);
         }
+    }
+
+    fn for_each_statement_list_with_generated_optionals(
+        &mut self,
+        f: &mut impl FnMut(&mut Vec<AleoStmt>, usize, &HashSet<String>),
+    ) {
+        // Use only declarations retained after pruning and bytecode name deduplication.
+        let names = self
+            .data_types
+            .iter()
+            .filter_map(|ty| match ty {
+                AleoDatatype::Struct(s) if s.is_generated_optional => Some(s.name.clone()),
+                _ => None,
+            })
+            .collect();
+        self.for_each_statement_list(&mut |stmts, num_inputs| f(stmts, num_inputs, &names));
     }
 }
 
@@ -195,6 +223,8 @@ impl Display for AleoDatatype {
 pub struct AleoStruct {
     name: String,
     fields: Vec<(String, AleoType)>,
+    /// True for declarations that implement a compiler-generated Optional wrapper.
+    is_generated_optional: bool,
 }
 impl Display for AleoStruct {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
