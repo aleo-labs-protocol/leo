@@ -189,6 +189,7 @@ fn run_test(test: &Test, force_rewrite: bool, port: u16) -> Option<String> {
     let output = Command::new(&commands_path)
         .arg(BINARY_PATH)
         .env("PATH", &path_with_leo_dir)
+        .env("LEO_TEST_ONLY_TESTNET", cfg!(feature = "only_testnet").to_string())
         .env("LEO_DEVNODE_PORT", port.to_string())
         .env("LEO_DEVNET_REST_PORT", devnet_base.to_string())
         .env("LEO_DEVNET_NODE_PORT", (devnet_base + 4).to_string())
