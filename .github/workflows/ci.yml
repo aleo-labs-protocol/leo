@@ -93,6 +93,8 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: |
           tmpdir="$(mktemp -d "$RUNNER_TEMP/leo-XXXXXXXX")"
+          # Stop CLI fixtures from loading the runner's .env from a parent directory.
+          touch "$tmpdir/.env"
           echo "TMPDIR=$tmpdir" >> "$GITHUB_ENV"
       - name: Build the workspace tests
         run: |
