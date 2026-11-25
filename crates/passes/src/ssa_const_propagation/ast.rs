@@ -467,7 +467,8 @@ impl AstReconstructor for SsaConstPropagationVisitor<'_> {
                 array_value.array_index(index_value.as_u32().unwrap() as usize).expect("We already checked bounds.");
             self.changed = true;
             let (new_expr, _) = self.value_to_expression(&result_value, span, id).expect(VALUE_ERROR);
-            return (new_expr, Some(result_value.clone()));
+            let value = result_value.with_projection_type(&new_expr);
+            return (new_expr, Some(value));
         }
 
         (ArrayAccess { array, index, ..input }.into(), None)

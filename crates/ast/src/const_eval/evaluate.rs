@@ -34,6 +34,9 @@ impl Value {
     /// fail when comparing values of different types,
     /// rather than just returning false.
     pub fn eq(&self, rhs: &Self) -> Result<bool, String> {
+        if self.id.is_some() != rhs.id.is_some() {
+            return Err("cannot compare values with missing type information".into());
+        }
         if self.id != rhs.id {
             return Ok(false);
         }

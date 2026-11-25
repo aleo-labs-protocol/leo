@@ -17,6 +17,14 @@ input = ["{ x: 1u32, y: 1u32, z: 1u32 }", "7u32", "8u32", "9u32"]
 program = "test.aleo"
 function = "nested"
 input = ["{ inner: { a: 1u32, b: 2u32 }, tag: 3u32 }", "42u32"]
+[case]
+program = "test.aleo"
+function = "compare_member"
+input = ["7u32"]
+[case]
+program = "test.aleo"
+function = "compare_member"
+input = ["8u32"]
 */
 
 struct Inner {
@@ -56,6 +64,15 @@ program test.aleo {
     fn nested(base: Outer, new_a: u32) -> Outer {
         let new_inner: Inner = Inner { a: new_a, ..base.inner };
         return Outer { inner: new_inner, ..base };
+    }
+
+    fn compare_member(x: u32) -> u32 {
+        const inner: Inner = Inner { a: 1u32, b: 2u32 };
+        const outer: Outer = Outer { inner: inner, tag: 3u32 };
+        if inner == outer.inner {
+            assert_eq(x, 7u32);
+        }
+        return x;
     }
 
     @noupgrade
