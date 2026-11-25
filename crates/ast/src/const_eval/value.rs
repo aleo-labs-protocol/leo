@@ -614,6 +614,14 @@ impl Value {
         Some(value)
     }
 
+    /// Restore the nominal type of a projected struct from its reconstructed expression.
+    pub fn with_projection_type(mut self, expression: &Expression) -> Self {
+        if let Expression::Composite(composite) = expression {
+            self.id = Some(composite.path.expect_global_location().clone());
+        }
+        self
+    }
+
     pub fn array_index(&self, i: usize) -> Option<Self> {
         let plaintext: &SvmPlaintext = self.try_as_ref()?;
         let Plaintext::Array(array, ..) = plaintext else {

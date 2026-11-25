@@ -178,10 +178,9 @@ impl AstReconstructor for ConstPropagationVisitor<'_> {
                     let result_value = array_value
                         .array_index(index_value.as_u32().unwrap() as usize)
                         .expect("We already checked bounds.");
-                    return (
-                        self.value_to_expression(&result_value, span, id).expect(VALUE_ERROR),
-                        Some(result_value.clone()),
-                    );
+                    let expr = self.value_to_expression(&result_value, span, id).expect(VALUE_ERROR);
+                    let value = result_value.with_projection_type(&expr);
+                    return (expr, Some(value));
                 }
             }
         } else {
@@ -249,10 +248,10 @@ impl AstReconstructor for ConstPropagationVisitor<'_> {
         let (inner, value_opt) = self.reconstruct_expression(input.inner, &());
         let member_name = input.name.name;
         if let Some(composite) = value_opt {
-            let value_result =
-                composite.member_access(member_name).expect("Type checking guarantees the member exists.");
-
-            (self.value_to_expression(&value_result, span, id).expect(VALUE_ERROR), Some(value_result.clone()))
+            let value = composite.member_access(member_name).expect("Type checking guarantees the member exists.");
+            let expr = self.value_to_expression(&value, span, id).expect(VALUE_ERROR);
+            let value = value.with_projection_type(&expr);
+            (expr, Some(value))
         } else {
             (MemberAccess { inner, ..input }.into(), None)
         }
