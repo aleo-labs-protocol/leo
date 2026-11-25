@@ -74,6 +74,19 @@ impl GeneratedPrograms {
     }
 }
 
+/// Returns the Aleo struct identifier for a source ABI path. Library types are inlined into the program.
+pub fn abi_struct_identifier(owner: &str, path: &[String]) -> Option<String> {
+    if path.is_empty() {
+        return None;
+    }
+    if owner.ends_with(".aleo") {
+        CodeGeneratingVisitor::legalize_path(path)
+    } else {
+        let qualified = std::iter::once(owner).chain(path.iter().map(String::as_str)).collect::<Vec<_>>();
+        CodeGeneratingVisitor::legalize_path(&qualified)
+    }
+}
+
 pub struct CodeGenerating;
 
 impl Pass for CodeGenerating {
@@ -89,6 +102,7 @@ impl Pass for CodeGenerating {
             current_function: None,
             variable_mapping: Default::default(),
             composite_mapping: Default::default(),
+            interface_type_uses: Default::default(),
             global_mapping: Default::default(),
             variant: None,
             program: match &state.ast {

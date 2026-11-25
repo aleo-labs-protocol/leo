@@ -62,10 +62,10 @@
 //! Mapping::set(vec__, $len_var, 10u32);
 //!
 //! // vec.push(vec.len());
-//! let $push_value = Mapping::get_or_use(vec__len__, false, 0u32);
+//! let $operand = Mapping::get_or_use(vec__len__, false, 0u32);
 //! let $len_var = Mapping::get_or_use(vec__len__, false, 0u32);
 //! Mapping::set(vec__len__, false, $len_var + 1u32);
-//! Mapping::set(vec__, $len_var, $push_value);
+//! Mapping::set(vec__, $len_var, $operand);
 //!
 //! // let x = vec.get(0u32);
 //! let $len_var = Mapping::get_or_use(vec__len__, false, 0u32);
@@ -135,19 +135,26 @@ impl Pass for StorageLowering {
 
     fn do_pass(input: TypeCheckingInput, state: &mut crate::CompilerState) -> Result<Self::Output> {
         let ast = std::mem::take(&mut state.ast);
-        let mut visitor = StorageLoweringVisitor { state, program: Symbol::intern(""), new_mappings: IndexMap::new() };
+        let ast = {
+            let mut visitor = StorageLoweringVisitor {
+                state,
+                program: Symbol::intern(""),
+                new_mappings: IndexMap::new(),
+                source_discardability: IndexMap::new(),
+                lowered_discardability: IndexMap::new(),
+            };
 
-        let ast = ast.map(
-            |program| visitor.reconstruct_program(program),
-            |library| library, // no-op for libraries
-        );
-
-        visitor.state.handler.last_err()?;
-        visitor.state.ast = ast;
+            ast.map(
+                |program| visitor.reconstruct_program(program),
+                |library| library, // no-op for libraries
+            )
+        };
+        state.handler.last_err()?;
+        state.ast = ast;
 
         // We need to recreate the symbol table and run type checking again because this pass may introduce new mappings
         // and new statements and expressions.
-        visitor.state.symbol_table = SymbolTable::default();
+        state.symbol_table = SymbolTable::default();
         GlobalVarsCollection::do_pass((), state)?;
         PathResolution::do_pass((), state)?;
         GlobalItemsCollection::do_pass((), state)?;

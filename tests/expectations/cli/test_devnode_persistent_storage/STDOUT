@@ -50,11 +50,11 @@ Once it is deployed, it CANNOT be changed.
 
 💰 Cost Breakdown (credits)
   Transaction Storage:  1.014000
-  Program Synthesis:    0.066328
+  Program Synthesis:    0.026366
   Namespace:            1.000000
   Constructor:          0.002000
   Priority Fee:         0.000000
-  Total Fee:            2.082328
+  Total Fee:            2.042366
   Function 'increment'
     Total Execution Cost:   0.001916
     |- Storage Cost:        0.001264

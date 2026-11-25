@@ -113,6 +113,8 @@ pub struct Compiler {
     compiler_options: CompilerOptions,
     /// State.
     state: CompilerState,
+    /// Interface ABIs from the most recent validated library build.
+    library_interfaces: Vec<leo_abi::interfaces::CompiledInterface>,
     /// The stubs for imported programs.
     import_stubs: IndexMap<Symbol, Stub>,
 }
@@ -187,6 +189,7 @@ impl Compiler {
             self.unit_name = Some(source_name);
         }
 
+        self.library_interfaces.clear();
         self.state.ast = Ast::Program(program);
 
         Ok(())
@@ -243,6 +246,7 @@ impl Compiler {
             .map(|(src, name)| with_session_globals(|s| s.source_map.new_source(src, name.clone())))
             .collect::<Vec<_>>();
 
+        self.library_interfaces.clear();
         self.state.ast = Ast::Library(leo_parser::parse_library(
             self.state.handler.clone(),
             &self.state.node_builder,
@@ -374,6 +378,7 @@ impl Compiler {
             },
             unit_name: expected_unit_name,
             rename: None,
+            library_interfaces: Vec::new(),
             compiler_options: compiler_options.unwrap_or_default(),
             import_stubs,
         }
@@ -410,6 +415,7 @@ impl Compiler {
         // produced ErrExpression nodes in the AST, which would cause panics in later passes.
         self.state.handler.last_err()?;
 
+        self.state.legacy_interface_structs.clear();
         self.do_pass_with_check::<NameValidation, _>((), &mut should_continue)?;
         self.do_pass_with_check::<GlobalVarsCollection, _>((), &mut should_continue)?;
         self.do_pass_with_check::<PathResolution, _>((), &mut should_continue)?;
@@ -507,7 +513,7 @@ impl Compiler {
             .filter(|(_, stub)| !matches!(stub, Stub::FromLibrary { .. }))
             .map(|(name, stub)| {
                 let abi = match stub {
-                    Stub::FromLeo { program, .. } => leo_abi::generate(program),
+                    Stub::FromLeo { program: imported, .. } => leo_abi::generate_with_stubs(imported, &program.stubs),
                     Stub::FromAleo { program, .. } => leo_abi::aleo::generate(program),
                     Stub::FromLibrary { .. } => unreachable!("filtered out"),
                 };
@@ -518,14 +524,50 @@ impl Compiler {
         (primary_abi, import_abis, interface_abis)
     }
 
-    /// Generates interface ABIs for a validated library.
-    ///
-    /// Must be called after `build_library()` since it reads the resolved AST.
+    /// Returns the interface ABIs from the most recent validated library build.
     pub fn generate_library_interface_abis(&self) -> Vec<leo_abi::interfaces::CompiledInterface> {
-        let Ast::Library(library) = &self.state.ast else {
-            panic!("expected Library AST");
+        self.library_interfaces.clone()
+    }
+
+    /// Uses the same specialization passes for standalone and imported library interfaces.
+    fn specialize_library_interfaces(&self, library: &Library) -> Result<Vec<leo_abi::interfaces::CompiledInterface>> {
+        if library.interfaces.is_empty() && library.modules.values().all(|module| module.interfaces.is_empty()) {
+            return Ok(Vec::new());
+        }
+
+        // Keep the validated library and its symbol tables available for downstream builds.
+        let mut library = library.clone();
+        let name = library.name;
+        let mut stubs = std::mem::take(&mut library.stubs);
+        stubs.insert(name, Stub::FromLibrary { library, parents: Default::default() });
+        let mut state = CompilerState {
+            ast: Ast::Program(Program { stubs, ..Default::default() }),
+            handler: self.state.handler.clone(),
+            node_builder: Rc::clone(&self.state.node_builder),
+            types: Rc::clone(&self.state.types),
+            network: self.state.network,
+            is_test: self.state.is_test,
+            ..Default::default()
         };
-        leo_abi::interfaces::generate_library_interfaces(library)
+        let config = TypeCheckingInput::new(state.network);
+        GlobalVarsCollection::do_pass((), &mut state)?;
+        PathResolution::do_pass((), &mut state)?;
+        GlobalItemsCollection::do_pass((), &mut state)?;
+        TypeChecking::do_pass(config.clone(), &mut state)?;
+        LibraryPruning::do_pass((), &mut state)?;
+        ConstPropUnrollAndMorphing::do_pass(config, &mut state)?;
+
+        let Ast::Program(mut program) = state.ast else { unreachable!("specialization preserves the program") };
+        let Some(Stub::FromLibrary { mut library, .. }) = program.stubs.shift_remove(&name) else {
+            unreachable!("specialization preserves library stubs")
+        };
+        // Every prototype now references a concrete definition. Discard templates from this ABI input.
+        library.structs.retain(|(_, composite)| composite.const_parameters.is_empty());
+        for module in library.modules.values_mut() {
+            module.composites.retain(|(_, composite)| composite.const_parameters.is_empty());
+        }
+        library.stubs = program.stubs;
+        Ok(leo_abi::interfaces::generate_library_interfaces(&library))
     }
 
     /// Compiles a program from a given source string and a list of module sources.
@@ -992,7 +1034,12 @@ impl Compiler {
         }
 
         match &self.state.ast {
-            Ast::Library(library) => Ok(library.clone()),
+            Ast::Library(library) => {
+                if run_frontend {
+                    self.library_interfaces = self.specialize_library_interfaces(library)?;
+                }
+                Ok(library.clone())
+            }
             Ast::Program(_) => unreachable!("expected Library AST"),
         }
     }

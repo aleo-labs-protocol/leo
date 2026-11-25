@@ -2453,7 +2453,7 @@ fn request_id_from_cancel(id: NumberOrString) -> RequestId {
 
 /// Send one successful JSON-RPC response.
 fn send_ok_response(connection: &Connection, id: RequestId, result: Value) -> Result<()> {
-    let response = Response { id, result: Some(result), error: None };
+    let response = Response { id, response_result: Ok(result) };
     connection.sender.send(Message::Response(response))?;
     Ok(())
 }
@@ -2480,8 +2480,7 @@ fn send_publish_diagnostics(
 
 /// Send one JSON-RPC error response.
 fn send_error_response(connection: &Connection, id: RequestId, code: i32, message: impl Into<String>) -> Result<()> {
-    let response =
-        Response { id, result: None, error: Some(ResponseError { code, message: message.into(), data: None }) };
+    let response = Response { id, response_result: Err(ResponseError { code, message: message.into(), data: None }) };
     connection.sender.send(Message::Response(response))?;
     Ok(())
 }
@@ -2904,7 +2903,7 @@ mod tests {
         send_request(&client, 2, "shutdown", Value::Null);
         let shutdown = recv_response(&client);
         assert_eq!(shutdown.id, 2.into());
-        assert_eq!(shutdown.result, Some(Value::Null));
+        assert_eq!(shutdown.response_result.expect("shutdown response"), Value::Null);
 
         send_notification(&client, "exit", json!({}));
 
@@ -2928,7 +2927,7 @@ mod tests {
 
         let response = recv_response(&client);
         assert_eq!(response.id, 2.into());
-        let error = response.error.expect("cancelled response error");
+        let error = response.response_result.expect_err("cancelled response error");
         assert_eq!(error.code, ErrorCode::RequestCanceled as i32);
         assert!(error.message.contains("cancelled"));
         assert!(state.semantic_token_requests.pending_by_key.is_empty());
@@ -2951,7 +2950,7 @@ mod tests {
 
         let response = recv_response(&client);
         assert_eq!(response.id, 2.into());
-        let error = response.error.expect("cancelled references response");
+        let error = response.response_result.expect_err("cancelled references response");
         assert_eq!(error.code, ErrorCode::RequestCanceled as i32);
         assert!(error.message.contains("evicted"));
         assert!(cancel.load(Ordering::SeqCst));
@@ -3011,7 +3010,7 @@ mod tests {
 
         let response = recv_response(&client);
         assert_eq!(response.id, 2.into());
-        let error = response.error.expect("cancelled response error");
+        let error = response.response_result.expect_err("cancelled response error");
         assert_eq!(error.code, ErrorCode::RequestCanceled as i32);
         assert!(error.message.contains("cancelled"));
         assert!(state.semantic_token_requests.pending_by_key.is_empty());
@@ -3045,7 +3044,7 @@ mod tests {
 
         let first = recv_response(&client);
         assert_eq!(first.id, 2.into());
-        assert_eq!(first.error.expect("panic error").code, super::INTERNAL_ERROR);
+        assert_eq!(first.response_result.expect_err("panic error").code, super::INTERNAL_ERROR);
 
         state
             .handle_semantic_tokens_full(&server, 3.into(), semantic_tokens_params(uri.clone()))
@@ -3053,7 +3052,7 @@ mod tests {
 
         let second = recv_response(&client);
         assert_eq!(second.id, 3.into());
-        assert_eq!(second.error.expect("repeat panic error").code, super::INTERNAL_ERROR);
+        assert_eq!(second.response_result.expect_err("repeat panic error").code, super::INTERNAL_ERROR);
         assert!(state.semantic_token_requests.pending_by_key.is_empty());
         state.scheduler.shutdown();
     }

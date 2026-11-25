@@ -54,8 +54,16 @@ struct Ctx<'a> {
 /// The returned ABI is pruned to only include types that appear in the public
 /// interface (functions, mappings, storage variables).
 pub fn generate(ast: &ast::Program) -> abi::Program {
+    generate_with_stubs(ast, &ast.stubs)
+}
+
+/// Generates the ABI for a Leo program using the compilation unit's reachable stubs.
+///
+/// A program imported from another compilation unit may carry only its nested stubs, while
+/// ABI conversion needs the outer unit's reachable map to resolve sibling dependencies.
+pub fn generate_with_stubs(ast: &ast::Program, stubs: &IndexMap<Symbol, ast::Stub>) -> abi::Program {
     let scope = ast.program_scopes.values().next().unwrap();
-    let ctx = Ctx { scope, stubs: &ast.stubs, modules: &ast.modules };
+    let ctx = Ctx { scope, stubs, modules: &ast.modules };
 
     let program = scope.program_id.to_string();
 
@@ -184,6 +192,16 @@ pub(crate) fn resolve_io_mode(mode: ast::Mode, is_view: bool) -> abi::Mode {
     }
 }
 
+/// Includes the enclosing module for resolved types and preserves explicit library qualifiers in the ABI.
+fn composite_ref_path(path: &ast::Path) -> abi::Path {
+    if let Some(location) = path.try_global_location()
+        && path.qualifier().first().is_none_or(|first| first.name != location.program)
+    {
+        return location.path.iter().map(|s| s.to_string()).collect();
+    }
+    path.segments_iter().map(|s| s.to_string()).collect()
+}
+
 fn convert_plaintext(ty: &ast::TypeKind) -> abi::Plaintext {
     match ty {
         ast::TypeKind::Address => abi::Plaintext::Primitive(abi::Primitive::Address),
@@ -199,7 +217,7 @@ fn convert_plaintext(ty: &ast::TypeKind) -> abi::Plaintext {
             length: extract_array_length(&arr_ty.length),
         }),
         ast::TypeKind::Composite(comp_ty) => abi::Plaintext::Struct(abi::StructRef {
-            path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
+            path: composite_ref_path(&comp_ty.path),
             program: comp_ty.path.program().map(|s| s.to_string()),
         }),
         ast::TypeKind::Optional(opt_ty) => {
@@ -232,7 +250,7 @@ fn convert_function_input(ty: &ast::TypeKind, ctx: &Ctx, mode: abi::Mode) -> abi
         && is_record(comp_ty, ctx)
     {
         return abi::FunctionInput::Record(abi::RecordRef {
-            path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
+            path: composite_ref_path(&comp_ty.path),
             program: comp_ty.path.program().map(|s| s.to_string()),
         });
     }
@@ -244,53 +262,76 @@ fn convert_function_output(ty: &ast::TypeKind, ctx: &Ctx, mode: abi::Mode) -> ab
         ast::TypeKind::Future(_) => abi::FunctionOutput::Final,
         ast::TypeKind::DynRecord => abi::FunctionOutput::DynamicRecord,
         ast::TypeKind::Composite(comp_ty) if is_record(comp_ty, ctx) => abi::FunctionOutput::Record(abi::RecordRef {
-            path: comp_ty.path.segments_iter().map(|s| s.to_string()).collect(),
+            path: composite_ref_path(&comp_ty.path),
             program: comp_ty.path.program().map(|s| s.to_string()),
         }),
         _ => abi::FunctionOutput::Plaintext { ty: convert_plaintext(ty), mode },
     }
 }
 
+/// Finds a composite by its exact module path and terminal name within one compilation unit.
+/// A non-empty module path must match a module entry; the root path searches only top-level
+/// composites.
+fn find_composite_at_path<'a>(
+    path: &[Symbol],
+    composites: &'a [(Symbol, ast::Composite)],
+    modules: &'a IndexMap<Vec<Symbol>, ast::Module>,
+) -> Option<&'a ast::Composite> {
+    let (&name, module_path) = path.split_last()?;
+    let composites = if module_path.is_empty() {
+        composites
+    } else {
+        let module = modules.iter().find(|(path, _)| path.as_slice() == module_path)?.1;
+        &module.composites
+    };
+
+    composites.iter().find(|(symbol, _)| *symbol == name).map(|(_, composite)| composite)
+}
+
+/// Finds a composite by its canonical `(program, path)` identity.
+///
+/// Leo and library sources resolve the path inside the exact module selected by the location.
+/// Aleo stubs expose root composites only, so a module-qualified Aleo location returns `None`.
+fn find_composite_at_location<'a>(
+    location: &ast::Location,
+    current_program: Symbol,
+    composites: &'a [(Symbol, ast::Composite)],
+    modules: &'a IndexMap<Vec<Symbol>, ast::Module>,
+    stubs: &'a IndexMap<Symbol, ast::Stub>,
+) -> Option<&'a ast::Composite> {
+    if location.program == current_program {
+        return find_composite_at_path(&location.path, composites, modules);
+    }
+
+    match stubs.get(&location.program)? {
+        ast::Stub::FromAleo { program, .. } => {
+            let (&name, module_path) = location.path.split_last()?;
+            if !module_path.is_empty() {
+                return None;
+            }
+            program.composites.iter().find(|(symbol, _)| *symbol == name).map(|(_, composite)| composite)
+        }
+        ast::Stub::FromLeo { program, .. } => {
+            let scope = program.program_scopes.get(&location.program)?;
+            find_composite_at_path(&location.path, &scope.composites, &program.modules)
+        }
+        ast::Stub::FromLibrary { library, .. } => {
+            find_composite_at_path(&location.path, &library.structs, &library.modules)
+        }
+    }
+}
+
 /// Checks if a composite type refers to a record.
 fn is_record(comp_ty: &ast::CompositeType, ctx: &Ctx) -> bool {
-    let name = comp_ty.path.identifier().name;
-
-    // Check if it's defined in the current program scope
-    if let Some((_, composite)) = ctx.scope.composites.iter().find(|(sym, _)| *sym == name) {
-        return composite.is_record;
-    }
-
-    // Check if it's defined in a module
-    for module in ctx.modules.values() {
-        if let Some((_, composite)) = module.composites.iter().find(|(sym, _)| *sym == name) {
-            return composite.is_record;
-        }
-    }
-
-    // Check if it's defined in an imported stub
-    if let Some(program) = comp_ty.path.program()
-        && let Some(stub) = ctx.stubs.get(&program)
-    {
-        let found = match stub {
-            ast::Stub::FromAleo { program, .. } => {
-                program.composites.iter().find(|(sym, _)| *sym == name).map(|(_, c)| c.is_record)
-            }
-            ast::Stub::FromLeo { program, .. } => program
-                .program_scopes
-                .values()
-                .flat_map(|scope| scope.composites.iter())
-                .find(|(sym, _)| *sym == name)
-                .map(|(_, c)| c.is_record),
-
-            ast::Stub::FromLibrary { .. } => None,
-        };
-        if let Some(is_record) = found {
-            return is_record;
-        }
-    }
-
-    // Default to struct if not found (shouldn't happen after type checking)
-    false
+    let Some(location) = comp_ty.path.try_global_location() else { return false };
+    find_composite_at_location(
+        location,
+        ctx.scope.program_id.as_symbol(),
+        &ctx.scope.composites,
+        ctx.modules,
+        ctx.stubs,
+    )
+    .is_some_and(|composite| composite.is_record)
 }
 
 fn extract_array_length(expr: &Expression) -> u32 {
@@ -322,35 +363,38 @@ fn convert_integer(int_ty: ast::IntegerType) -> abi::Primitive {
 pub fn prune_non_interface_types(program: &mut abi::Program) {
     let mut used_types: HashSet<abi::Path> = HashSet::new();
 
-    // Extract program name without .aleo suffix for comparison
+    let program_name = &program.program;
+    collect_public_type_references(program, &mut used_types);
+
+    // Collect transitive dependencies from structs and records.
+    collect_transitive_from_structs(&program.structs, program_name, &mut used_types);
+    collect_transitive_from_records(&program.records, program_name, &mut used_types);
+
+    program.structs.retain(|s| used_types.contains(&s.path));
+    program.records.retain(|r| used_types.contains(&r.path));
+}
+
+/// Collects the type references from function signatures, mappings, and storage.
+fn collect_public_type_references(program: &abi::Program, used_types: &mut HashSet<abi::Path>) {
     let program_name = &program.program;
 
-    // Phase 1: Collect from interface items
     for function in program.functions.iter().chain(program.views.iter()) {
         for input in &function.inputs {
-            collect_from_function_input(input, program_name, &mut used_types);
+            collect_from_function_input(input, program_name, used_types);
         }
         for output in &function.outputs {
-            collect_from_function_output(output, program_name, &mut used_types);
+            collect_from_function_output(output, program_name, used_types);
         }
     }
 
     for mapping in &program.mappings {
-        collect_from_plaintext(&mapping.key, program_name, &mut used_types);
-        collect_from_plaintext(&mapping.value, program_name, &mut used_types);
+        collect_from_plaintext(&mapping.key, program_name, used_types);
+        collect_from_plaintext(&mapping.value, program_name, used_types);
     }
 
     for storage_var in &program.storage_variables {
-        collect_from_abi_storage_type(&storage_var.ty, program_name, &mut used_types);
+        collect_from_abi_storage_type(&storage_var.ty, program_name, used_types);
     }
-
-    // Phase 2: Collect transitive dependencies from structs and records
-    collect_transitive_from_structs(&program.structs, program_name, &mut used_types);
-    collect_transitive_from_records(&program.records, program_name, &mut used_types);
-
-    // Phase 3: Prune
-    program.structs.retain(|s| used_types.contains(&s.path));
-    program.records.retain(|r| used_types.contains(&r.path));
 }
 
 /// Checks if a type reference is local to the current program.

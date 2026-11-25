@@ -29,6 +29,72 @@
           }
         }
       ]
+    },
+    {
+      "name": "packet",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "my_lib",
+                  "Packet::[3u32]"
+                ],
+                "program": "my_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Primitive": {
+                "UInt": "U8"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "encode",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "my_lib",
+                  "Tag::[2u32]"
+                ],
+                "program": "my_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "my_lib",
+                  "Tag::[3u32]"
+                ],
+                "program": "my_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
     }
   ]
 }

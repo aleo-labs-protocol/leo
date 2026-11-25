@@ -5,3 +5,10 @@
     │ 
     │ Help: Check `registry.aleo::foo` for typos and confirm it is declared in this scope. If it lives in another program, import it with the program-qualified name (e.g. `credits.aleo::credits`).
 ────╯
+[ETYC0372005] Error: unknown variable `registry.aleo::enabled`
+   ╭─[ outer.leo:3:12 ]
+   │
+ 3 │     return registry.aleo::enabled;
+   │ 
+   │ Help: Check `registry.aleo::enabled` for typos and confirm it is declared in this scope. If it lives in another program, import it with the program-qualified name (e.g. `credits.aleo::credits`).
+───╯

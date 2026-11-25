@@ -34,7 +34,8 @@ pub struct SsaConstPropagationVisitor<'a> {
     /// initializer is an atom — to the atom each field was initialized with.
     /// Used to forward `x.field` to the stored atom without rematerializing
     /// the enclosing struct — effectively scalarizing short-lived aggregates.
-    pub atom_fielded_composites: IndexMap<Symbol, IndexMap<Symbol, Expression>>,
+    /// The flag allows forwarding across SSA copies of dynamic storage wrappers.
+    pub atom_fielded_composites: IndexMap<Symbol, (IndexMap<Symbol, Expression>, bool)>,
     /// Have we actually modified the program at all?
     pub changed: bool,
 }

@@ -38,6 +38,8 @@ pub struct CodeGeneratingVisitor<'a> {
     /// Mapping of composites to a Boolean indicate whether the composite is a record or not.
     /// A composite here is identified by its `Location`.
     pub composite_mapping: IndexMap<Location, bool>,
+    /// Interface specializations referenced by the bytecode currently being generated.
+    pub interface_type_uses: IndexSet<Location>,
     /// Mapping of global identifiers to their associated names.
     pub global_mapping: IndexMap<Location, String>,
     /// The variant of the function we are currently traversing.
@@ -139,8 +141,27 @@ impl CodeGeneratingVisitor<'_> {
     /// For library composites the library name is prepended so that the resulting
     /// identifier is unique and cannot collide with a local type of the same base
     /// name (e.g. `[math_lib, Foo]` → `"Foo__<hash>"`).
-    pub(crate) fn legalize_composite_name(&self, loc: &Location) -> String {
-        if self.state.symbol_table.is_library(loc.program) {
+    pub(crate) fn legalize_composite_name(&mut self, loc: &Location) -> String {
+        if self.state.interface_only_structs.contains(loc) || self.state.legacy_storage_options.contains_key(loc) {
+            self.interface_type_uses.insert(loc.clone());
+        }
+        Self::composite_name(self.state, self.bytecode_location(loc))
+    }
+
+    pub(super) fn bytecode_location<'a>(&'a self, loc: &'a Location) -> &'a Location {
+        if self.state.interface_only_structs.contains(loc) {
+            self.state.legacy_interface_types.get(loc).map_or(loc, |ty| ty.path.expect_global_location())
+        } else if let Some((old, value, _, _)) = self.state.legacy_storage_options.get(loc)
+            && self.state.interface_only_structs.contains(value)
+        {
+            old
+        } else {
+            loc
+        }
+    }
+
+    pub(super) fn composite_name(state: &CompilerState, loc: &Location) -> String {
+        if state.symbol_table.is_library(loc.program) {
             let full_path: Vec<Symbol> = std::iter::once(loc.program).chain(loc.path.iter().copied()).collect();
             Self::legalize_path(&full_path)
                 .unwrap_or_else(|| panic!("path format cannot be legalized at this point: {}", loc))
@@ -168,7 +189,7 @@ impl CodeGeneratingVisitor<'_> {
     /// # Returns
     /// - `Some(String)`: A valid Leo identifier.
     /// - `None`: If the path is invalid or cannot be legalized.
-    pub(crate) fn legalize_path(path: &[Symbol]) -> Option<String> {
+    pub(crate) fn legalize_path(path: &[impl std::fmt::Display]) -> Option<String> {
         /// Checks if a string is a legal Leo identifier: [a-zA-Z][a-zA-Z0-9_]*
         fn is_legal_identifier(s: &str) -> bool {
             let mut chars = s.chars();
@@ -178,7 +199,7 @@ impl CodeGeneratingVisitor<'_> {
         }
 
         /// Generates a hashed Leo identifier from the full path, using the given base segment.
-        fn generate_hashed_name(path: &[Symbol], base: &str) -> String {
+        fn generate_hashed_name(path: &[impl std::fmt::Display], base: &str) -> String {
             use base62::encode;
             use sha2::{Digest, Sha256};
             use std::fmt::Write;
@@ -230,7 +251,7 @@ impl CodeGeneratingVisitor<'_> {
             // "some_very_long_storage_variable__len__"
             //  - Keep at most 13 chars from the prefix
             //  - Produces something like: "some_very_lon__len__CpUbpLTf1Ow"
-            let truncated_prefix = &prefix[..13.min(prefix.len())];
+            let truncated_prefix = prefix.get(..13.min(prefix.len()))?;
             return Some(generate_hashed_name(path, &(truncated_prefix.to_owned() + "__len")));
         }
 
@@ -238,7 +259,7 @@ impl CodeGeneratingVisitor<'_> {
             // "some_very_long_storage_variable__"
             //  - Keep at most 18 chars from the prefix
             //  - Produces something like: "some_very_long_sto__Hn1pThQeV3"
-            let truncated_prefix = &prefix[..18.min(prefix.len())];
+            let truncated_prefix = prefix.get(..18.min(prefix.len()))?;
             return Some(generate_hashed_name(path, &(truncated_prefix.to_owned() + "__")));
         }
 

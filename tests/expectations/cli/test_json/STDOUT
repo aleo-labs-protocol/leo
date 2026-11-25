@@ -84,11 +84,11 @@ Once it is deployed, it CANNOT be changed.
 
 💰 Cost Breakdown (credits)
   Transaction Storage:  0.956000
-  Program Synthesis:    0.095589
+  Program Synthesis:    0.030203
   Namespace:            1.000000
   Constructor:          0.010440
   Priority Fee:         0.000000
-  Total Fee:            2.062029
+  Total Fee:            1.996643
   Function 'main'
     Total Execution Cost:   0.001328
     |- Storage Cost:        0.001328
@@ -238,11 +238,11 @@ Loaded the following programs into the VM:
 
 💰 Cost Breakdown (credits)
   Transaction Storage:  0.956000
-  Program Synthesis:    0.095589
+  Program Synthesis:    0.030203
   Namespace:            1.000000
   Constructor:          0.010440
   Priority Fee:         0.000000
-  Total Fee:            2.062029
+  Total Fee:            1.996643
   Function 'main'
     Total Execution Cost:   0.001328
     |- Storage Cost:        0.001328

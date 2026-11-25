@@ -19,7 +19,7 @@ $LEO_BIN deploy $COMMON_OPTS
 grep -Fq '"name": "test_program1.aleo"' leo.lock
 grep -Fq '"network": "testnet"' leo.lock
 grep -Fq '"edition": 0' leo.lock
-grep -Fq '"checksum": [' leo.lock
+grep -Eq '"checksum": "[0-9a-f]{64}"' leo.lock
 LOCK_COPY=$(mktemp)
 trap 'rm -f "$LOCK_COPY"' EXIT
 cp leo.lock "$LOCK_COPY"

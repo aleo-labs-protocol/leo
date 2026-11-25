@@ -3,6 +3,7 @@
 # Tests that a program implementing a library interface emits the external
 # interface ABI under build/my_program/interfaces/<lib>/.
 
+set -eu
 LEO_BIN=${1}
 
 cd my_program || exit 1
@@ -19,3 +20,76 @@ echo
 
 echo "--- library interface ABI ---" | tee /dev/stderr
 cat build/my_program/interfaces/my_lib/Greeter.json
+echo
+
+# Compare a standalone standard with the copy emitted for its implementation.
+fixture=$(mktemp -d)
+trap 'rm -rf "$fixture"' EXIT
+cp -R ../my_lib "$fixture/my_lib"
+cp -R . "$fixture/my_program"
+cd "$fixture"
+
+"$LEO_BIN" build --path my_lib >/dev/null
+standalone=my_lib/build/my_lib/interfaces/Greeter.json
+imported=my_program/build/my_program/interfaces/my_lib/Greeter.json
+bytecode=my_program/build/my_program/my_program.aleo
+cmp "$standalone" "$imported"
+"$LEO_BIN" abi "$bytecode" --satisfies "$standalone" --output report.json >/dev/null 2>&1
+cat report.json
+echo
+
+# A program ABI can name a library type without providing its fields.
+program_abi=my_program/build/my_program/abi.json
+if "$LEO_BIN" abi "$bytecode" --satisfies "$program_abi" --output incomplete.json >/dev/null 2>&1; then
+    exit 1
+fi
+cat incomplete.json
+echo
+
+# A standard can also require a struct independently of its function signatures.
+sed 's/"structs": \[/"structs": [{"path":["Required"],"fields":[]},/' "$standalone" > extra.json
+if "$LEO_BIN" abi "$bytecode" --satisfies extra.json --output extra-report.json >/dev/null 2>&1; then
+    exit 1
+fi
+cat extra-report.json
+echo
+
+# Change the input to a different specialization with the same fields.
+sed -e 's/: my_lib::Greeter {/{/' -e 's/Tag::\[2u32\]/Tag::[4u32]/g' my_program/src/main.leo > wrong.leo
+cp wrong.leo my_program/src/main.leo
+"$LEO_BIN" build --path my_program >/dev/null
+if "$LEO_BIN" abi "$bytecode" --satisfies "$standalone" --output wrong-report.json >/dev/null 2>&1; then
+    exit 1
+fi
+cat wrong-report.json
+echo
+
+# The implementing program must use the library's struct, even when a local struct has identical fields.
+cat > my_lib/src/lib.leo <<'LEO'
+export struct Metadata { amount: u8 }
+export interface Identity {
+    record Token { amount: Metadata, owner: address, .. }
+    fn describe(input: Metadata) -> Metadata;
+    fn consume(input: Token) -> Token;
+}
+LEO
+cat > my_program/src/main.leo <<'LEO'
+program my_program.aleo : my_lib::Identity {
+    record Token { amount: my_lib::Metadata, owner: address }
+    fn describe(input: my_lib::Metadata) -> my_lib::Metadata { return input; }
+    fn consume(input: Token) -> Token { return input; }
+    @noupgrade
+    constructor() {}
+}
+LEO
+"$LEO_BIN" build --path my_lib >/dev/null
+"$LEO_BIN" build --path my_program >/dev/null
+identity=my_lib/build/my_lib/interfaces/Identity.json
+"$LEO_BIN" abi "$bytecode" --satisfies "$identity" --output result.json >/dev/null
+# Compare the same layout with an unqualified local struct in bytecode.
+sed -E 's/Metadata__[[:alnum:]_]+/Metadata/g' "$bytecode" > local.aleo
+mv local.aleo "$bytecode"
+"$LEO_BIN" abi "$bytecode" >/dev/null
+if "$LEO_BIN" abi "$bytecode" --satisfies "$identity" >/dev/null 2>&1; then
+    exit 1
+fi

@@ -104,13 +104,12 @@ fn clone_resolve_checkout(
     }
 
     // A no-ref clone fetches all branches and tags, so any reference resolves against it.
-    let parsed = gix::url::parse(url.into()).map_err(|e| crate::errors::git_error(name, url, e))?;
+    let parsed = gix::url::parse(url).map_err(|e| crate::errors::git_error(name, url, e))?;
     let mut prepare = gix::prepare_clone(parsed, tmp)
         .map_err(|e| crate::errors::git_error(name, url, e))?
         .configure_connection(|connection| {
             // Public repos only: never supply credentials, so a private repo fails rather than
             // resolving via the developer's local git credentials (not reproducible elsewhere).
-            #[allow(clippy::result_large_err)] // gix's error type is large and not boxable here.
             connection.set_credentials(|_action| Ok(None));
             Ok(())
         });

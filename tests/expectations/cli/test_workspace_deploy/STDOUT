@@ -64,11 +64,11 @@ Once it is deployed, it CANNOT be changed.
 
 💰 Cost Breakdown (credits)
   Transaction Storage:  0.864000
-  Program Synthesis:    0.108124
+  Program Synthesis:    0.032226
   Namespace:            100000.000000
   Constructor:          0.002000
   Priority Fee:         0.000000
-  Total Fee:            100000.974124
+  Total Fee:            100000.898226
   Function 'mint'
     Total Execution Cost:   0.001375
     |- Storage Cost:        0.001375
@@ -97,11 +97,11 @@ Once it is deployed, it CANNOT be changed.
 
 💰 Cost Breakdown (credits)
   Transaction Storage:  0.909000
-  Program Synthesis:    0.159677
+  Program Synthesis:    0.042083
   Namespace:            1000000.000000
   Constructor:          0.002000
   Priority Fee:         0.000000
-  Total Fee:            1000001.070677
+  Total Fee:            1000000.953083
   Function 'do_swap'
     Total Execution Cost:   0.002248
     |- Storage Cost:        0.002248

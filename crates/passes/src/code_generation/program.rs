@@ -77,10 +77,26 @@ impl<'a> CodeGeneratingVisitor<'a> {
         };
 
         // Add each `struct` or `record` in the post-ordering and produce an Aleo struct or record.
-        let data_types = order
+        let mut data_types: IndexMap<_, _> = order
             .into_iter()
-            .filter_map(|loc| lookup(&loc).map(|composite| self.visit_struct_or_record(composite, &loc)))
+            .filter_map(|loc| {
+                // Preserve previously emitted template names when their original fields have Aleo types.
+                // Dependencies come first, so a field can refer only to a template we could also emit.
+                lookup(&loc)
+                    .filter(|c| {
+                        c.const_parameters.is_empty()
+                            || c.members
+                                .iter()
+                                .all(|m| m.type_.kind().is_empty() || self.has_concrete_layout(m.type_.kind()))
+                    })
+                    .map(|composite| {
+                        let data_type = self.visit_struct_or_record(composite, &loc);
+                        (loc, data_type)
+                    })
+            })
             .collect();
+
+        self.interface_type_uses.clear();
 
         // Visit each mapping in the Leo AST and produce an Aleo mapping declaration.
         let mappings = program_scope.mappings.iter().map(|(_symbol, mapping)| self.visit_mapping(mapping)).collect();
@@ -137,7 +153,72 @@ impl<'a> CodeGeneratingVisitor<'a> {
         // If the constructor exists, visit it and produce an Aleo constructor.
         let constructor = program_scope.constructor.as_ref().map(|c| self.visit_constructor(c));
 
+        let state = self.state;
+        if !state.interface_only_structs.is_empty() || !state.legacy_storage_options.is_empty() {
+            // Keep the transitive dependencies of historically emitted declarations and types
+            // named by actual instructions, mappings, function signatures, or the constructor.
+            let used = self
+                .state
+                .composite_graph
+                .post_order_with_filter(|loc| {
+                    let storage_only =
+                        state.legacy_storage_options.get(loc).is_some_and(|(_, value, _, used_independently)| {
+                            !state.interface_only_structs.contains(value) && !used_independently
+                        });
+                    data_types.contains_key(loc)
+                        && ((!state.interface_only_structs.contains(loc) && !storage_only)
+                            || self.interface_type_uses.contains(loc))
+                })
+                .expect("type checking ensures the composite graph is acyclic");
+            data_types.retain(|loc, _| used.contains(loc));
+        }
+        // An independent instantiation keeps the specialized value type. Older deployments
+        // can also contain its template-named wrapper from a dynamic storage read.
+        for (location, (old, value, original_inner, _)) in &state.legacy_storage_options {
+            if location.program == this_program
+                && !data_types.contains_key(old)
+                && !state.interface_only_structs.contains(value)
+            {
+                let name = Self::composite_name(self.state, old);
+                let fields = vec![
+                    ("is_some".to_owned(), AleoType::Boolean),
+                    ("val".to_owned(), self.visit_type(original_inner)),
+                ];
+                data_types.insert(old.clone(), AleoDatatype::Struct(AleoStruct { name, fields }));
+            }
+        }
+        let data_types = if state.legacy_interface_types.is_empty() {
+            data_types.into_values().collect()
+        } else {
+            // A template and an identical specialization can resolve to the same bytecode location.
+            // Keep the first declaration so it precedes all users of either location.
+            data_types.into_iter().unique_by(|(loc, _)| self.bytecode_location(loc).clone()).map(|(_, ty)| ty).collect()
+        };
         AleoProgram { imports, program_id, data_types, mappings, functions, constructor }
+    }
+
+    fn has_concrete_layout(&self, ty: &TypeKind) -> bool {
+        match ty {
+            TypeKind::Array(array) => array.length.as_u32().is_some() && self.has_concrete_layout(array.element_type()),
+            TypeKind::Composite(composite) => {
+                let location = composite.path.expect_global_location();
+                self.composite_mapping.contains_key(location)
+                    || (Some(location.program) != self.program_id.map(|id| id.as_symbol())
+                        && !self.state.symbol_table.is_library(location.program))
+            }
+            TypeKind::Address
+            | TypeKind::Boolean
+            | TypeKind::Field
+            | TypeKind::Group
+            | TypeKind::Scalar
+            | TypeKind::Signature
+            | TypeKind::String
+            | TypeKind::Identifier
+            | TypeKind::DynRecord
+            | TypeKind::Integer(_)
+            | TypeKind::Ident(_) => true,
+            _ => false,
+        }
     }
 
     fn visit_struct_or_record(&mut self, composite: &'a Composite, loc: &Location) -> AleoDatatype {
@@ -451,7 +532,7 @@ impl<'a> CodeGeneratingVisitor<'a> {
         let program = self.program_id.unwrap().as_symbol();
 
         // Helper to construct the string associated with the type.
-        let create_type = |type_: &TypeKind| {
+        let mut create_type = |type_: &TypeKind| {
             match type_ {
                 TypeKind::Mapping(_) | TypeKind::Tuple(_) => panic!("Mappings cannot contain mappings or tuples."),
                 TypeKind::Ident(identifier) => {

@@ -26,6 +26,7 @@ use leo_ast::{
     Expression,
     Function,
     Identifier,
+    Interface,
     Location,
     Module,
     Path,
@@ -57,6 +58,10 @@ pub struct MonomorphizationVisitor<'a> {
     pub unresolved_composite_exprs: Vec<CompositeExpression>,
     /// A vector of all the composite type instantiations of const generic composites that have not been resolved.
     pub unresolved_composite_types: Vec<CompositeType>,
+    /// Original template names referenced by root library interfaces in this iteration.
+    pub legacy_interface_structs: IndexSet<Location>,
+    /// Whether the current prototype belongs to the root of a library.
+    pub in_library_root_interface: bool,
     /// Have we actually modified the program at all?
     pub changed: bool,
 }
@@ -106,6 +111,8 @@ impl MonomorphizationVisitor<'_> {
         path_segs.extend_from_slice(&original_loc.path[..original_loc.path.len() - 1]);
         path_segs.push(monomorphized_name);
         let storage_loc = Location::new(original_loc.program, path_segs);
+        // An independent instantiation keeps the definition in the historical bytecode schema.
+        self.state.interface_only_structs.swap_remove(&storage_loc);
 
         // Build the new path pointing directly to the storage location.
         let new_composite_path =
@@ -159,8 +166,13 @@ impl MonomorphizationVisitor<'_> {
         new_composite_path
     }
 
-    /// Assembles a `Module` from the already-populated `reconstructed_*` maps. Interfaces are
-    /// reconstructed because they may reference composites that have been monomorphized.
+    pub(super) fn reconstruct_interfaces(&mut self, interfaces: &mut [(Symbol, Interface)]) {
+        for (_, interface) in interfaces {
+            *interface = self.reconstruct_interface(std::mem::take(interface));
+        }
+    }
+
+    /// Assembles a `Module` from the already-populated `reconstructed_*` maps.
     /// `input.unit_name` is used (not `self.program`) because a nested `reconstruct_program`
     /// call on a `Stub::FromLeo` dependency may have moved `self.program` off the module's own
     /// compilation unit.
@@ -168,7 +180,6 @@ impl MonomorphizationVisitor<'_> {
         Module {
             composites: items_at_path(&self.reconstructed_composites, input.unit_name, &input.path).collect(),
             functions: items_at_path(&self.reconstructed_functions, input.unit_name, &input.path).collect(),
-            interfaces: input.interfaces.into_iter().map(|(i, int)| (i, self.reconstruct_interface(int))).collect(),
             ..input
         }
     }
@@ -217,7 +228,7 @@ impl MonomorphizationVisitor<'_> {
             mappings,
             storage_variables,
             functions,
-            interfaces: input.interfaces.into_iter().map(|(i, int)| (i, self.reconstruct_interface(int))).collect(),
+            interfaces: input.interfaces,
             constructor: input.constructor,
             consts,
             span: input.span,

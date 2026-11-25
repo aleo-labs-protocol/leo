@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the Leo library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{CompilerState, expression_can_be_discarded};
+use crate::{CompilerState, expression_can_be_discarded_with};
 
 use leo_ast::*;
 use leo_span::{Span, Symbol, sym};
@@ -26,6 +26,18 @@ pub struct StorageLoweringVisitor<'a> {
     // The name of the current program scope
     pub program: Symbol,
     pub new_mappings: IndexMap<Location, Mapping>,
+    // Lowering can reuse a source node ID for an expression with different operands.
+    pub source_discardability: IndexMap<NodeID, bool>,
+    pub lowered_discardability: IndexMap<NodeID, bool>,
+}
+
+pub(super) fn can_discard(expr: &Expression, state: &CompilerState, cache: &mut IndexMap<NodeID, bool>) -> bool {
+    if let Some(&result) = cache.get(&expr.id()) {
+        return result;
+    }
+    let result = expression_can_be_discarded_with(expr, state, |child| can_discard(child, state, cache));
+    cache.insert(expr.id(), result);
+    result
 }
 
 impl StorageLoweringVisitor<'_> {
@@ -214,6 +226,51 @@ impl StorageLoweringVisitor<'_> {
         BinaryExpression { op, left, right, span: Span::default(), id: self.state.node_builder.next_id() }.into()
     }
 
+    /// Records the wrapper name emitted by older compilers for a dynamic read of root library storage.
+    pub fn record_legacy_storage_option(&mut self, interface: &TypeKind, inner: &TypeKind, read: &Expression) {
+        let TypeKind::Composite(interface) = interface else { return };
+        let owner = interface.path.expect_global_location();
+        if owner.path.len() != 1 || !self.state.symbol_table.is_library(owner.program) {
+            return;
+        }
+
+        fn legacy_inner(state: &CompilerState, ty: &TypeKind) -> Option<(Location, TypeKind)> {
+            match ty {
+                TypeKind::Array(array) => {
+                    let (value, element) = legacy_inner(state, array.element_type())?;
+                    let mut array = array.clone();
+                    array.element_type = Box::new(element);
+                    Some((value, TypeKind::Array(array)))
+                }
+                TypeKind::Composite(value) => {
+                    let location = value.path.expect_global_location();
+                    let template = state.legacy_interface_types.get(location)?;
+                    Some((location.clone(), TypeKind::Composite(template.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        if let Some((value, legacy)) = legacy_inner(self.state, inner) {
+            let Expression::Ternary(ternary) = read else { unreachable!("a lowered storage read is a ternary") };
+            self.state.dynamic_storage_values.extend([ternary.if_true.id(), ternary.if_false.id()]);
+            let old = Location::new(self.program, vec![crate::make_optional_struct_symbol(&legacy)]);
+            // Historical wrapper names omit the library owner. Keep the first owner's definition
+            // and use the specialized wrapper for any other owner's nominally distinct type.
+            let templates = &self.state.legacy_interface_types;
+            if self.state.legacy_storage_options.values().any(|(claimed, prior, _, _)| {
+                *claimed == old
+                    && templates[prior].path.expect_global_location() != templates[&value].path.expect_global_location()
+            }) {
+                return;
+            }
+            let new = crate::make_optional_struct_symbol(inner);
+            self.state
+                .legacy_storage_options
+                .insert(Location::new(self.program, vec![new]), (old, value, legacy, false));
+        }
+    }
+
     /// Lowers `Interface@(target)::storage` (singleton bare read) to a ternary
     /// `contains.dynamic ? get_or_use.dynamic(..) : None` producing `Option<T>`.
     pub fn lower_dynamic_read(
@@ -258,6 +315,7 @@ impl StorageLoweringVisitor<'_> {
 
         let none_expr: Expression = Literal::none(Span::default(), self.state.node_builder.next_id()).into();
         let ternary = self.ternary_expr(contains_expr, get_or_use_expr, none_expr, span);
+        self.record_legacy_storage_option(&interface_ty, storage_proto.type_.kind(), &ternary);
 
         let mut stmts = prog_stmts;
         stmts.extend(net_stmts);
@@ -281,28 +339,7 @@ impl StorageLoweringVisitor<'_> {
             None => (self.literal_default_network(), vec![]),
         };
         let index_argument = arguments.into_iter().next().expect("type checking guarantees one argument");
-        let index_type = self
-            .state
-            .type_table
-            .get(&index_argument.id())
-            .expect("type checking should assign a type to the vector index");
-        let index_must_be_evaluated_once = !expression_can_be_discarded(&index_argument, self.state);
-        let (index_expr, mut index_stmts) = self.reconstruct_expression(index_argument, &());
-        self.state.type_table.insert(index_expr.id(), index_type);
-        let index_expr = if index_must_be_evaluated_once {
-            let index_var_sym = self.state.assigner.unique_symbol("$index", "$");
-            let index_var_ident =
-                Identifier { name: index_var_sym, span: Default::default(), id: self.state.node_builder.next_id() };
-            self.state.type_table.insert(index_var_ident.id, index_type);
-            index_stmts.push(self.state.assigner.simple_definition(
-                index_var_ident,
-                index_expr,
-                self.state.node_builder.next_id(),
-            ));
-            index_var_ident.into()
-        } else {
-            index_expr
-        };
+        let (index_expr, index_stmts) = self.reconstruct_expression(index_argument, &());
 
         let base_name = member.name.to_string();
         let val_mapping_sym = Symbol::intern(&format!("{base_name}__"));

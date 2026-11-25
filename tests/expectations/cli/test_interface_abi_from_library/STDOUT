@@ -5,7 +5,7 @@
 ⚠️ No endpoint specified, defaulting to 'https://api.explorer.provable.com/v1'.
 
        Leo 🔨 Compiling 'my_program.aleo'
-       Leo     Program size: 0.15 KB / 2000.00 KB
+       Leo     Program size: 0.83 KB / 2000.00 KB
        Leo ✅ Compiled 'my_program.aleo' into Aleo instructions.
        Leo ✅ Generated ABI for program 'my_program.aleo'.
        Leo ✅ Generated 1 interface ABI(s).
@@ -36,6 +36,72 @@ build exit code: 0
             "ty": {
               "Primitive": {
                 "UInt": "U64"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "packet",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "my_lib",
+                  "Packet::[3u32]"
+                ],
+                "program": "my_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Primitive": {
+                "UInt": "U8"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "encode",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "my_lib",
+                  "Tag::[2u32]"
+                ],
+                "program": "my_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "my_lib",
+                  "Tag::[3u32]"
+                ],
+                "program": "my_lib"
               }
             },
             "mode": "Private"
@@ -78,10 +144,248 @@ build exit code: 0
           }
         }
       ]
+    },
+    {
+      "name": "encode",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "Tag::[2u32]"
+                ],
+                "program": "my_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "Tag::[3u32]"
+                ],
+                "program": "my_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
+    },
+    {
+      "name": "packet",
+      "inputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Struct": {
+                "path": [
+                  "Packet::[3u32]"
+                ],
+                "program": "my_lib"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "Plaintext": {
+            "ty": {
+              "Primitive": {
+                "UInt": "U8"
+              }
+            },
+            "mode": "Private"
+          }
+        }
+      ]
     }
   ],
   "records": [],
   "mappings": [],
   "storage_variables": [],
-  "structs": []
+  "structs": [
+    {
+      "path": [
+        "Bytes::[3u32]"
+      ],
+      "fields": [
+        {
+          "name": "data",
+          "ty": {
+            "Array": {
+              "element": {
+                "Primitive": {
+                  "UInt": "U8"
+                }
+              },
+              "length": 3
+            }
+          }
+        },
+        {
+          "name": "empty",
+          "ty": {
+            "Array": {
+              "element": {
+                "Array": {
+                  "element": {
+                    "Primitive": {
+                      "UInt": "U8"
+                    }
+                  },
+                  "length": 3
+                }
+              },
+              "length": 0
+            }
+          }
+        },
+        {
+          "name": "wrappers",
+          "ty": {
+            "Array": {
+              "element": {
+                "Struct": {
+                  "path": [
+                    "Wrapper"
+                  ],
+                  "program": "my_lib"
+                }
+              },
+              "length": 0
+            }
+          }
+        },
+        {
+          "name": "tags",
+          "ty": {
+            "Array": {
+              "element": {
+                "Struct": {
+                  "path": [
+                    "Tag::[3u32]"
+                  ],
+                  "program": "my_lib"
+                }
+              },
+              "length": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "Hidden"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "Packet::[3u32]"
+      ],
+      "fields": [
+        {
+          "name": "bytes",
+          "ty": {
+            "Struct": {
+              "path": [
+                "Bytes::[3u32]"
+              ],
+              "program": "my_lib"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "Tag::[2u32]"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U8"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "Tag::[3u32]"
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "ty": {
+            "Primitive": {
+              "UInt": "U8"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "Wrapper"
+      ],
+      "fields": [
+        {
+          "name": "hidden",
+          "ty": {
+            "Struct": {
+              "path": [
+                "Hidden"
+              ],
+              "program": "my_lib"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+{
+  "satisfied": true,
+  "problems": []
+}
+{
+  "satisfied": false,
+  "problems": [
+    "standard lacks the definition of library struct `my_lib::Packet::[3u32]`"
+  ]
+}
+{
+  "satisfied": false,
+  "problems": [
+    "missing struct `Required__HD94UxupNDX`"
+  ]
+}
+{
+  "satisfied": false,
+  "problems": [
+    "function `encode` differs",
+    "missing struct `Tag__FprkXI3s1ZN`"
+  ]
 }

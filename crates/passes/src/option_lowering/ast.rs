@@ -61,7 +61,7 @@ impl leo_ast::AstReconstructor for OptionLoweringVisitor<'_> {
         let (inner_type, _) = self.reconstruct_type(*input.inner.clone());
 
         // Create an optional wrapper struct for `inner_type`
-        let struct_name = self.insert_optional_wrapper_struct(&inner_type);
+        let struct_name = self.insert_optional_wrapper_struct(&inner_type, None);
 
         (
             TypeKind::Composite(CompositeType {
@@ -87,7 +87,7 @@ impl leo_ast::AstReconstructor for OptionLoweringVisitor<'_> {
                 panic!("Type checking guarantees that `None` has an Optional type");
             };
 
-            return (self.wrap_none(&inner), vec![]);
+            return (self.wrap_none(&inner, input.id()), vec![]);
         }
 
         // Reconstruct the expression based on its variant
@@ -434,6 +434,7 @@ impl leo_ast::AstReconstructor for OptionLoweringVisitor<'_> {
         let (expr, stmts) = self.reconstruct_expression(input.expression, &None);
 
         input.expression = expr;
+        input.type_ = self.reconstruct_type_node(input.type_).0;
 
         (input.into(), stmts)
     }

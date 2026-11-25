@@ -16,8 +16,19 @@
 
 use crate::{Assigner, SymbolTable, TypeTable};
 
-use indexmap::IndexMap;
-use leo_ast::{Ast, CallGraph, CompositeGraph, Location, NetworkName, NodeBuilder, TypeInterner};
+use indexmap::{IndexMap, IndexSet};
+use leo_ast::{
+    Ast,
+    CallGraph,
+    CompositeGraph,
+    CompositeType,
+    Location,
+    NetworkName,
+    NodeBuilder,
+    NodeID,
+    TypeInterner,
+    TypeKind,
+};
 use leo_errors::{Handler, Result};
 
 use std::rc::Rc;
@@ -41,6 +52,17 @@ pub struct CompilerState {
     pub symbol_table: SymbolTable,
     /// A graph of which composite refer to each other.
     pub composite_graph: CompositeGraph,
+    /// Original struct names that older compilers emitted for root library interface types.
+    pub legacy_interface_structs: IndexSet<Location>,
+    /// Specializations introduced only by root library interface prototypes.
+    pub interface_only_structs: IndexSet<Location>,
+    /// Specializations with the same emitted fields as their original templates.
+    pub legacy_interface_types: IndexMap<Location, CompositeType>,
+    /// Maps a concrete storage wrapper to its original location, concrete value struct, original value type,
+    /// and whether ordinary declarations or expressions also require the concrete wrapper.
+    pub legacy_storage_options: IndexMap<Location, (Location, Location, TypeKind, bool)>,
+    /// The expressions that wrap dynamic storage reads in an optional.
+    pub dynamic_storage_values: IndexSet<NodeID>,
     /// A graph of which functions call each other.
     pub call_graph: CallGraph,
     /// How many times a given function is called.

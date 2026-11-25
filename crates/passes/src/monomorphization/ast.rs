@@ -34,6 +34,30 @@ use indexmap::IndexMap;
 use itertools::{Either, Itertools};
 use leo_span::Symbol;
 
+/// Only alias layouts with the same emitted fields. In particular an unevaluated array
+/// length cannot compare equal to a concrete length as it can during early type checking.
+fn same_layout(template: &leo_ast::Composite, concrete: &leo_ast::Composite) -> bool {
+    fn same_type(a: &TypeKind, b: &TypeKind) -> bool {
+        match (a, b) {
+            (TypeKind::Array(a), TypeKind::Array(b)) => {
+                a.length.as_u32().is_some_and(|n| b.length.as_u32() == Some(n))
+                    && same_type(a.element_type(), b.element_type())
+            }
+            (TypeKind::Composite(a), TypeKind::Composite(b)) => {
+                a.const_arguments.is_empty()
+                    && b.const_arguments.is_empty()
+                    && a.path.expect_global_location() == b.path.expect_global_location()
+            }
+            _ => a == b,
+        }
+    }
+    let mut old = template.members.iter().filter(|m| !m.type_.kind().is_empty());
+    let mut new = concrete.members.iter().filter(|m| !m.type_.kind().is_empty());
+    old.by_ref().all(|a| {
+        new.next().is_some_and(|b| a.identifier.name == b.identifier.name && same_type(a.type_.kind(), b.type_.kind()))
+    }) && new.next().is_none()
+}
+
 impl<'a> MonomorphizationVisitor<'a> {
     /// Evaluates the given constant arguments if possible.
     ///
@@ -80,11 +104,27 @@ impl AstReconstructor for MonomorphizationVisitor<'_> {
             return (TypeKind::Composite(input), Default::default());
         };
 
+        // Only the type written in the prototype used the template name in older bytecode.
+        // Types discovered while specializing its fields follow the normal dependency graph.
+        let in_library_root_interface = std::mem::take(&mut self.in_library_root_interface);
+        if in_library_root_interface {
+            self.legacy_interface_structs.insert(input.path.expect_global_location().clone());
+        }
+        let path = self.monomorphize_composite(&input.path, &evaluated_const_args);
+        self.in_library_root_interface = in_library_root_interface;
+        if in_library_root_interface {
+            let template = &self.reconstructed_composites[input.path.expect_global_location()];
+            let concrete = &self.reconstructed_composites[path.expect_global_location()];
+            if same_layout(template, concrete) {
+                self.state.legacy_interface_types.insert(path.expect_global_location().clone(), input.clone());
+            }
+        }
+
         // At this stage, we know that we're going to modify the program
         self.changed = true;
         (
             TypeKind::Composite(CompositeType {
-                path: self.monomorphize_composite(&input.path, &evaluated_const_args),
+                path,
                 const_arguments: vec![], // remove const arguments
             }),
             Default::default(),

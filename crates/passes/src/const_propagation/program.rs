@@ -116,6 +116,10 @@ impl UnitReconstructor for ConstPropagationVisitor<'_> {
             .map(|(i, f)| if f.const_parameters.is_empty() { (i, self.reconstruct_function(f)) } else { (i, f) })
             .collect();
 
+        for (_, interface) in &mut input.interfaces {
+            *interface = self.reconstruct_interface(std::mem::take(interface));
+        }
+
         // Process submodules, applying the same const-propagation logic to their items.
         input.modules = input.modules.into_iter().map(|(id, m)| (id, self.reconstruct_module(m))).collect();
 

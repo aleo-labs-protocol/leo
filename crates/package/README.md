@@ -22,14 +22,14 @@ Leo reads and writes the lock at the workspace root, or beside `program.json` fo
 
 Standalone `.aleo` files can resolve network imports without manual pins. They do not create a project lock. Remote command targets can also load without a project; their first response has the same endpoint trust limit. Upgrade checks must inspect the current deployed edition.
 
-The lock format is JSON. Version 2 adds a `network` array to the existing `git` array. A valid version 1 Git lock remains readable. Each network entry has these fields:
+The lock format is JSON. Version 3 writes each network checksum as a hexadecimal string. Leo can still read version 1 Git locks, version 2 locks, and checksums stored as arrays of 32 bytes. Leo writes version 3 when it saves a lock. Each network entry has these fields:
 
 | Field | Value |
 | --- | --- |
 | `name` | The full program ID, for example `token.aleo`. |
 | `network` | `mainnet`, `testnet`, or `canary`. |
 | `edition` | The resolved edition number, from 0 to 65535. |
-| `checksum` | An array of 32 integers, each from 0 to 255. |
+| `checksum` | A string of 64 lowercase hexadecimal characters. |
 
 The checksum is the SHA3-256 hash from snarkVM `Program::to_checksum()`. Comments and spacing do not change it. Duplicate entries and invalid lock files stop resolution. The built-in `credits.aleo` program comes from snarkVM at edition zero and needs no network entry. For this built-in program, Leo ignores the manifest edition and uses the bundled edition zero.
 
