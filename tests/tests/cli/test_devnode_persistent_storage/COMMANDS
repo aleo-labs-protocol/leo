@@ -25,7 +25,7 @@ wait_for_devnode() {
   while [ $SECONDS -lt $deadline ]; do
     local version
     version=$(curl -sf "http://127.0.0.1:${PORT}/testnet/consensus_version" 2>/dev/null || echo "")
-    if [ "$version" = "22" ]; then
+    if [ "$version" = "23" ]; then
       return 0
     fi
     sleep 1

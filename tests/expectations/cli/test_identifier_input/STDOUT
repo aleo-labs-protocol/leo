@@ -38,7 +38,7 @@ Attempting to determine the consensus version from the latest block height at ht
   Address:            aleo1s3ws5tra87fjycnjrwsjcrnw2qxr8jfqqdugnf0xzqqw29q9m5pqem2u4t
   Endpoint:           http://localhost:3030
   Network:            testnet
-  Consensus Version:  22
+  Consensus Version:  23
 
 🎯 Execution Target:
   Program:        test_identifier_input.aleo
