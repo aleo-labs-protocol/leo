@@ -17,7 +17,7 @@
 use leo_errors::LeoError;
 
 use serde::Serialize;
-use snarkvm::prelude::{CanaryV0, MainnetV0, Network, TestnetV0};
+use snarkvm::prelude::{MainnetV0, Network, TestnetV0};
 use std::{fmt, str::FromStr};
 
 // Retrievable networks for an external program
@@ -28,8 +28,6 @@ pub enum NetworkName {
     TestnetV0 = 1,
     #[serde(rename = "mainnet")]
     MainnetV0 = 0,
-    #[serde(rename = "canary")]
-    CanaryV0 = 2,
 }
 
 impl NetworkName {
@@ -37,7 +35,6 @@ impl NetworkName {
         match self {
             NetworkName::TestnetV0 => TestnetV0::ID,
             NetworkName::MainnetV0 => MainnetV0::ID,
-            NetworkName::CanaryV0 => CanaryV0::ID,
         }
     }
 }
@@ -49,7 +46,6 @@ impl FromStr for NetworkName {
         match s {
             "testnet" => Ok(NetworkName::TestnetV0),
             "mainnet" => Ok(NetworkName::MainnetV0),
-            "canary" => Ok(NetworkName::CanaryV0),
             _ => Err(crate::errors::invalid_network_name(s).into()),
         }
     }
@@ -60,7 +56,6 @@ impl fmt::Display for NetworkName {
         match self {
             NetworkName::TestnetV0 => write!(f, "testnet"),
             NetworkName::MainnetV0 => write!(f, "mainnet"),
-            NetworkName::CanaryV0 => write!(f, "canary"),
         }
     }
 }

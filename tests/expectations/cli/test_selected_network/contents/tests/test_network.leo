@@ -9,11 +9,6 @@ program test_network.aleo {
         return final { assert_eq(std::ctx::network_id(), 1u16); };
     }
 
-    @test
-    fn canary_id() -> Final {
-        return final { assert_eq(std::ctx::network_id(), 2u16); };
-    }
-
     @noupgrade
     constructor() {}
 }

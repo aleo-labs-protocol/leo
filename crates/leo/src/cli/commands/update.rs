@@ -48,7 +48,7 @@ impl Command for LeoUpdate {
             )
             .into());
         }
-        let network = get_network(&self.env_override.network).unwrap_or_else(|_| {
+        let network = get_optional_network(&self.env_override.network)?.unwrap_or_else(|| {
             tracing::warn!("No network specified, defaulting to 'testnet'.");
             NetworkName::TestnetV0
         });

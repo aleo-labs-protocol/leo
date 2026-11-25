@@ -168,8 +168,9 @@ mod tests {
         std::fs::create_dir_all(&root).expect("The temporary directory must be created");
         let context =
             Context::new(Some(root.clone()), Some(root.join("cache")), false, None).expect("The context must be valid");
-        let store = ConsensusStore::<TestnetV0, ConsensusMemory<TestnetV0>>::open(aleo_std::StorageMode::Production)
-            .expect("The memory store must open");
+        let store =
+            ConsensusStore::<TestnetV0, ConsensusMemory<TestnetV0>>::open(snarkvm::utilities::StorageMode::Production)
+                .expect("The memory store must open");
         let vm = VM::from(store).expect("The VM must initialize");
         leo_span::create_session_if_not_set_then(|_| {
             let error = load_extra_programs_into_vm(

@@ -29,7 +29,7 @@ use crate::{CompilerState, Pass};
 use leo_ast::{Ast, CallGraph, CompositeGraph, NetworkName, UnitVisitor};
 use leo_errors::Result;
 
-use snarkvm::prelude::{CanaryV0, MainnetV0, Network, TestnetV0};
+use snarkvm::prelude::{MainnetV0, Network, TestnetV0};
 
 use indexmap::{IndexMap, IndexSet};
 
@@ -60,13 +60,6 @@ impl TypeCheckingInput {
                 TestnetV0::MAX_FUNCTIONS,
                 TestnetV0::MAX_INPUTS,
                 TestnetV0::MAX_OUTPUTS,
-            ),
-            NetworkName::CanaryV0 => (
-                CanaryV0::LATEST_MAX_ARRAY_ELEMENTS(),
-                CanaryV0::LATEST_MAX_MAPPINGS(),
-                CanaryV0::MAX_FUNCTIONS,
-                CanaryV0::MAX_INPUTS,
-                CanaryV0::MAX_OUTPUTS,
             ),
         };
         Self { max_array_elements, max_mappings, max_functions, max_inputs, max_outputs }

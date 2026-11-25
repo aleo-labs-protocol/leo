@@ -59,13 +59,13 @@ pub struct LeoDevnet {
     pub(crate) num_validators: usize,
     #[clap(long, help = "Number of clients", default_value = "2")]
     pub(crate) num_clients: usize,
-    #[clap(short = 'n', long, help = "Network (mainnet=0, testnet=1, canary=2)", default_value = "testnet")]
+    #[clap(short = 'n', long, help = "Network (mainnet=0, testnet=1)", default_value = "testnet")]
     pub(crate) network: NetworkName,
     #[clap(short = 's', long, help = "Ledger / log root directory", default_value = "./")]
     pub(crate) storage: PathBuf,
     #[clap(long, help = "Path to snarkOS binary. If it does not exist, set `--install` to build it at this path.")]
     pub(crate) snarkos: Option<PathBuf>,
-    #[clap(long, help = "Required features for snarkOS (e.g. `test_network`)", value_delimiter = ',')]
+    #[clap(long, help = "Required features for snarkOS (e.g. `dev-network`)", value_delimiter = ',')]
     pub(crate) snarkos_features: Vec<String>,
     #[clap(long, help = "Required version for snarkOS (e.g. `4.1.0`). Defaults to latest version on `crates.io`.")]
     pub(crate) snarkos_version: Option<String>,
@@ -73,7 +73,7 @@ pub struct LeoDevnet {
     pub(crate) install: bool,
     #[clap(
         long,
-        help = "Optional consensus heights to use. The `test_network` feature must be enabled for this to work.",
+        help = "Optional consensus heights to use. The `dev-network` feature must be enabled for this to work.",
         value_delimiter = ',',
         env = "CONSENSUS_VERSION_HEIGHTS"
     )]
@@ -141,10 +141,10 @@ impl LeoDevnet {
             bail!("Nested tmux session detected.  Unset $TMUX and retry.");
         }
 
-        // If the devnet heights are provided, ensure the `test_network` feature is enabled, and validate the heights.
+        // If the devnet heights are provided, ensure the `dev-network` feature is enabled, and validate the heights.
         if let Some(ref heights) = self.consensus_heights {
-            if !self.snarkos_features.contains(&"test_network".to_string()) {
-                bail!("The `test_network` feature must be enabled on snarkOS to use `--consensus-heights`.");
+            if !self.snarkos_features.contains(&"dev-network".to_string()) {
+                bail!("The `dev-network` feature must be enabled on snarkOS to use `--consensus-heights`.");
             }
             validate_consensus_heights(heights.as_slice())?;
         }
@@ -248,7 +248,7 @@ impl LeoDevnet {
         println!("🔍  Detected: {version_str}");
 
         // The version string has the following form:
-        // "snarkos refs/heads/staging ace765a42551092fbb47799c2651d6b6df30e49a features=[default,snarkos_node_metrics,test_network]"
+        // "snarkos refs/heads/staging ace765a42551092fbb47799c2651d6b6df30e49a features=[default,snarkos_node_metrics,dev-network]"
         // Parse the features and see if it matches the expected features.
         let features_str = version_str
             .trim()

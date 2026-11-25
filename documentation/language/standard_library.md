@@ -248,7 +248,7 @@ Use `caller()` for decisions that depend on the immediate caller. Use `signer()`
 | `program_owner()`  | `address`   | The address that owns this program (typically the deployer).                               |
 | `block_height()`   | `u32`       | Height of the block containing the current transaction.                                    |
 | `block_timestamp()`| `i64`       | Unix timestamp (seconds) of the block containing the current transaction.                  |
-| `network_id()`     | `u16`       | Numeric identifier of the network (mainnet, testnet, canary, etc).                         |
+| `network_id()`     | `u16`       | Numeric identifier of the network (mainnet or testnet).                                    |
 
 ---
 

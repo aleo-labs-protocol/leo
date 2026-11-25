@@ -1356,9 +1356,6 @@ fn disassemble_dependency_bytecode(program_name: Symbol, bytecode: &str, network
         NetworkName::TestnetV0 => {
             leo_disassembler::disassemble_from_str_unchecked::<snarkvm::prelude::TestnetV0>(program_name, bytecode)
         }
-        NetworkName::CanaryV0 => {
-            leo_disassembler::disassemble_from_str_unchecked::<snarkvm::prelude::CanaryV0>(program_name, bytecode)
-        }
     };
 
     disassembled

@@ -172,11 +172,6 @@ pub fn disassemble_from_str_for_network(
                     .map_err(|e| crate::errors::snarkvm_validation_error(&name, e))?;
                 disassemble_from_str(name, program, &mut process)
             }
-            NetworkName::CanaryV0 => {
-                let mut process = snarkvm::prelude::Process::<snarkvm::prelude::CanaryV0>::load()
-                    .map_err(|e| crate::errors::snarkvm_validation_error(&name, e))?;
-                disassemble_from_str(name, program, &mut process)
-            }
         }
     }
     #[cfg(target_arch = "wasm32")]
@@ -184,7 +179,6 @@ pub fn disassemble_from_str_for_network(
         match network {
             NetworkName::MainnetV0 => disassemble_from_str_unchecked::<snarkvm::prelude::MainnetV0>(name, program),
             NetworkName::TestnetV0 => disassemble_from_str_unchecked::<snarkvm::prelude::TestnetV0>(name, program),
-            NetworkName::CanaryV0 => disassemble_from_str_unchecked::<snarkvm::prelude::CanaryV0>(name, program),
         }
     }
 }

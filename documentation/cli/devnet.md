@@ -40,7 +40,7 @@ This flag is required!
 
 ### `--snarkos-features <FEATURES>`
 
-Specifies which features of snarkOS to use (for example `test_network`)
+Specifies which features of snarkOS to use (for example `dev-network`)
 
 ### `--install`
 
@@ -56,7 +56,7 @@ Specifies which version of snarkOS to use or install. Defaults to latest version
 
 ### `--consensus-heights <CONSENSUS_HEIGHTS>`
 
-Optional blocks heights to use for each successive consensus upgrade. Must have `--snarkos-features test_network` enabled as well.
+Optional blocks heights to use for each successive consensus upgrade. Must have `--snarkos-features dev-network` enabled as well.
 
 The following settings enable each consensus version at its corresponding block:
 
@@ -80,7 +80,6 @@ Specifies what the network ID of the devnet will be.
 | :-: | :---------------: |
 |  0  |      Mainnet      |
 |  1  | Testnet (default) |
-|  2  |      Canary       |
 
 ### `--tmux`
 

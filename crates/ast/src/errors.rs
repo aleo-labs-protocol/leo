@@ -23,5 +23,5 @@ const CODE_MASK: i32 = 2000;
 
 pub(crate) fn invalid_network_name(network: impl Display) -> Backtraced {
     Backtraced::error(CODE_PREFIX, CODE_MASK + 18, format!("invalid network name: `{network}`"))
-        .with_help("Valid network names are `testnet`, `mainnet`, and `canary`.")
+        .with_help("Valid network names are `testnet` and `mainnet`.")
 }

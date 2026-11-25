@@ -13,27 +13,21 @@ jobs:
       RUSTC_BOOTSTRAP: 1
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
         with:
           submodules: true
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
           components: rustfmt
 
       - name: Set up rust-cache
         uses: Swatinem/rust-cache@v2
 
       - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          # Don't run tests in parallel because codecov with rayon will blow the stack.
-          args: --all --locked --profile ci --features only_testnet,leo-test-framework/no_parallel
+        # Run tests in sequence to keep coverage collection within the stack limit.
+        run: cargo +stable test --all --locked --profile ci --features only_testnet,leo-test-framework/no_parallel
         env:
           CARGO_INCREMENTAL: "0"
 
@@ -55,6 +49,6 @@ jobs:
           for file in target/ci/deps/*-*; do if [[ "$file" != *\.* ]]; then mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --exclude-region='@kcov_skip(start):@kcov_skip(end)' --verify "target/cov/$(basename $file)" "$file"; fi done
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

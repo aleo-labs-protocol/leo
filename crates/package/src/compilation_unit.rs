@@ -19,7 +19,7 @@ use crate::{MAX_PROGRAM_SIZE, *};
 use leo_errors::Result;
 use leo_span::Symbol;
 
-use snarkvm::prelude::{CanaryV0, MainnetV0, Program as SvmProgram, ProgramID, TestnetV0};
+use snarkvm::prelude::{MainnetV0, Program as SvmProgram, ProgramID, TestnetV0};
 
 use indexmap::{IndexMap, IndexSet};
 use std::path::Path;
@@ -243,7 +243,6 @@ impl CompilationUnit {
             let bytecode = match network {
                 NetworkName::MainnetV0 => SvmProgram::<MainnetV0>::credits()?.to_string(),
                 NetworkName::TestnetV0 => SvmProgram::<TestnetV0>::credits()?.to_string(),
-                NetworkName::CanaryV0 => SvmProgram::<CanaryV0>::credits()?.to_string(),
             };
             return Ok(Self {
                 name: Symbol::intern(&full_name),

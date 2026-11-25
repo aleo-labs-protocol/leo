@@ -21,18 +21,20 @@ use check_transaction::TransactionStatus;
 use leo_ast::NetworkName;
 use leo_package::{Package, ProgramData, fetch_program_from_network, retry_network_call};
 
-use aleo_std::StorageMode;
 use rand::{CryptoRng, Rng};
-use snarkvm::prelude::{
-    Authorization,
-    Execution,
-    Fee,
-    Field,
-    Itertools,
-    Network,
-    Program,
-    execution_cost,
-    execution_cost_for_authorization,
+use snarkvm::{
+    prelude::{
+        Authorization,
+        Execution,
+        Fee,
+        Field,
+        Itertools,
+        Network,
+        Program,
+        execution_cost,
+        execution_cost_for_authorization,
+    },
+    utilities::StorageMode,
 };
 
 use clap::Parser;
@@ -40,7 +42,7 @@ use colored::*;
 use std::{convert::TryFrom, path::PathBuf};
 
 #[cfg(not(feature = "only_testnet"))]
-use snarkvm::circuit::{AleoCanaryV0, AleoV0};
+use snarkvm::circuit::AleoV0;
 use snarkvm::{
     circuit::{Aleo, AleoTestnetV0},
     prelude::{
@@ -187,12 +189,6 @@ impl Command for LeoExecute {
                 panic!("Mainnet chosen with only_testnet feature");
                 #[cfg(not(feature = "only_testnet"))]
                 handle_execute::<AleoV0>(self, context, network, input)
-            }
-            NetworkName::CanaryV0 => {
-                #[cfg(feature = "only_testnet")]
-                panic!("Canary chosen with only_testnet feature");
-                #[cfg(not(feature = "only_testnet"))]
-                handle_execute::<AleoCanaryV0>(self, context, network, input)
             }
         }
     }

@@ -20,7 +20,6 @@ use itertools::Itertools;
 use leo_ast::NetworkName;
 use leo_package::fetch_from_network;
 use snarkvm::prelude::{
-    CANARY_V0_CONSENSUS_VERSION_HEIGHTS,
     ConsensusVersion,
     MAINNET_V0_CONSENSUS_VERSION_HEIGHTS,
     TEST_CONSENSUS_VERSION_HEIGHTS,
@@ -56,7 +55,7 @@ pub struct BuildOptions {
 pub struct EnvOptions {
     #[clap(
         long,
-        help = "The network type to use. e.g `mainnet`, `testnet, and `canary`. Overrides the `NETWORK` environment variable in your shell or `.env` file.",
+        help = "The network type to use. `mainnet` or `testnet`. Overrides the `NETWORK` environment variable in your shell or `.env` file.",
         global = true
     )]
     pub(crate) network: Option<NetworkName>,
@@ -236,6 +235,7 @@ pub fn get_consensus_version(
         Some(20) => Ok(ConsensusVersion::V20),
         Some(21) => Ok(ConsensusVersion::V21),
         Some(22) => Ok(ConsensusVersion::V22),
+        Some(23) => Ok(ConsensusVersion::V23),
         // If none is provided, then attempt to query the current block height and use it to determine the version.
         None => {
             println!("Attempting to determine the consensus version from the latest block height at {endpoint}...");
@@ -283,7 +283,7 @@ pub fn check_consensus_version_mismatch(
 }
 
 // A helper function to get the consensus version based on the block height.
-// Note. This custom implementation is necessary because we use `snarkVM` with the `test_heights` feature enabled, which does not reflect the actual consensus version heights.
+// Note. This custom implementation is necessary because we use `snarkVM` with the `dev-network` feature enabled, which does not reflect the actual consensus version heights.
 pub fn get_consensus_version_from_height(seek_height: u32, heights: &[u32]) -> Result<ConsensusVersion> {
     // Find the consensus version based on the block height.
     let index = match heights.binary_search_by(|height| height.cmp(&seek_height)) {
@@ -328,6 +328,7 @@ pub fn number_to_consensus_version(index: usize) -> Result<ConsensusVersion> {
         20 => Ok(ConsensusVersion::V20),
         21 => Ok(ConsensusVersion::V21),
         22 => Ok(ConsensusVersion::V22),
+        23 => Ok(ConsensusVersion::V23),
         _ => Err(crate::errors::custom(format!(
             "Invalid consensus version: {index}. You may need to update Leo to support this version."
         ))
@@ -356,7 +357,6 @@ pub fn get_consensus_heights(network_name: NetworkName, is_devnet: bool) -> Vec<
         TEST_CONSENSUS_VERSION_HEIGHTS.into_iter().map(|(_, v)| v).collect_vec()
     } else {
         match network_name {
-            NetworkName::CanaryV0 => CANARY_V0_CONSENSUS_VERSION_HEIGHTS,
             NetworkName::MainnetV0 => MAINNET_V0_CONSENSUS_VERSION_HEIGHTS,
             NetworkName::TestnetV0 => TESTNET_V0_CONSENSUS_VERSION_HEIGHTS,
         }
@@ -412,18 +412,23 @@ pub fn get_endpoint(endpoint: &Option<String>) -> Result<String> {
     }
 }
 
-/// Returns the network name.
-/// If the `--network` options is not provided, it will default to the environment variable.
+/// Returns the network from the command line or the environment.
 pub fn get_network(network: &Option<NetworkName>) -> Result<NetworkName> {
-    match network {
-        Some(network) => Ok(*network),
-        None => {
-            // Load the network from the environment.
-            let network = std::env::var("NETWORK").map_err(|_| {
-                crate::errors::custom("Please provide the `--network` or set the `NETWORK` environment variable.")
-            })?;
-            // Parse the network.
-            Ok(NetworkName::from_str(&network)?)
+    get_optional_network(network)?.ok_or_else(|| {
+        crate::errors::custom("Please provide the `--network` or set the `NETWORK` environment variable.").into()
+    })
+}
+
+/// Returns None when neither the command line nor the environment specifies a network.
+pub fn get_optional_network(network: &Option<NetworkName>) -> Result<Option<NetworkName>> {
+    if network.is_some() {
+        return Ok(*network);
+    }
+    match std::env::var("NETWORK") {
+        Ok(value) => Ok(Some(NetworkName::from_str(&value)?)),
+        Err(std::env::VarError::NotPresent) => Ok(None),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            Err(crate::errors::custom("NETWORK must contain valid UTF-8.").into())
         }
     }
 }
@@ -456,9 +461,15 @@ mod test {
 
     #[test]
     fn test_latest_consensus_version() {
-        assert_eq!(ConsensusVersion::latest(), ConsensusVersion::V22); // If this fails, update the test and any code that matches on `ConsensusVersion`.
+        assert_eq!(ConsensusVersion::latest(), ConsensusVersion::V23); // If this fails, update the test and any code that matches on `ConsensusVersion`.
         let context = super::Context::new(None, None, false, None).expect("Test context must be valid");
-        for version in [ConsensusVersion::V19, ConsensusVersion::V20, ConsensusVersion::V21, ConsensusVersion::V22] {
+        for version in [
+            ConsensusVersion::V19,
+            ConsensusVersion::V20,
+            ConsensusVersion::V21,
+            ConsensusVersion::V22,
+            ConsensusVersion::V23,
+        ] {
             assert_eq!(super::number_to_consensus_version(version as usize).expect("Valid version"), version);
             assert_eq!(
                 super::get_consensus_version(
@@ -473,7 +484,7 @@ mod test {
                 version
             );
         }
-        assert!(super::number_to_consensus_version(23).is_err());
+        assert!(super::number_to_consensus_version(24).is_err());
     }
 
     #[test]
@@ -498,11 +509,7 @@ mod test {
         assert!(super::validate_consensus_heights(&(0..n - 1).collect::<Vec<_>>()).is_err());
         // Empty input is a graceful error, not an index-out-of-bounds panic.
         assert!(super::validate_consensus_heights(&[]).is_err());
-        for schedule in [
-            super::MAINNET_V0_CONSENSUS_VERSION_HEIGHTS,
-            super::TESTNET_V0_CONSENSUS_VERSION_HEIGHTS,
-            super::CANARY_V0_CONSENSUS_VERSION_HEIGHTS,
-        ] {
+        for schedule in [super::MAINNET_V0_CONSENSUS_VERSION_HEIGHTS, super::TESTNET_V0_CONSENSUS_VERSION_HEIGHTS] {
             assert!(super::validate_consensus_heights(&schedule.map(|(_, height)| height)).is_ok());
         }
         let mut duplicate = valid.clone();

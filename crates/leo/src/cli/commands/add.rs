@@ -241,7 +241,7 @@ impl Command for LeoAdd {
             // Verify the program exists before recording it, reusing the build's fetch path.
             // Network/endpoint default like `build`; the name comes from the env because
             // `--network` here selects the source rather than a network name.
-            let network = get_network(&None).unwrap_or_else(|_| {
+            let network = get_optional_network(&None)?.unwrap_or_else(|| {
                 tracing::warn!("⚠️ No network specified, defaulting to 'testnet'.");
                 NetworkName::TestnetV0
             });

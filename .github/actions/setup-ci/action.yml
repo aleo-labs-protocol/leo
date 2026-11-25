@@ -86,14 +86,20 @@ runs:
     - uses: taiki-e/install-action@v2
       if: inputs.nextest == 'true'
       with:
-        tool: cargo-nextest@0.9.114
+        tool: cargo-nextest@0.9.152
+
+    # Pin the release candidate until snarkOS 5.0.0 is published.
+    - name: Select snarkOS revision
+      if: inputs.snarkos == 'true'
+      shell: bash
+      run: echo "SNARKOS_REV=73fd16438642630b572b42360e90e28791b5b59f" >> "$GITHUB_ENV"
 
     - uses: actions/cache/restore@v6
       if: inputs.snarkos == 'true' && runner.environment == 'github-hosted'
       id: snarkos-cache
       with:
         path: ~/.cache/leo-ci-snarkos
-        key: snarkos-test-network-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-rust-1.96.0-${{ hashFiles('.resources/snarkos-version') }}
+        key: snarkos-test-network-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-rust-1.96.0-${{ hashFiles('.resources/snarkos-version') }}-${{ env.SNARKOS_REV }}
 
     - name: Install snarkOS
       if: inputs.snarkos == 'true'
@@ -105,9 +111,9 @@ runs:
         version="$(tr -d '[:space:]' < .resources/snarkos-version)"
         root="$HOME/.cache/leo-ci-snarkos"
         # A box keeps one install for each version and doesn't use the Actions cache.
-        if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then root="$root/$version"; CACHE_HIT=true; fi
+        if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then root="$root/$version-$SNARKOS_REV"; CACHE_HIT=true; fi
         if [ "$CACHE_HIT" != true ] || [ ! -x "$root/bin/snarkos" ]; then
-          cargo install snarkos --locked --version "$version" --features test_network --root "$root" --force
+          cargo install snarkos --locked --git https://github.com/ProvableHQ/snarkOS --rev "$SNARKOS_REV" --features dev-network --root "$root" --force
         fi
         "$root/bin/snarkos" --version
         echo "$root/bin" >> "$GITHUB_PATH"

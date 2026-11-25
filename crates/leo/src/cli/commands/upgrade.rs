@@ -21,7 +21,7 @@ use leo_ast::NetworkName;
 use leo_package::{Package, ProgramData};
 
 #[cfg(not(feature = "only_testnet"))]
-use snarkvm::prelude::{CanaryV0, MainnetV0};
+use snarkvm::prelude::MainnetV0;
 use snarkvm::{
     circuit::{Aleo, AleoTestnetV0},
     ledger::query::Query as SnarkVMQuery,
@@ -37,12 +37,12 @@ use crate::cli::{
     check_transaction::TransactionStatus,
     commands::deploy::{consensus_limit, deploy_with_placeholder_certificate, validate_deployment_limits},
 };
-use aleo_std::StorageMode;
 use colored::*;
 use itertools::Itertools;
 use snarkvm::{
     prelude::{ConsensusVersion, ProgramID, Stack, check_program_plaintext_sizes, store::helpers::memory::BlockMemory},
     synthesizer::program::StackTrait,
+    utilities::StorageMode,
 };
 use std::path::PathBuf;
 
@@ -132,12 +132,6 @@ impl Command for LeoUpgrade {
                 panic!("Mainnet chosen with only_testnet feature");
                 #[cfg(not(feature = "only_testnet"))]
                 handle_upgrade::<MainnetV0, snarkvm::circuit::AleoV0>(&self, context, network, input)
-            }
-            NetworkName::CanaryV0 => {
-                #[cfg(feature = "only_testnet")]
-                panic!("Canary chosen with only_testnet feature");
-                #[cfg(not(feature = "only_testnet"))]
-                handle_upgrade::<CanaryV0, snarkvm::circuit::AleoCanaryV0>(&self, context, network, input)
             }
         }
     }

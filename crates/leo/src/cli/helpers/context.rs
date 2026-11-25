@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the Leo library. If not, see <https://www.gnu.org/licenses/>.
 
-use aleo_std;
 use leo_errors::Result;
 use leo_package::{Lock, Manifest, Workspace};
 
-use aleo_std::aleo_dir;
+use snarkvm::utilities::aleo_dir;
 use std::{env::current_dir, path::PathBuf};
 
 /// Project context, manifest, current directory etc
