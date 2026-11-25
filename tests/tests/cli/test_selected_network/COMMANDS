@@ -7,18 +7,21 @@ cp -R . "$project"
 cd "$project"
 
 # The flag takes precedence over the environment in every build.
-NETWORK=canary "$leo" test testnet_id --network testnet --offline > result 2>&1
+NETWORK=mainnet "$leo" test testnet_id --network testnet --offline > result 2>&1
 grep -q '1 test run: 1 passed, 0 failed' result
 
-# The testnet-only binary rejects the other two networks.
-for network in mainnet canary; do
-    if [ "${LEO_TEST_ONLY_TESTNET:-false}" = true ]; then
-        if NETWORK="$network" "$leo" test "${network}_id" --offline > result 2>&1; then
-            exit 1
-        fi
-        grep -qF 'This build of leo test supports only testnet.' result
-    else
-        NETWORK="$network" "$leo" test "${network}_id" --offline > result 2>&1 || { cat result >&2; exit 1; }
-        grep -q '1 test run: 1 passed, 0 failed' result
+# The testnet-only binary rejects mainnet.
+if [ "${LEO_TEST_ONLY_TESTNET:-false}" = true ]; then
+    if NETWORK=mainnet "$leo" test mainnet_id --offline > result 2>&1; then
+        exit 1
     fi
-done
+    grep -qF 'This build of leo test supports only testnet.' result
+else
+    NETWORK=mainnet "$leo" test mainnet_id --offline > result 2>&1 || { cat result >&2; exit 1; }
+    grep -q '1 test run: 1 passed, 0 failed' result
+fi
+
+if NETWORK=canary "$leo" test testnet_id --offline > result 2>&1; then
+    exit 1
+fi
+grep -qF 'invalid network name: `canary`' result

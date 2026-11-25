@@ -27,7 +27,7 @@ The lock format is JSON. Version 3 writes each network checksum as a hexadecimal
 | Field | Value |
 | --- | --- |
 | `name` | The full program ID, for example `token.aleo`. |
-| `network` | `mainnet`, `testnet`, or `canary`. |
+| `network` | `mainnet` or `testnet`. |
 | `edition` | The resolved edition number, from 0 to 65535. |
 | `checksum` | A string of 64 lowercase hexadecimal characters. |
 

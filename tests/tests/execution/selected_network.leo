@@ -1,5 +1,5 @@
 /*
-execution_networks = ["mainnet", "testnet", "canary"]
+execution_networks = ["mainnet", "testnet"]
 
 [case]
 program = "example.aleo"

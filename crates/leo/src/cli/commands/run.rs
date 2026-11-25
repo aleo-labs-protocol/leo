@@ -20,13 +20,13 @@ use super::common::load_extra_programs_into_vm;
 use leo_ast::{NetworkName, TEST_PRIVATE_KEY};
 use leo_package::{Package, ProgramData};
 
-use aleo_std::StorageMode;
+use snarkvm::utilities::StorageMode;
 
 use clap::Parser;
 use std::path::PathBuf;
 
 #[cfg(not(feature = "only_testnet"))]
-use snarkvm::circuit::{AleoCanaryV0, AleoV0};
+use snarkvm::circuit::AleoV0;
 use snarkvm::{
     circuit::{Aleo, AleoTestnetV0},
     prelude::{
@@ -90,9 +90,9 @@ impl Command for LeoRun {
             if context.package_filter.is_some() {
                 return Err(crate::errors::custom("`--package` cannot be used with an Aleo bytecode file.").into());
             }
-            let network = match get_network(&self.env_override.network) {
-                Ok(network) => network,
-                Err(_) => {
+            let network = match get_optional_network(&self.env_override.network)? {
+                Some(network) => network,
+                None => {
                     println!("⚠️ No network specified, defaulting to 'testnet'.");
                     NetworkName::TestnetV0
                 }
@@ -150,9 +150,9 @@ impl Command for LeoRun {
         }
 
         // Get the network, defaulting to `TestnetV0` if none is specified.
-        let network = match get_network(&self.env_override.network) {
-            Ok(network) => network,
-            Err(_) => {
+        let network = match get_optional_network(&self.env_override.network)? {
+            Some(network) => network,
+            None => {
                 println!("⚠️ No network specified, defaulting to 'testnet'.");
                 NetworkName::TestnetV0
             }
@@ -166,12 +166,6 @@ impl Command for LeoRun {
                 panic!("Mainnet chosen with only_testnet feature");
                 #[cfg(not(feature = "only_testnet"))]
                 handle_run::<AleoV0>(self, context, network, input)
-            }
-            NetworkName::CanaryV0 => {
-                #[cfg(feature = "only_testnet")]
-                panic!("Canary chosen with only_testnet feature");
-                #[cfg(not(feature = "only_testnet"))]
-                handle_run::<AleoCanaryV0>(self, context, network, input)
             }
         }
     }

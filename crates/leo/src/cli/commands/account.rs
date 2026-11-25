@@ -18,7 +18,7 @@ use super::*;
 use leo_ast::NetworkName;
 
 #[cfg(not(feature = "only_testnet"))]
-use snarkvm::prelude::{CanaryV0, MainnetV0};
+use snarkvm::prelude::MainnetV0;
 use snarkvm::{
     console::program::{Signature, ToFields, Value},
     prelude::{Address, Network, PrivateKey, TestnetV0, ViewKey},
@@ -154,12 +154,6 @@ impl Command for Account {
                     #[cfg(not(feature = "only_testnet"))]
                     generate_new_account::<MainnetV0>(network, seed, write, discreet, &ctx, endpoint)
                 }
-                NetworkName::CanaryV0 => {
-                    #[cfg(feature = "only_testnet")]
-                    panic!("Canary chosen with only_testnet feature");
-                    #[cfg(not(feature = "only_testnet"))]
-                    generate_new_account::<CanaryV0>(network, seed, write, discreet, &ctx, endpoint)
-                }
             }?,
             Account::Import { private_key, write, discreet, network, endpoint } => match network {
                 NetworkName::TestnetV0 => {
@@ -171,12 +165,6 @@ impl Command for Account {
                     #[cfg(not(feature = "only_testnet"))]
                     import_account::<MainnetV0>(network, private_key, write, discreet, &ctx, endpoint)
                 }
-                NetworkName::CanaryV0 => {
-                    #[cfg(feature = "only_testnet")]
-                    panic!("Canary chosen with only_testnet feature");
-                    #[cfg(not(feature = "only_testnet"))]
-                    import_account::<CanaryV0>(network, private_key, write, discreet, &ctx, endpoint)
-                }
             }?,
             Self::Sign { message, raw, private_key, private_key_file, network } => {
                 let result = match network {
@@ -186,12 +174,6 @@ impl Command for Account {
                         panic!("Mainnet chosen with only_testnet feature");
                         #[cfg(not(feature = "only_testnet"))]
                         sign_message::<MainnetV0>(message, raw, private_key, private_key_file)
-                    }
-                    NetworkName::CanaryV0 => {
-                        #[cfg(feature = "only_testnet")]
-                        panic!("Canary chosen with only_testnet feature");
-                        #[cfg(not(feature = "only_testnet"))]
-                        sign_message::<CanaryV0>(message, raw, private_key, private_key_file)
                     }
                 }?;
                 println!("{result}")
@@ -205,12 +187,6 @@ impl Command for Account {
                         #[cfg(not(feature = "only_testnet"))]
                         verify_message::<MainnetV0>(address, signature, message, raw)
                     }
-                    NetworkName::CanaryV0 => {
-                        #[cfg(feature = "only_testnet")]
-                        panic!("Canary chosen with only_testnet feature");
-                        #[cfg(not(feature = "only_testnet"))]
-                        verify_message::<CanaryV0>(address, signature, message, raw)
-                    }
                 }?;
                 println!("{result}")
             }
@@ -222,12 +198,6 @@ impl Command for Account {
                         panic!("Mainnet chosen with only_testnet feature");
                         #[cfg(not(feature = "only_testnet"))]
                         decrypt_ciphertext::<MainnetV0>(key, key_file, &ciphertext)
-                    }
-                    NetworkName::CanaryV0 => {
-                        #[cfg(feature = "only_testnet")]
-                        panic!("Canary chosen with only_testnet feature");
-                        #[cfg(not(feature = "only_testnet"))]
-                        decrypt_ciphertext::<CanaryV0>(key, key_file, &ciphertext)
                     }
                 }?;
                 println!("{result}")
@@ -494,6 +464,8 @@ fn wait_for_keypress() {
 #[cfg(test)]
 mod tests {
     use super::{decrypt_ciphertext, sign_message, verify_message};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha20Rng;
     use snarkvm::{
         prelude::{
             Address,
@@ -505,7 +477,6 @@ mod tests {
             ProgramID,
             Record,
             Scalar,
-            TestRng,
             U8,
             Uniform,
             ViewKey,
@@ -590,7 +561,7 @@ mod tests {
     #[test]
     fn test_decrypt() -> anyhow::Result<()> {
         // Initialize an RNG.
-        let mut rng = &mut TestRng::default();
+        let mut rng = ChaCha20Rng::seed_from_u64(0);
 
         // Test decryption with a private key
         let private_key =
@@ -603,14 +574,14 @@ mod tests {
         // Create a random record.
         let process = Process::<CurrentNetwork>::load()?;
         let stack = process.get_stack(ProgramID::from_str("credits.aleo")?)?;
-        let randomizer = Scalar::<CurrentNetwork>::rand(rng);
+        let randomizer = Scalar::<CurrentNetwork>::rand(&mut rng);
         let nonce = CurrentNetwork::g_scalar_multiply(&randomizer);
         let record = stack.sample_record(&address, &Identifier::from_str("credits").unwrap(), nonce, &mut rng)?;
         let record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_plaintext(
             record.owner().clone(),
             record.data().clone(),
             nonce,
-            U8::new(u8::rand(rng) % 2),
+            U8::new(u8::rand(&mut rng) % 2),
         )?;
         let record_string = record.to_string();
         let ciphertext = record.encrypt(randomizer)?;

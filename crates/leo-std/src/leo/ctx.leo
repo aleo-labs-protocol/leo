@@ -74,7 +74,7 @@ export fn block_timestamp() -> i64 {
 }
 
 // Returns the numeric identifier of the network this program is executing on
-// (e.g. mainnet, testnet, canary). Use this to gate behavior that differs
+// (mainnet or testnet). Use this to gate behavior that differs
 // between deployment targets.
 @_onchain_context
 export fn network_id() -> u16 {

@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Specific Tag
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
@@ -61,7 +61,7 @@ jobs:
           mv tempdir/leo-${{ steps.get_version.outputs.version }}-x86_64-unknown-linux-gnu.zip .
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         if: ${{ github.event.inputs.release_flag == 'true' }}
         with:
           tag_name: ${{ github.event.inputs.tag }}
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Specific Tag
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
@@ -125,7 +125,7 @@ jobs:
           mv tempdir/leo-${{ steps.get_version.outputs.version }}-x86_64-unknown-linux-musl.zip .
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         if: ${{ github.event.inputs.release_flag == 'true' }}
         with:
           tag_name: ${{ github.event.inputs.tag }}
@@ -139,7 +139,7 @@ jobs:
     runs-on: macos-14-large
     steps:
       - name: Checkout Specific Tag
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
@@ -177,7 +177,7 @@ jobs:
           mv tempdir/leo-${{ steps.get_version.outputs.version }}-x86_64-apple-darwin.zip .
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         if: ${{ github.event.inputs.release_flag == 'true' }}
         with:
           tag_name: ${{ github.event.inputs.tag }}
@@ -196,7 +196,7 @@ jobs:
           xcode-version: latest-stable
 
       - name: Checkout Specific Tag
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
@@ -206,7 +206,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          profile: minimal
           target: aarch64-apple-darwin
           components: rustfmt
 
@@ -242,7 +241,7 @@ jobs:
           mv tempdir/leo.zip .
 
       - name: Release macOS M1 Version
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         if: ${{ github.event.inputs.release_flag == 'true' }}
         with:
           tag_name: ${{ github.event.inputs.tag }}
@@ -250,7 +249,7 @@ jobs:
             leo-${{ steps.get_version.outputs.version }}-aarch64-apple-darwin.zip
 
       - name: Release Universal Version
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         if: ${{ github.event.inputs.release_flag == 'true' }}
         with:
           tag_name: ${{ github.event.inputs.tag }}
@@ -263,7 +262,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout Specific Tag
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
@@ -276,13 +275,13 @@ jobs:
           components: rustfmt
 
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "11" # Specify the LLVM/Clang version you need
+          version: "21"
           directory: ${{ runner.temp }}/llvm
 
       - name: Set LIBCLANG_PATH
-        run: echo "LIBCLANG_PATH=${{ runner.temp }}/llvm/lib" >> $GITHUB_ENV
+        run: echo "LIBCLANG_PATH=${{ runner.temp }}/llvm/bin" >> $env:GITHUB_ENV
 
       - name: Verify Cargo.lock Exists
         run: |
@@ -305,7 +304,7 @@ jobs:
           Compress-Archive target/release/leo.exe leo-${{ steps.get_version.outputs.version }}-x86_64-pc-windows-msvc.zip 
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         if: ${{ github.event.inputs.release_flag == 'true' }}
         with:
           tag_name: ${{ github.event.inputs.tag }}

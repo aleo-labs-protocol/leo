@@ -54,7 +54,7 @@ use leo_ast::{
     Variant,
 };
 use snarkvm::{
-    prelude::{CanaryV0, MainnetV0, TestnetV0},
+    prelude::{MainnetV0, TestnetV0},
     synthesizer::program::SerializeVariant,
 };
 
@@ -962,9 +962,6 @@ impl CodeGeneratingVisitor<'_> {
                         NetworkName::TestnetV0 => AleoType::from(
                             type_.to_snarkvm::<TestnetV0>().expect("TYC guarantees that the type is valid"),
                         ),
-                        NetworkName::CanaryV0 => AleoType::from(
-                            type_.to_snarkvm::<CanaryV0>().expect("TYC guarantees that the type is valid"),
-                        ),
                         NetworkName::MainnetV0 => AleoType::from(
                             type_.to_snarkvm::<MainnetV0>().expect("TYC guarantees that the type is valid"),
                         ),
@@ -1099,11 +1096,6 @@ impl CodeGeneratingVisitor<'_> {
                             &struct_not_supported,
                         ),
                         NetworkName::MainnetV0 => input_type.size_in_bits::<MainnetV0, _, _>(
-                            is_raw,
-                            &struct_not_supported,
-                            &struct_not_supported,
-                        ),
-                        NetworkName::CanaryV0 => input_type.size_in_bits::<CanaryV0, _, _>(
                             is_raw,
                             &struct_not_supported,
                             &struct_not_supported,

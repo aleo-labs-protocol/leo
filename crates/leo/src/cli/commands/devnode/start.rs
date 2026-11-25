@@ -18,7 +18,6 @@ use super::{logger::initialize_terminal_logger, *};
 use serde_json::json;
 use std::{net::SocketAddr, path::PathBuf};
 
-use aleo_std_storage::StorageMode;
 use snarkvm::{
     ledger::store::helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
     prelude::{
@@ -30,6 +29,7 @@ use snarkvm::{
         TestnetV0,
         store::ConsensusStorage,
     },
+    utilities::StorageMode,
 };
 
 use crate::cli::commands::devnode::rest::Rest;

@@ -39,7 +39,7 @@ jobs:
       previous-tag: ${{ steps.previous.outputs.previous-tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -182,7 +182,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.tag }}
 
@@ -292,7 +292,7 @@ jobs:
           echo "ARCHIVE=$archive" >> $env:GITHUB_ENV
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
@@ -304,7 +304,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.tag }}
           fetch-depth: 0
@@ -326,7 +326,7 @@ jobs:
           PREVIOUS_TAG: ${{ needs.prepare.outputs.previous-tag }}
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-metadata
           path: |
@@ -342,14 +342,14 @@ jobs:
       contents: write
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: release-*
           merge-multiple: true
 
       - name: Create Release
         if: needs.prepare.outputs.previous-tag != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           name: "${{ needs.prepare.outputs.crate-name }} v${{ needs.prepare.outputs.version }}"
@@ -364,7 +364,7 @@ jobs:
 
       - name: Create First Release
         if: needs.prepare.outputs.previous-tag == ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           name: "${{ needs.prepare.outputs.crate-name }} v${{ needs.prepare.outputs.version }}"

@@ -18,7 +18,7 @@ A local devnet can be a heavyweight but reliable way to test your application on
 The Leo CLI provides a helpful command to help startup a local devnet:
 
 ```bash
-leo devnet --snarkos <SNARKOS> --snarkos-features test_network
+leo devnet --snarkos <SNARKOS> --snarkos-features dev-network
 ```
 
 The `<SNARKOS>` is the path to an installed binary of [**snarkOS**](https://github.com/ProvableHQ/snarkOS), the decentralized operating system that forms the backbone of the Aleo network.
@@ -26,7 +26,7 @@ The `<SNARKOS>` is the path to an installed binary of [**snarkOS**](https://gith
 If snarkOS is not installed, pass `--install`. The CLI downloads, compiles, and stores the binary at the `<SNARKOS>` path.
 
 ```bash
-leo devnet --snarkos <SNARKOS> --snarkos-features test_network --install
+leo devnet --snarkos <SNARKOS> --snarkos-features dev-network --install
 ```
 
 :::info
@@ -44,7 +44,7 @@ Windows users will need to perform some additional steps in order for snarkOS to
 The `tmux` command will allow you to toggle between nodes in your local devnet. You can enable this by passing the `--tmux` flag upon startup:
 
 ```bash
-leo devnet --snarkos <SNARKOS> --snarkos-features test_network --tmux
+leo devnet --snarkos <SNARKOS> --snarkos-features dev-network --tmux
 ```
 
 :::info
@@ -101,14 +101,14 @@ See the full [`leo devnet` CLI documentation](./../cli/devnet.md).
 
 When you start the devnet, the CLI will actually spin up a new instance of the blockchain from genesis via the snarkOS binary. This means that the chain will start at block 0 and consensus version 1, and the only program deployed will be `credits.aleo`.
 
-The height of the chain will increase as blocks are produced. At various different heights, a new consensus version will activate, which will unlock various features that have been implemented as the Aleo network has matured. By default, snarkOS built with `--features test_network` will fast forward to the highest `ConsensusVersion` on a Testnet ledger within a few blocks. You can get more insights by calling `curl localhost:3030/testnet/version`.
+The height of the chain will increase as blocks are produced. At various different heights, a new consensus version will activate, which will unlock various features that have been implemented as the Aleo network has matured. By default, snarkOS built with `--features dev-network` will fast forward to the highest `ConsensusVersion` on a Testnet ledger within a few blocks. You can get more insights by calling `curl localhost:3030/testnet/version`.
 
-To test an older `ConsensusVersion`, give a comma-separated height list to `--consensus-heights`. For example, use `0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,20,$((2**32 - 1)),$((2**32 - 1)),$((2**32 - 1)),$((2**32 - 1)),$((2**32 - 1))` to activate V17 at height 20. V18 through V22 then stay inactive. The list must have one height for each consensus version in the VM.
+To test an older `ConsensusVersion`, give a comma-separated height list to `--consensus-heights`. For example, use `0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,20,$((2**32 - 1)),$((2**32 - 1)),$((2**32 - 1)),$((2**32 - 1)),$((2**32 - 1)),$((2**32 - 1))` to activate V17 at height 20. V18 through V23 then stay inactive. The list must have one height for each consensus version in the VM.
 
 Each time you stop and restart the chain, the prior state and history will be saved. You can clear any prior history by passing the `--clear-storage` flag:
 
 ```bash
-leo devnet --snarkos <SNARKOS> --snarkos-features test_network --clear-storage
+leo devnet --snarkos <SNARKOS> --snarkos-features dev-network --clear-storage
 ```
 
 Clearing the ledger history may be useful if you wish to redeploy your program without changing the name. However, this will erase all transaction history and start a new instance of the Aleo blockchain from genesis.

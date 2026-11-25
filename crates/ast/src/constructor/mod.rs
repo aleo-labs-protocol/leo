@@ -49,7 +49,6 @@ impl Constructor {
         match network {
             NetworkName::MainnetV0 => self.get_upgrade_variant::<snarkvm::prelude::MainnetV0>(),
             NetworkName::TestnetV0 => self.get_upgrade_variant::<snarkvm::prelude::TestnetV0>(),
-            NetworkName::CanaryV0 => self.get_upgrade_variant::<snarkvm::prelude::CanaryV0>(),
         }
     }
 

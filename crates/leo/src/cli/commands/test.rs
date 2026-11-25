@@ -202,7 +202,7 @@ fn handle_test(command: LeoTest, package: Package) -> Result<TestOutput> {
         return Err(crate::errors::custom("`leo test` is not supported for library packages.").into());
     }
 
-    let network = get_network(&command.env_override.network).unwrap_or(NetworkName::TestnetV0);
+    let network = get_optional_network(&command.env_override.network)?.unwrap_or(NetworkName::TestnetV0);
     #[cfg(feature = "only_testnet")]
     if network != NetworkName::TestnetV0 {
         return Err(crate::errors::custom("This build of leo test supports only testnet.").into());

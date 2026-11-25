@@ -723,11 +723,6 @@ impl TypeCheckingVisitor<'_> {
                             &struct_not_supported,
                             &struct_not_supported,
                         ),
-                        NetworkName::CanaryV0 => input_type.size_in_bits::<CanaryV0, _, _>(
-                            variant.is_raw(),
-                            &struct_not_supported,
-                            &struct_not_supported,
-                        ),
                     };
                     if let Ok(size_in_bits) = size_in_bits {
                         // Check that the size in bits is a multiple of 8.
@@ -879,11 +874,6 @@ impl TypeCheckingVisitor<'_> {
                             &struct_not_supported,
                         ),
                         NetworkName::MainnetV0 => input_type.size_in_bits::<MainnetV0, _, _>(
-                            variant.is_raw(),
-                            &struct_not_supported,
-                            &struct_not_supported,
-                        ),
-                        NetworkName::CanaryV0 => input_type.size_in_bits::<CanaryV0, _, _>(
                             variant.is_raw(),
                             &struct_not_supported,
                             &struct_not_supported,
@@ -1562,9 +1552,6 @@ impl TypeCheckingVisitor<'_> {
                     NetworkName::MainnetV0 => {
                         input_type.size_in_bits::<MainnetV0, _, _>(is_raw, &struct_not_supported, &struct_not_supported)
                     }
-                    NetworkName::CanaryV0 => {
-                        input_type.size_in_bits::<CanaryV0, _, _>(is_raw, &struct_not_supported, &struct_not_supported)
-                    }
                 };
 
                 if let Ok(size_in_bits) = size_in_bits {
@@ -1607,9 +1594,6 @@ impl TypeCheckingVisitor<'_> {
                     }
                     NetworkName::MainnetV0 => {
                         type_.size_in_bits::<MainnetV0, _, _>(is_raw, &struct_not_supported, &struct_not_supported)
-                    }
-                    NetworkName::CanaryV0 => {
-                        type_.size_in_bits::<CanaryV0, _, _>(is_raw, &struct_not_supported, &struct_not_supported)
                     }
                 };
 

@@ -21,7 +21,7 @@ use leo_span::{Span, Symbol};
 use serde::Serialize;
 use snarkvm::{
     console::program::ProgramID,
-    prelude::{CanaryV0, MainnetV0, Network, Result, TestnetV0},
+    prelude::{MainnetV0, Network, Result, TestnetV0},
 };
 use std::str::FromStr;
 
@@ -48,7 +48,6 @@ impl ProgramId {
         match network {
             NetworkName::MainnetV0 => ProgramID::<MainnetV0>::from_str(string).map(|id| (&id).into()),
             NetworkName::TestnetV0 => ProgramID::<TestnetV0>::from_str(string).map(|id| (&id).into()),
-            NetworkName::CanaryV0 => ProgramID::<CanaryV0>::from_str(string).map(|id| (&id).into()),
         }
     }
 
@@ -60,9 +59,6 @@ impl ProgramId {
             }
             NetworkName::TestnetV0 => {
                 ProgramID::<TestnetV0>::from_str(&self.to_string())?.to_address().map(|addr| addr.to_string())
-            }
-            NetworkName::CanaryV0 => {
-                ProgramID::<CanaryV0>::from_str(&self.to_string())?.to_address().map(|addr| addr.to_string())
             }
         }
     }

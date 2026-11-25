@@ -26,7 +26,7 @@ use leo_errors::Handler;
 use leo_package::{Package, ProgramData};
 use leo_parser::parse_program;
 use leo_span::{Symbol, source_map::FileName, with_session_globals};
-use snarkvm::prelude::{CanaryV0, MainnetV0, TestnetV0};
+use snarkvm::prelude::{MainnetV0, TestnetV0};
 
 use std::{fs, path::Path, rc::Rc};
 
@@ -178,7 +178,6 @@ fn disassemble_bytecode(program_name: Symbol, bytecode: &str) -> Result<Stub, St
     let disassembled = match BENCH_NETWORK {
         NetworkName::MainnetV0 => leo_disassembler::disassemble_from_str_unchecked::<MainnetV0>(program_name, bytecode),
         NetworkName::TestnetV0 => leo_disassembler::disassemble_from_str_unchecked::<TestnetV0>(program_name, bytecode),
-        NetworkName::CanaryV0 => leo_disassembler::disassemble_from_str_unchecked::<CanaryV0>(program_name, bytecode),
     };
 
     match disassembled {
@@ -195,7 +194,7 @@ fn disassemble_bytecode(program_name: Symbol, bytecode: &str) -> Result<Stub, St
 /// program's compiler passes.
 ///
 pub fn load_fixture(package_dir: &Path) -> Result<FixtureData, String> {
-    let home = aleo_std::aleo_dir();
+    let home = snarkvm::utilities::aleo_dir();
 
     let package = match Package::from_directory(
         package_dir,

@@ -44,8 +44,8 @@ Run these commands from the repository root:
 
 ```bash
 # Apply safe fixes. Then, verify that no errors remain.
-npx markdownlint-cli@0.47.0 --config .markdownlint.yaml --fix 'documentation/**/*.md'
-npx markdownlint-cli@0.47.0 --config .markdownlint.yaml 'documentation/**/*.md'
+npx markdownlint-cli@0.50.1 --config .markdownlint.yaml --fix 'documentation/**/*.md'
+npx markdownlint-cli@0.50.1 --config .markdownlint.yaml 'documentation/**/*.md'
 
 # Compile each code snippet. Use `leo test` when a snippet has a tests/ directory.
 for d in $(find documentation/code_snippets -name program.json -not -path '*/build/*' | xargs -n1 dirname); do

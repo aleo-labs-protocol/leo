@@ -20,7 +20,7 @@ use leo_ast::{AleoProgram, DiGraph, DiGraphError, NetworkName};
 use leo_errors::LeoError;
 
 use snarkvm::{
-    prelude::{CanaryV0, MainnetV0, Network, Process as SvmProcess, TestnetV0},
+    prelude::{MainnetV0, Network, Process as SvmProcess, TestnetV0},
     synthesizer::program::Program as SvmProgram,
 };
 
@@ -38,7 +38,7 @@ pub struct LeoAbi {
     #[clap(value_name = "FILE")]
     file: PathBuf,
 
-    /// Network for parsing (mainnet, testnet, canary).
+    /// Network for parsing (mainnet or testnet).
     #[clap(long, short, default_value = "testnet")]
     network: NetworkName,
 
@@ -323,7 +323,6 @@ fn disassemble_with_imports(
     match network {
         NetworkName::MainnetV0 => disassemble_with_imports_typed::<MainnetV0>(name, bytecode, imports_dir),
         NetworkName::TestnetV0 => disassemble_with_imports_typed::<TestnetV0>(name, bytecode, imports_dir),
-        NetworkName::CanaryV0 => disassemble_with_imports_typed::<CanaryV0>(name, bytecode, imports_dir),
     }
 }
 

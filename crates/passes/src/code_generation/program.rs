@@ -35,7 +35,7 @@ use leo_ast::{
 use leo_span::{Symbol, sym};
 
 use indexmap::IndexMap;
-use snarkvm::prelude::{CanaryV0, MainnetV0, TestnetV0};
+use snarkvm::prelude::{MainnetV0, TestnetV0};
 
 impl<'a> CodeGeneratingVisitor<'a> {
     pub fn visit_program(&mut self, input: &'a Program) -> AleoProgram {
@@ -401,7 +401,6 @@ impl<'a> CodeGeneratingVisitor<'a> {
             let max_writes = match self.state.network {
                 NetworkName::MainnetV0 => MainnetV0::LATEST_MAX_WRITES(),
                 NetworkName::TestnetV0 => TestnetV0::LATEST_MAX_WRITES(),
-                NetworkName::CanaryV0 => CanaryV0::LATEST_MAX_WRITES(),
             };
             let write_count =
                 statements.iter().filter(|s| matches!(s, AleoStmt::Set(..) | AleoStmt::Remove(..))).count();
@@ -501,7 +500,6 @@ impl<'a> CodeGeneratingVisitor<'a> {
         let max_writes = match self.state.network {
             NetworkName::MainnetV0 => MainnetV0::LATEST_MAX_WRITES(),
             NetworkName::TestnetV0 => TestnetV0::LATEST_MAX_WRITES(),
-            NetworkName::CanaryV0 => CanaryV0::LATEST_MAX_WRITES(),
         };
         let write_count =
             constructor.statements.iter().filter(|s| matches!(s, AleoStmt::Set(..) | AleoStmt::Remove(..))).count();
@@ -512,7 +510,6 @@ impl<'a> CodeGeneratingVisitor<'a> {
             if let Err(e) = match self.state.network {
                 NetworkName::MainnetV0 => check_snarkvm_constructor::<MainnetV0>(&constructor),
                 NetworkName::TestnetV0 => check_snarkvm_constructor::<TestnetV0>(&constructor),
-                NetworkName::CanaryV0 => check_snarkvm_constructor::<CanaryV0>(&constructor),
             } {
                 panic!("Compilation produced an invalid constructor: {e}");
             }

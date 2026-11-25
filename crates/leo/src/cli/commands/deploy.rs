@@ -20,10 +20,9 @@ use check_transaction::TransactionStatus;
 use leo_ast::NetworkName;
 use leo_package::{Package, ProgramData, fetch_program_from_network, retry_network_call};
 
-use aleo_std::StorageMode;
 use rand::CryptoRng;
 #[cfg(not(feature = "only_testnet"))]
-use snarkvm::prelude::{CanaryV0, MainnetV0};
+use snarkvm::prelude::MainnetV0;
 use snarkvm::{
     circuit::{Aleo, AleoTestnetV0},
     ledger::{
@@ -54,6 +53,7 @@ use snarkvm::{
         store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     synthesizer::program::StackTrait,
+    utilities::StorageMode,
 };
 
 use colored::*;
@@ -193,12 +193,6 @@ impl Command for LeoDeploy {
                 panic!("Mainnet chosen with only_testnet feature");
                 #[cfg(not(feature = "only_testnet"))]
                 handle_deploy::<MainnetV0, snarkvm::circuit::AleoV0>(&self, context, network, input)
-            }
-            NetworkName::CanaryV0 => {
-                #[cfg(feature = "only_testnet")]
-                panic!("Canary chosen with only_testnet feature");
-                #[cfg(not(feature = "only_testnet"))]
-                handle_deploy::<CanaryV0, snarkvm::circuit::AleoCanaryV0>(&self, context, network, input)
             }
         }
     }
@@ -742,14 +736,6 @@ fn handle_workspace_deploy(command: LeoDeploy, context: Context, targets: Vec<Pa
             panic!("Mainnet chosen with only_testnet feature");
             #[cfg(not(feature = "only_testnet"))]
             handle_workspace_deploy_inner::<MainnetV0, snarkvm::circuit::AleoV0>(&command, context, network, packages)
-        }
-        NetworkName::CanaryV0 => {
-            #[cfg(feature = "only_testnet")]
-            panic!("Canary chosen with only_testnet feature");
-            #[cfg(not(feature = "only_testnet"))]
-            handle_workspace_deploy_inner::<CanaryV0, snarkvm::circuit::AleoCanaryV0>(
-                &command, context, network, packages,
-            )
         }
     }
 }

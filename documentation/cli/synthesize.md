@@ -31,7 +31,7 @@ This enables better understanding of program size and key management.
 
 ### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.
 
 ### `--endpoint <ENDPOINT>`
 

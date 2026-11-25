@@ -48,7 +48,7 @@ leo query block ab1sm6kyqle2ftg4z8gegafqrjy0jwjhzu6fmy73726dgszrtxhxvfqha0eee --
 
 #### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.
 
 #### `--endpoint <ENDPOINT>`
 
@@ -128,7 +128,7 @@ where `<ID>` is the ID of the transaction. The transaction will be returned in J
 
 #### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.
 
 #### `--endpoint <ENDPOINT>`
 
@@ -194,7 +194,7 @@ leo query program credits.aleo --mapping-value account <YOUR_ADDRESS>
 
 #### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.
 
 #### `--endpoint <ENDPOINT>`
 
@@ -228,7 +228,7 @@ This command queries the latest stateroot of a given network.
 
 #### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.
 
 #### `--endpoint <ENDPOINT>`
 
@@ -248,7 +248,7 @@ This command queries the current validator committee for a given network.
 
 #### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.
 
 #### `--endpoint <ENDPOINT>`
 
@@ -292,7 +292,7 @@ Queries the transmissions in the memory pool.
 
 #### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.
 
 #### `--endpoint <ENDPOINT>`
 
@@ -328,7 +328,7 @@ Queries the count of all participating peers
 
 #### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.
 
 #### `--endpoint <ENDPOINT>`
 

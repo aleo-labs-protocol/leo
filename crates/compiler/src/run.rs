@@ -30,12 +30,11 @@
 use leo_ast::{NetworkName, TEST_PRIVATE_KEY, const_eval::Value};
 use leo_errors::Result;
 
-use aleo_std_storage::StorageMode;
 use anyhow::anyhow;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use serde_json;
 use snarkvm::{
-    circuit::{Aleo, AleoCanaryV0, AleoTestnetV0, AleoV0},
+    circuit::{Aleo, AleoTestnetV0, AleoV0},
     prelude::{
         Address,
         Block,
@@ -62,6 +61,7 @@ use snarkvm::{
         store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     synthesizer::program::{FinalizeStoreTrait, ProgramCore, StackTrait},
+    utilities::StorageMode,
 };
 use std::{
     any::Any,
@@ -321,7 +321,6 @@ pub fn run_without_ledger_for_network(
     match network {
         NetworkName::MainnetV0 => run_without_ledger_for::<AleoV0>(config, cases),
         NetworkName::TestnetV0 => run_without_ledger_for::<AleoTestnetV0>(config, cases),
-        NetworkName::CanaryV0 => run_without_ledger_for::<AleoCanaryV0>(config, cases),
     }
 }
 
@@ -556,11 +555,10 @@ fn failed_evaluation_outcome(case: &Case, e: String) -> EvaluationOutcome {
 }
 
 const TESTNET_GENESIS: &[u8] = include_bytes!("resources/genesis_8d710d7e2_40val_snarkos_dev_network.bin");
-// Generate these fixtures with snarkVM 4.13.1's VM::genesis_beacon and TEST_PRIVATE_KEY.
+// Generate this fixture with snarkVM 4.13.1's VM::genesis_beacon and TEST_PRIVATE_KEY.
 // Use ChaCha20Rng::seed_from_u64(0) and set_stream(1) to keep genesis transactions separate
 // from test transactions, which use the default stream (0).
 const MAINNET_GENESIS: &[u8] = include_bytes!("resources/genesis_mainnet.bin");
-const CANARY_GENESIS: &[u8] = include_bytes!("resources/genesis_canary.bin");
 
 /// Runs each case set on its own ledger and reports each set's outcomes in input order.
 pub fn run_with_ledger(
@@ -583,9 +581,6 @@ pub fn run_with_ledger_for_network(
             run_with_ledger_for::<AleoV0>(MAINNET_GENESIS, config, case_sets, &mut on_case_set_done)
         }
         NetworkName::TestnetV0 => run_with_ledger(config, case_sets, on_case_set_done),
-        NetworkName::CanaryV0 => {
-            run_with_ledger_for::<AleoCanaryV0>(CANARY_GENESIS, config, case_sets, &mut on_case_set_done)
-        }
     }
 }
 

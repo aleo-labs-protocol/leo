@@ -28,7 +28,7 @@ jobs:
   benchmarks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
@@ -41,7 +41,8 @@ jobs:
         run: cargo codspeed build -p leo-benchmarks
 
       - name: Run the benchmarks
-        uses: CodSpeedHQ/action@v3
+        uses: CodSpeedHQ/action@v5
         with:
+          mode: simulation
           run: cargo codspeed run -p leo-benchmarks
           token: ${{ secrets.CODSPEED_TOKEN }}

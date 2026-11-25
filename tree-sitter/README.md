@@ -19,7 +19,7 @@ tree-sitter test
 If you do not have the CLI installed globally, you can run the corpus tests with:
 
 ```bash
-npx --yes tree-sitter-cli@0.25.10 test
+npx --yes tree-sitter-cli@0.27.2 test
 ```
 
 The generated files in `src/` are committed so normal Rust builds do not require

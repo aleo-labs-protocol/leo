@@ -108,7 +108,7 @@ jobs:
           start=$SECONDS
           cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
           echo "Linux test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: linux-test-mismatches
@@ -146,7 +146,7 @@ jobs:
           start=$SECONDS
           cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
           echo "$RUNNER_OS test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: macos-test-mismatches
@@ -183,7 +183,7 @@ jobs:
           start=$SECONDS
           cargo nextest run --all --locked --cargo-profile ci --features only_testnet --verbose
           echo "$RUNNER_OS test execution: $((SECONDS - start)) seconds." >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: windows-test-mismatches
@@ -205,13 +205,13 @@ jobs:
           components: rustfmt
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
       - uses: actions/cache@v6
         with:
           path: ~/.npm
-          key: tree-sitter-cli-0.25.10-${{ runner.os }}-${{ runner.arch }}
+          key: tree-sitter-cli-0.27.2-${{ runner.os }}-${{ runner.arch }}
       - run: cargo +nightly fmt --all -- --check
-      - run: npx --yes tree-sitter-cli@0.25.10 test
+      - run: npx --yes tree-sitter-cli@0.27.2 test
         working-directory: tree-sitter
 
   rust-checks:
@@ -262,18 +262,18 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
       - uses: actions/cache@v6
         with:
           path: ~/.npm
-          key: docs-lint-mdlint-0.47.0-mlc-3.14.2
+          key: docs-lint-mdlint-0.50.1-mlc-3.15.0
       - name: Check Markdown
-        run: npx --yes markdownlint-cli@0.47.0 --config .markdownlint.yaml 'documentation/**/*.md'
+        run: npx --yes markdownlint-cli@0.50.1 --config .markdownlint.yaml 'documentation/**/*.md'
       - name: Check documentation links
         run: |
           rc=0
           while IFS= read -r -d '' file; do
-            npx --yes markdown-link-check@3.14.2 --config .mlc_config.json --quiet "$file" || rc=1
+            npx --yes markdown-link-check@3.15.0 --config .mlc_config.json --quiet "$file" || rc=1
           done < <(find documentation -name '*.md' -print0)
           exit "$rc"
 
@@ -292,7 +292,7 @@ jobs:
           cache-key: leo-executable-default
       - name: Build the default-feature CLI
         run: cargo install --path crates/leo --root "$RUNNER_TEMP/leo" --locked --force
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: leo-executable
           path: ${{ runner.temp }}/leo/bin/leo
@@ -327,7 +327,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: steps.selected.outputs.run == 'true'
         with:
           name: leo-executable

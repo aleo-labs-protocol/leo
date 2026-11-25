@@ -77,7 +77,7 @@ Pass `--output <FILE>` together with `--satisfies` to write the report as JSON (
     Path to the .aleo bytecode file. The file must have a `.aleo` extension and contain
     valid Aleo instructions.
 --network <NETWORK>, -n <NETWORK>
-    Network used to parse the bytecode (`mainnet`, `testnet`, or `canary`). Defaults to
+    Network used to parse the bytecode (`mainnet` or `testnet`). Defaults to
     `testnet`. Network choice affects how some literals are interpreted.
 --output <PATH>, -o <PATH>
     Without `--satisfies`: output directory. Writes `<PATH>/<program>.abi.json` for the

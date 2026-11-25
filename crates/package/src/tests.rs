@@ -42,7 +42,7 @@ use crate::{
 
 use leo_span::Symbol;
 
-use snarkvm::prelude::{CanaryV0, MainnetV0, Program, TestnetV0};
+use snarkvm::prelude::{MainnetV0, Program, TestnetV0};
 use std::{
     io::{Read, Write},
     net::TcpListener,
@@ -363,18 +363,13 @@ fn bundled_credits_ignores_hostile_cache() {
     leo_span::create_session_if_not_set_then(|_| {
         let home = unique_dir("network-bundled-credits");
         let hostile = TRUSTED_TOKEN.replace("token.aleo", "credits.aleo");
-        for network in
-            [leo_ast::NetworkName::MainnetV0, leo_ast::NetworkName::TestnetV0, leo_ast::NetworkName::CanaryV0]
-        {
+        for network in [leo_ast::NetworkName::MainnetV0, leo_ast::NetworkName::TestnetV0] {
             let expected = match network {
                 leo_ast::NetworkName::MainnetV0 => {
                     Program::<MainnetV0>::credits().expect("bundled credits must exist").to_string()
                 }
                 leo_ast::NetworkName::TestnetV0 => {
                     Program::<TestnetV0>::credits().expect("bundled credits must exist").to_string()
-                }
-                leo_ast::NetworkName::CanaryV0 => {
-                    Program::<CanaryV0>::credits().expect("bundled credits must exist").to_string()
                 }
             };
             let cache = home.join(format!("registry/{network}/credits/0/credits.aleo"));

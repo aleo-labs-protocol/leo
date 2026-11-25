@@ -19,10 +19,10 @@ use super::*;
 use leo_ast::NetworkName;
 use leo_package::{Package, ProgramData};
 
-use aleo_std::StorageMode;
+use snarkvm::utilities::StorageMode;
 
 #[cfg(not(feature = "only_testnet"))]
-use snarkvm::circuit::{AleoCanaryV0, AleoV0};
+use snarkvm::circuit::AleoV0;
 use snarkvm::{
     algorithms::crypto_hash::sha256,
     circuit::{Aleo, AleoTestnetV0},
@@ -89,12 +89,6 @@ impl Command for LeoSynthesize {
                 panic!("Mainnet chosen with only_testnet feature");
                 #[cfg(not(feature = "only_testnet"))]
                 handle_synthesize::<AleoV0>(self, context, network, input)
-            }
-            NetworkName::CanaryV0 => {
-                #[cfg(feature = "only_testnet")]
-                panic!("Canary chosen with only_testnet feature");
-                #[cfg(not(feature = "only_testnet"))]
-                handle_synthesize::<AleoCanaryV0>(self, context, network, input)
             }
         }
     }

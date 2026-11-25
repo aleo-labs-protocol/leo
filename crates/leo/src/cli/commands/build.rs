@@ -21,7 +21,7 @@ use leo_compiler::{Compiled, Compiler, CompilerOptions};
 use leo_package::{ABI_FILENAME, Package};
 use leo_span::Symbol;
 
-use snarkvm::prelude::{CanaryV0, MainnetV0, Process as SvmProcess, Program as SvmProgram, TestnetV0};
+use snarkvm::prelude::{MainnetV0, Process as SvmProcess, Program as SvmProgram, TestnetV0};
 
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -32,14 +32,13 @@ use std::{
 };
 
 /// Network-typed `Process` used during the disassemble loop. The variants let
-/// a single loop body reuse a process across iterations without triplicating
+/// a single loop body reuse a process across iterations without duplicating
 /// the body for each network. Held for the duration of the build's stub
 /// resolution, then dropped (a separate `Process` is loaded later for the
 /// post-build bulk validation in `validate_compiled_programs_inner`).
 enum DisassembleProcess {
     Mainnet(SvmProcess<MainnetV0>),
     Testnet(SvmProcess<TestnetV0>),
-    Canary(SvmProcess<CanaryV0>),
 }
 
 /// A program queued for bytecode validation after the build.
@@ -109,9 +108,9 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
     let home_path = context.home()?;
 
     // Get the network, defaulting to `TestnetV0` if none is specified.
-    let network = match get_network(&command.env_override.network) {
-        Ok(network) => network,
-        Err(_) => {
+    let network = match get_optional_network(&command.env_override.network)? {
+        Some(network) => network,
+        None => {
             println!("⚠️ No network specified, defaulting to 'testnet'.");
             NetworkName::TestnetV0
         }
@@ -216,15 +215,12 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
     // (issue #29399 — `from_function_core` panics on shapes the grammar accepts).
     // `add_program` is contextual, so the same process must be reused across the
     // loop in topological order; the enum lets the network-typed process live
-    // across iterations without triplicating the loop body.
+    // across iterations without duplicating the loop body.
     let mut disassemble_process = match network {
         NetworkName::MainnetV0 => DisassembleProcess::Mainnet(SvmProcess::<MainnetV0>::load().map_err(|e| {
             crate::errors::custom(format!("Failed to initialize snarkVM process for disassembler validation: {e}"))
         })?),
         NetworkName::TestnetV0 => DisassembleProcess::Testnet(SvmProcess::<TestnetV0>::load().map_err(|e| {
-            crate::errors::custom(format!("Failed to initialize snarkVM process for disassembler validation: {e}"))
-        })?),
-        NetworkName::CanaryV0 => DisassembleProcess::Canary(SvmProcess::<CanaryV0>::load().map_err(|e| {
             crate::errors::custom(format!("Failed to initialize snarkVM process for disassembler validation: {e}"))
         })?),
     };
@@ -252,9 +248,6 @@ fn handle_build(command: &LeoBuild, context: Context) -> Result<<LeoBuild as Com
                     }
                     DisassembleProcess::Testnet(p) => {
                         leo_disassembler::disassemble_from_str::<TestnetV0>(unit.name, bytecode, p)
-                    }
-                    DisassembleProcess::Canary(p) => {
-                        leo_disassembler::disassemble_from_str::<CanaryV0>(unit.name, bytecode, p)
                     }
                 }?;
 
@@ -552,13 +545,12 @@ fn program_checksums(network: NetworkName, bytecode: &str) -> Result<BuildOutput
     Ok(match network {
         NetworkName::MainnetV0 => collect_checksums(&SvmProgram::<MainnetV0>::from_str(bytecode)?),
         NetworkName::TestnetV0 => collect_checksums(&SvmProgram::<TestnetV0>::from_str(bytecode)?),
-        NetworkName::CanaryV0 => collect_checksums(&SvmProgram::<CanaryV0>::from_str(bytecode)?),
     })
 }
 
 /// Builds the `leo build` JSON output from the primary program's compiled bytecode on disk.
 pub fn build_output(package: &Package, network: Option<NetworkName>) -> Result<BuildOutput> {
-    let network = get_network(&network).unwrap_or(NetworkName::TestnetV0);
+    let network = get_optional_network(&network)?.unwrap_or(NetworkName::TestnetV0);
     let unit =
         package.primary_unit().ok_or_else(|| crate::errors::custom("No primary program found in the package."))?;
     let name = unit.name.to_string();
@@ -648,9 +640,6 @@ fn compile_leo_source_directory(
                 NetworkName::TestnetV0 => {
                     SvmProgram::<TestnetV0>::from_str(&import.bytecode)?.to_checksum().iter().join(", ")
                 }
-                NetworkName::CanaryV0 => {
-                    SvmProgram::<CanaryV0>::from_str(&import.bytecode)?.to_checksum().iter().join(", ")
-                }
             };
 
             tracing::info!("    Import '{}': checksum = '[{dep_checksum}]'", import.name);
@@ -706,7 +695,6 @@ fn validate_compiled_programs(programs: &IndexMap<String, ProgramForValidation>,
     match network {
         NetworkName::MainnetV0 => validate_compiled_programs_inner::<MainnetV0>(programs),
         NetworkName::TestnetV0 => validate_compiled_programs_inner::<TestnetV0>(programs),
-        NetworkName::CanaryV0 => validate_compiled_programs_inner::<CanaryV0>(programs),
     }
 }
 

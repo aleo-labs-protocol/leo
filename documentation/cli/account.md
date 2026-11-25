@@ -261,4 +261,4 @@ Specifies the path to a file containing the private key or view key. This will r
 
 #### `--network <NETWORK>`
 
-Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet`, `mainnet`, and `canary`.
+Specifies the network to deploy to. Overrides any `NETWORK` environment variable set manually or in a `.env` file. Valid network names are `testnet` and `mainnet`.

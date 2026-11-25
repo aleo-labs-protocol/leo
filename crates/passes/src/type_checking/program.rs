@@ -22,7 +22,7 @@ use leo_errors::Label;
 use leo_span::{Symbol, sym};
 
 use itertools::Itertools;
-use snarkvm::prelude::{CanaryV0, MainnetV0, TestnetV0};
+use snarkvm::prelude::{MainnetV0, TestnetV0};
 use std::collections::{BTreeMap, HashMap};
 
 /// Recursively walks a member type and adds a composite-dependency edge from
@@ -652,7 +652,6 @@ impl UnitVisitor for TypeCheckingVisitor<'_> {
         // Get the upgrade variant.
         // Note, `get_upgrade_variant` will return an error if the constructor is not well-formed.
         let result = match self.state.network {
-            NetworkName::CanaryV0 => constructor.get_upgrade_variant::<CanaryV0>(),
             NetworkName::TestnetV0 => constructor.get_upgrade_variant::<TestnetV0>(),
             NetworkName::MainnetV0 => constructor.get_upgrade_variant::<MainnetV0>(),
         };
