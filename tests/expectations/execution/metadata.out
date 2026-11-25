@@ -19,7 +19,14 @@ finalize is_network_id:
     assert.eq r0 network.id;
 
 constructor:
-    assert.eq true true;
+    is.eq edition 0u16 into r0;
+    branch.eq r0 false to end_then_0_0;
+    branch.eq true true to end_constructor;
+    branch.eq true true to end_otherwise_0_1;
+    position end_then_0_0;
+    position end_otherwise_0_1;
+    assert.eq edition 1u16;
+    position end_constructor;
 verified: true
 status: rejected
 {

@@ -55,6 +55,10 @@ program metadata.aleo {
 
     @custom
     constructor() {
-        assert_eq(true, true);
+        let edition = std::ctx::edition();
+        if edition == 0u16 {
+            return;
+        }
+        assert_eq(edition, 1u16);
     }
 }

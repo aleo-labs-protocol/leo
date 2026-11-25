@@ -433,6 +433,7 @@ impl<'a> CodeGeneratingVisitor<'a> {
 
     fn visit_constructor(&mut self, constructor: &'a Constructor) -> AleoConstructor {
         // Initialize the state of `self` with the appropriate values before visiting `constructor`.
+        self.current_function = None;
         self.next_register = 0;
         self.next_label = 0;
         self.conditional_depth = 0;
@@ -488,7 +489,19 @@ impl<'a> CodeGeneratingVisitor<'a> {
                     ],
                 }
             }
-            UpgradeVariant::Custom => AleoConstructor { statements: self.visit_block(&constructor.block) },
+            UpgradeVariant::Custom => {
+                let mut statements = self.visit_block(&constructor.block);
+                let is_exit =
+                    |s: &AleoStmt| matches!(s, AleoStmt::BranchEq(_, _, label) if label == CONSTRUCTOR_END_LABEL);
+                // A trailing return already falls through to the end of the constructor.
+                while statements.last().is_some_and(is_exit) {
+                    statements.pop();
+                }
+                if statements.iter().any(is_exit) {
+                    statements.push(AleoStmt::Position(CONSTRUCTOR_END_LABEL.to_owned()));
+                }
+                AleoConstructor { statements }
+            }
             UpgradeVariant::NoUpgrade => {
                 // This is the expected snarkVM constructor bytecode for a program that is not upgradable.
                 AleoConstructor {

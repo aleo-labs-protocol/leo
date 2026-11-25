@@ -44,6 +44,8 @@ use snarkvm::{
 };
 use visitor::*;
 
+const CONSTRUCTOR_END_LABEL: &str = "end_constructor";
+
 /// The structured output of code generation, before serialization.
 #[derive(Default)]
 pub struct GeneratedPrograms {
