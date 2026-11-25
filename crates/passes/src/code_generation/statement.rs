@@ -92,14 +92,21 @@ impl CodeGeneratingVisitor<'_> {
     }
 
     fn visit_return(&mut self, input: &ReturnStatement) -> Vec<AleoStmt> {
+        let Some(function) = self.current_function else {
+            // Constructors can only return the unit literal.
+            return vec![AleoStmt::BranchEq(
+                AleoExpr::Bool(true),
+                AleoExpr::Bool(true),
+                CONSTRUCTOR_END_LABEL.to_owned(),
+            )];
+        };
         let mut instructions = vec![];
-        let mut operands: IndexMap<AleoExpr, &Output> =
-            IndexMap::with_capacity(self.current_function.unwrap().output.len());
+        let mut operands: IndexMap<AleoExpr, &Output> = IndexMap::with_capacity(function.output.len());
 
         if let Expression::Tuple(tuple) = &input.expression {
             // Now tuples only appear in return position, so let's handle this
             // ourselves.
-            let outputs = &self.current_function.unwrap().output;
+            let outputs = &function.output;
             assert_eq!(tuple.elements.len(), outputs.len());
 
             for (expr, output) in tuple.elements.iter().zip_eq(outputs) {
@@ -122,12 +129,11 @@ impl CodeGeneratingVisitor<'_> {
             // Not a tuple - only one output.
             let (operand, op_instructions) = self.visit_expression(&input.expression);
             if let Some(operand) = operand {
-                let output = &self.current_function.unwrap().output[0];
+                let output = &function.output[0];
 
                 if self.internal_record_inputs.contains(&operand) {
                     // We can't output an internal record we received as input.
-                    let (new_operand, new_instr) =
-                        self.clone_register(&operand, &self.current_function.unwrap().output_type);
+                    let (new_operand, new_instr) = self.clone_register(&operand, &function.output_type);
                     instructions.extend(new_instr);
                     operands.insert(new_operand, output);
                 } else {
@@ -147,7 +153,7 @@ impl CodeGeneratingVisitor<'_> {
                 instructions.push(AleoStmt::Output(
                     operand.clone(),
                     AleoType::Future {
-                        name: self.current_function.unwrap().identifier.to_string(),
+                        name: function.identifier.to_string(),
                         program: self.program_id.unwrap().as_symbol().to_string(),
                     },
                     None,

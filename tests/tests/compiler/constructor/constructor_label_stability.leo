@@ -9,10 +9,9 @@ program test.aleo {
     constructor() {
         let current_edition: u16 = std::ctx::edition();
         if current_edition > 0u16 {
-            let current_checksum: [u8; 32] = std::ctx::checksum();
-        } else {
-            admin.set(true, std::ctx::program_owner());
+            return;
         }
+        admin.set(true, std::ctx::program_owner());
     }
 }
 

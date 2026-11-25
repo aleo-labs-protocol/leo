@@ -2640,8 +2640,10 @@ impl AstVisitor for TypeCheckingVisitor<'_> {
         }
 
         if self.scope_state.is_constructor {
-            // It must return a unit value; nothing else to check.
-            if !matches!(input.expression, Expression::Unit(..)) {
+            if matches!(input.expression, Expression::Unit(..)) {
+                self.visit_expression(&input.expression, &Some(TypeKind::Unit));
+                self.scope_state.has_return = true;
+            } else {
                 self.emit_err(crate::errors::type_checker::constructor_can_only_return_unit(
                     &input.expression,
                     input.span,
