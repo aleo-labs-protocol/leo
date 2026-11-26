@@ -179,18 +179,21 @@ impl<'a> WriteTransformingVisitor<'a> {
                 .into();
                 accumulate.push(one_assign);
                 for (i, &member) in array_members.iter().enumerate() {
+                    let index = Literal::integer(
+                        IntegerType::U32,
+                        i.to_string(),
+                        Default::default(),
+                        self.state.node_builder.next_id(),
+                    );
+                    self.state.type_table.insert(index.id(), leo_ast::Type::U32);
                     let access = ArrayAccess {
                         array: Path::from(place).to_local().into(),
-                        index: Literal::integer(
-                            IntegerType::U32,
-                            format!("{i}u32"),
-                            Default::default(),
-                            self.state.node_builder.next_id(),
-                        )
-                        .into(),
+                        index: index.into(),
                         span: Default::default(),
                         id: self.state.node_builder.next_id(),
                     };
+                    let member_ty = self.state.type_table.get(&member.id()).unwrap();
+                    self.state.type_table.insert(access.id(), member_ty);
                     self.reconstruct_assign_recurse(member, access.into(), accumulate);
                 }
             }
